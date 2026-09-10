@@ -8,26 +8,56 @@ import { EmptyState, FilterChip, SearchBar, StationCard } from '@/components';
 import { StationMap } from '@/map';
 import { mockStations } from '@/mocks/stations';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
-import type { Station } from '@/types/domain';
+import { useVehicleStore } from '@/store/vehicles';
+import type { Station, Vehicle } from '@/types/domain';
+
+interface MapFilter {
+  id: string;
+  label: string;
+  test: (station: Station) => boolean;
+}
 
 /**
- * Yalnizca mevcut veriyle durustce uygulanabilen filtreler.
- * "Aracima uygun" ve "Favoriler" arac profili / favori listesi eklendiginde gelecek.
+ * "Aracima uygun" yalnizca aktif arac varken listelenir; arac yokken
+ * hicbir seyi filtrelemeyen bir cip gostermek yaniltici olurdu.
  */
-const FILTERS = [
-  { id: 'available', label: 'Müsait', test: (s: Station) => s.connectors.some((c) => c.status === 'AVAILABLE') },
-  { id: 'fast', label: 'Hızlı', test: (s: Station) => s.connectors.some((c) => c.powerKw >= 50) },
-  { id: 'open24h', label: '24 saat', test: (s: Station) => s.isOpen24h },
-] as const;
+function buildFilters(vehicle?: Vehicle): MapFilter[] {
+  const filters: MapFilter[] = [
+    {
+      id: 'available',
+      label: 'Müsait',
+      test: (s) => s.connectors.some((c) => c.status === 'AVAILABLE'),
+    },
+    { id: 'fast', label: 'Hızlı', test: (s) => s.connectors.some((c) => c.powerKw >= 50) },
+  ];
+
+  if (vehicle) {
+    filters.push({
+      id: 'vehicle',
+      label: 'Aracıma uygun',
+      test: (s) => s.connectors.some((c) => vehicle.connectors.includes(c.type)),
+    });
+  }
+
+  filters.push({ id: 'open24h', label: '24 saat', test: (s) => s.isOpen24h });
+  return filters;
+}
 
 export default function MapScreen() {
   const [query, setQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string>();
   const router = useRouter();
+  const vehicles = useVehicleStore((state) => state.vehicles);
+  const activeVehicleId = useVehicleStore((state) => state.activeVehicleId);
 
   const toggleFilter = (id: string) =>
     setActiveFilters((prev) => (prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]));
+
+  const filters = useMemo(
+    () => buildFilters(vehicles.find((v) => v.id === activeVehicleId)),
+    [vehicles, activeVehicleId],
+  );
 
   const stations = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase('tr');
@@ -38,12 +68,12 @@ export default function MapScreen() {
         station.address.toLocaleLowerCase('tr').includes(normalized);
 
       const matchesFilters = activeFilters.every(
-        (id) => FILTERS.find((f) => f.id === id)?.test(station) ?? true,
+        (id) => filters.find((f) => f.id === id)?.test(station) ?? true,
       );
 
       return matchesQuery && matchesFilters;
     });
-  }, [query, activeFilters]);
+  }, [query, activeFilters, filters]);
 
   return (
     <View style={styles.root}>
@@ -82,7 +112,7 @@ export default function MapScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chips}>
-          {FILTERS.map((filter) => (
+          {filters.map((filter) => (
             <FilterChip
               key={filter.id}
               label={filter.label}
