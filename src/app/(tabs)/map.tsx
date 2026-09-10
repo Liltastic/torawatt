@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState, FilterChip, SearchBar, StationCard } from '@/components';
+import { StationMap } from '@/map';
 import { mockStations } from '@/mocks/stations';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
 import type { Station } from '@/types/domain';
@@ -21,6 +22,7 @@ const FILTERS = [
 export default function MapScreen() {
   const [query, setQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [selectedId, setSelectedId] = useState<string>();
 
   const toggleFilter = (id: string) =>
     setActiveFilters((prev) => (prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]));
@@ -43,7 +45,15 @@ export default function MapScreen() {
 
   return (
     <View style={styles.root}>
-      <SafeAreaView edges={['top']} style={styles.header}>
+      {/* Harita en altta; arama ve alt sheet uzerine biniyor. */}
+      <StationMap
+        stations={stations}
+        selectedId={selectedId}
+        onSelectStation={setSelectedId}
+        style={styles.map}
+      />
+
+      <SafeAreaView edges={['top']} style={styles.header} pointerEvents="box-none">
         <View style={styles.headerRow}>
           <Text style={styles.brand}>TORA WATT</Text>
           <Pressable accessibilityRole="button" accessibilityLabel="Bildirimler" hitSlop={10} style={styles.iconButton}>
@@ -59,20 +69,11 @@ export default function MapScreen() {
         />
       </SafeAreaView>
 
-      {/* Harita saglayicisi secilmedi (spec bolum 24). MapProvider soyutlamasi gelince burasi doluyor. */}
-      <View style={styles.mapPlaceholder}>
-        <Ionicons name="map-outline" size={28} color={colors.primary} />
-        <Text style={styles.mapPlaceholderText}>Harita katmanı bekliyor</Text>
-        <Text style={styles.mapPlaceholderHint}>Sağlayıcı seçimi yapılınca buraya gelecek</Text>
-      </View>
-
       <View style={[styles.sheet, shadows.sheet]}>
         <View style={styles.grabber} />
 
         <Text style={styles.sheetTitle}>
-          {stations.length > 0
-            ? `Yakınında ${stations.length} istasyon`
-            : 'Eşleşen istasyon yok'}
+          {stations.length > 0 ? `Yakınında ${stations.length} istasyon` : 'Eşleşen istasyon yok'}
         </Text>
 
         <ScrollView
@@ -98,7 +99,14 @@ export default function MapScreen() {
               description="Filtreleri gevşetmeyi veya farklı bir arama yapmayı dene."
             />
           ) : (
-            stations.map((station) => <StationCard key={station.id} station={station} />)
+            stations.map((station) => (
+              <StationCard
+                key={station.id}
+                station={station}
+                selected={station.id === selectedId}
+                onPress={() => setSelectedId(station.id)}
+              />
+            ))
           )}
         </ScrollView>
       </View>
@@ -108,6 +116,8 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  map: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+
   header: { paddingHorizontal: spacing.xl },
   headerRow: {
     flexDirection: 'row',
@@ -128,23 +138,15 @@ const styles = StyleSheet.create({
   },
   search: { marginTop: spacing.lg },
 
-  mapPlaceholder: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.lg,
-  },
-  mapPlaceholderText: { ...typography.bodyStrong, color: colors.text, marginTop: spacing.md },
-  mapPlaceholderHint: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-
   sheet: {
+    marginTop: 'auto',
     backgroundColor: colors.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderTopWidth: 1,
     borderColor: colors.border,
     paddingTop: spacing.md,
-    maxHeight: '58%',
+    maxHeight: '52%',
   },
   grabber: {
     width: 40,

@@ -1,4 +1,4 @@
-import type { ChargerStatus } from '@/types/domain';
+import type { ChargerStatus, StationAvailability } from '@/types/domain';
 
 /**
  * TORA WATT renk tokenlari (spec bolum 17).
@@ -32,26 +32,35 @@ export const colors = {
   white: '#FFFFFF',
 } as const;
 
+/** Soket durumu ve istasyon uygunlugu ayni rozet/pin paletini paylasir. */
+export type BadgeStatus = ChargerStatus | StationAvailability;
+
 /** Istasyon pin ve soket durum renkleri (spec bolum 5). */
-export const statusColors: Record<ChargerStatus, string> = {
+export const statusColors: Record<BadgeStatus, string> = {
   AVAILABLE: colors.success,
+  PARTIAL: colors.warning,
   OCCUPIED: colors.warning,
+  FULL: colors.danger,
   FAULTED: colors.danger,
   OFFLINE: colors.neutral,
   UNKNOWN: colors.neutral,
 };
 
-export const statusSoftColors: Record<ChargerStatus, string> = {
+export const statusSoftColors: Record<BadgeStatus, string> = {
   AVAILABLE: colors.successSoft,
+  PARTIAL: colors.warningSoft,
   OCCUPIED: colors.warningSoft,
+  FULL: colors.dangerSoft,
   FAULTED: colors.dangerSoft,
   OFFLINE: colors.neutralSoft,
   UNKNOWN: colors.neutralSoft,
 };
 
-export const statusLabels: Record<ChargerStatus, string> = {
+export const statusLabels: Record<BadgeStatus, string> = {
   AVAILABLE: 'Müsait',
+  PARTIAL: 'Kısmen müsait',
   OCCUPIED: 'Dolu',
+  FULL: 'Dolu',
   FAULTED: 'Arızalı',
   OFFLINE: 'Çevrimdışı',
   UNKNOWN: 'Bilinmiyor',

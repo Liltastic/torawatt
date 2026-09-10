@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing, typography } from '@/theme';
-import { currentTypeOf, type Station } from '@/types/domain';
+import { currentTypeOf, stationAvailability, type Station } from '@/types/domain';
 import { formatDistance, formatPrice } from '@/utils/format';
 
 import { AvailabilityBadge, PowerBadge } from './Badges';
@@ -11,7 +11,15 @@ import { AvailabilityBadge, PowerBadge } from './Badges';
  * Alt sheet ve arama sonuclarindaki istasyon satiri (spec bolum 5):
  * mesafe, musait soket, maks. guc ve baslangic fiyati.
  */
-export function StationCard({ station, onPress }: { station: Station; onPress?: () => void }) {
+export function StationCard({
+  station,
+  selected = false,
+  onPress,
+}: {
+  station: Station;
+  selected?: boolean;
+  onPress?: () => void;
+}) {
   const available = station.connectors.filter((c) => c.status === 'AVAILABLE').length;
   const total = station.connectors.length;
 
@@ -26,14 +34,14 @@ export function StationCard({ station, onPress }: { station: Station; onPress?: 
     undefined,
   );
 
-  const overallStatus = available > 0 ? 'AVAILABLE' : total > 0 ? 'OCCUPIED' : 'UNKNOWN';
+  const availability = stationAvailability(station);
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${station.name}, ${total} soketten ${available} tanesi müsait`}
       onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+      style={({ pressed }) => [styles.row, selected && styles.selected, pressed && styles.pressed]}>
       <View style={styles.main}>
         <Text style={styles.name} numberOfLines={1}>
           {station.name}
@@ -49,7 +57,7 @@ export function StationCard({ station, onPress }: { station: Station; onPress?: 
           {strongest && (
             <PowerBadge currentType={currentTypeOf(strongest)} powerKw={strongest.powerKw} />
           )}
-          <AvailabilityBadge status={overallStatus} style={styles.badgeGap} />
+          <AvailabilityBadge status={availability} style={styles.badgeGap} />
         </View>
       </View>
 
@@ -79,6 +87,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.card,
   },
   pressed: { backgroundColor: colors.surfaceMuted },
+  selected: { backgroundColor: colors.primarySoft },
   main: { flex: 1 },
   name: { ...typography.h3, color: colors.text },
   meta: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },

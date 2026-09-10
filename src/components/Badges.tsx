@@ -1,8 +1,8 @@
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { colors, radius, spacing, typography } from '@/theme';
-import { statusColors, statusLabels, statusSoftColors } from '@/theme/colors';
-import { connectorLabels, type ChargerStatus, type ConnectorType, type CurrentType } from '@/types/domain';
+import { statusColors, statusLabels, statusSoftColors, type BadgeStatus } from '@/theme/colors';
+import { connectorLabels, type ConnectorType, type CurrentType } from '@/types/domain';
 
 /** Soket / istasyon musaitlik rozeti (spec bolum 7). */
 export function AvailabilityBadge({
@@ -10,7 +10,7 @@ export function AvailabilityBadge({
   label,
   style,
 }: {
-  status: ChargerStatus;
+  status: BadgeStatus;
   label?: string;
   style?: StyleProp<ViewStyle>;
 }) {

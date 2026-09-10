@@ -116,3 +116,22 @@ export const connectorLabels: Record<ConnectorType, string> = {
   CHADEMO: 'CHAdeMO',
   NACS: 'NACS',
 };
+
+/** Istasyon seviyesinde uygunluk; harita pini bu dort duruma gore renklenir (spec bolum 5). */
+export type StationAvailability = 'AVAILABLE' | 'PARTIAL' | 'FULL' | 'UNKNOWN';
+
+/**
+ * Cevrimdisi ve durumu bilinmeyen soketler hesaba katilmaz: kullanicinin
+ * sarj olabilecegi soket var mi, sorusunu yanitliyoruz.
+ */
+export function stationAvailability(station: Pick<Station, 'connectors'>): StationAvailability {
+  const usable = station.connectors.filter(
+    (c) => c.status !== 'OFFLINE' && c.status !== 'UNKNOWN',
+  );
+  if (usable.length === 0) return 'UNKNOWN';
+
+  const available = usable.filter((c) => c.status === 'AVAILABLE').length;
+  if (available === 0) return 'FULL';
+  if (available === usable.length) return 'AVAILABLE';
+  return 'PARTIAL';
+}
