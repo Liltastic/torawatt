@@ -11,9 +11,9 @@ import { connectorLabels } from '@/types/domain';
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 /** Spec bolum 4'teki profil menusu. Yapilmamis olanlar gorunur ama pasif. */
-const MENU: { icon: IoniconName; label: string; href?: string }[] = [
+const MENU: { icon: IoniconName; label: string; href?: string; tag?: string }[] = [
   { icon: 'car-sport-outline', label: 'Araçlarım', href: '/vehicles' },
-  { icon: 'card-outline', label: 'Ödeme yöntemleri' },
+  { icon: 'card-outline', label: 'Ödeme yöntemleri', href: '/payment/methods', tag: 'demo' },
   { icon: 'heart-outline', label: 'Favoriler' },
   { icon: 'notifications-outline', label: 'Bildirimler' },
   { icon: 'pricetag-outline', label: 'Kampanyalar' },
@@ -89,6 +89,9 @@ export default function ProfileScreen() {
                   {item.label}
                 </Text>
 
+                {item.tag ? (
+                  <Text style={styles.tag}>{item.tag}</Text>
+                ) : null}
                 {enabled ? (
                   <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
                 ) : (
@@ -152,6 +155,12 @@ const styles = StyleSheet.create({
   menuLabel: { ...typography.body, color: colors.text, flex: 1, marginLeft: spacing.md },
   menuLabelDisabled: { color: colors.textTertiary },
   soon: { ...typography.caption, color: colors.textTertiary },
+  tag: {
+    ...typography.caption,
+    color: colors.warning,
+    fontWeight: '700',
+    marginRight: spacing.sm,
+  },
 
   version: {
     ...typography.caption,

@@ -1,9 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card, EmptyState } from '@/components';
+import { shareInvoice } from '@/services/invoice';
 import { useHistoryStore } from '@/store/history';
 import { colors, radius, spacing, typography } from '@/theme';
 import {
@@ -19,6 +21,7 @@ export default function HistoryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const item = useHistoryStore((state) => state.findById(id));
+  const [sharing, setSharing] = useState(false);
 
   if (!item) {
     return (
@@ -68,13 +71,31 @@ export default function HistoryDetailScreen() {
         </Card>
 
         <View style={styles.notice}>
-          <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} />
+          <Ionicons name="construct-outline" size={16} color={colors.warning} />
           <Text style={styles.noticeText}>
-            Fatura indirme, faturalandırma servisi bağlandığında etkinleşecek.
+            Belge bir demodur, resmi fatura değildir. Gerçek fatura, faturalandırma servisi ve
+            e-Arşiv entegrasyonu tamamlanınca buradan alınabilecek.
           </Text>
         </View>
 
-        <Button label="Faturayı indir" variant="secondary" disabled style={styles.invoice} />
+        <Button
+          label="Şarj özetini indir"
+          variant="secondary"
+          loading={sharing}
+          style={styles.invoice}
+          onPress={async () => {
+            setSharing(true);
+            try {
+              await shareInvoice(item);
+            } catch (error) {
+              // Sentry baglandiginda bu buraya raporlanacak (spec bolum 19).
+              console.error('Fatura olusturulamadi', error);
+              Alert.alert('Belge oluşturulamadı', 'Lütfen tekrar dene.');
+            } finally {
+              setSharing(false);
+            }
+          }}
+        />
       </ScrollView>
     </View>
   );

@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card, ConnectorBadge, EmptyState, PowerBadge } from '@/components';
 import { findMockStation } from '@/mocks/stations';
+import { selectDefaultMethod, usePaymentStore } from '@/store/payment';
 import { useSessionStore } from '@/store/session';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
 import { currentTypeOf } from '@/types/domain';
@@ -18,6 +19,8 @@ export default function ChargeSummaryScreen() {
   }>();
   const router = useRouter();
   const startSession = useSessionStore((state) => state.start);
+  const methods = usePaymentStore((state) => state.methods);
+  const defaultMethod = selectDefaultMethod(methods);
 
   const station = findMockStation(stationId);
   const connector = station?.connectors.find((c) => c.id === connectorId);
@@ -84,7 +87,15 @@ export default function ChargeSummaryScreen() {
             }
           />
           <PriceRow label="Başlatma ücreti" value="Yok" />
-          <PriceRow label="Ödeme yöntemi" value="Henüz tanımlı değil" last />
+          <PriceRow
+            label="Ödeme yöntemi"
+            value={
+              defaultMethod
+                ? `${defaultMethod.brand} ···· ${defaultMethod.last4} (demo)`
+                : 'Tanımlı değil'
+            }
+            last
+          />
         </Card>
 
         <View style={styles.notice}>
