@@ -143,3 +143,41 @@ export interface ChargingHistoryDetail extends ChargingHistoryItem {
   pricePerKwh: number;
   idleFee?: number;
 }
+
+/** Rezervasyon karti icin gerekli, istasyon aramadan gosterilebilen alanlar. */
+export interface ReservationDetail extends Reservation {
+  stationName: string;
+  connectorLabel: string;
+  createdAt: string;
+}
+
+/** Rezervasyon baslangicindan sonra soketin tutuldugu sure. */
+export const RESERVATION_GRACE_MINUTES = 15;
+
+/**
+ * Kayitli durum ile gercek durum ayrisabilir: bekleme suresi dolmus bir
+ * rezervasyon hala CONFIRMED yaziyor olabilir. Gosterirken bunu kullan.
+ */
+export function effectiveReservationStatus(
+  reservation: Pick<Reservation, 'status' | 'startsAt' | 'durationMinutes'>,
+  now: number = Date.now(),
+): ReservationStatus {
+  if (reservation.status === 'CANCELLED' || reservation.status === 'EXPIRED') {
+    return reservation.status;
+  }
+
+  const startsAt = new Date(reservation.startsAt).getTime();
+  const deadline = startsAt + RESERVATION_GRACE_MINUTES * 60_000;
+
+  if (reservation.status === 'ARRIVED') return 'ARRIVED';
+  return now > deadline ? 'EXPIRED' : reservation.status;
+}
+
+export const reservationStatusLabels: Record<ReservationStatus, string> = {
+  DRAFT: 'Taslak',
+  PENDING: 'Onay bekliyor',
+  CONFIRMED: 'Onaylandı',
+  ARRIVED: 'Geldin',
+  EXPIRED: 'Süresi doldu',
+  CANCELLED: 'İptal edildi',
+};

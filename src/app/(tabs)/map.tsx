@@ -8,8 +8,15 @@ import { EmptyState, FilterChip, SearchBar, StationCard } from '@/components';
 import { StationMap } from '@/map';
 import { mockStations } from '@/mocks/stations';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
+import { selectActiveReservation, useReservationStore } from '@/store/reservations';
 import { useVehicleStore } from '@/store/vehicles';
-import type { Station, Vehicle } from '@/types/domain';
+import {
+  effectiveReservationStatus,
+  reservationStatusLabels,
+  type Station,
+  type Vehicle,
+} from '@/types/domain';
+import { formatTime } from '@/utils/format';
 
 interface MapFilter {
   id: string;
@@ -50,9 +57,12 @@ export default function MapScreen() {
   const router = useRouter();
   const vehicles = useVehicleStore((state) => state.vehicles);
   const activeVehicleId = useVehicleStore((state) => state.activeVehicleId);
+  const reservations = useReservationStore((state) => state.items);
 
   const toggleFilter = (id: string) =>
     setActiveFilters((prev) => (prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]));
+
+  const activeReservation = useMemo(() => selectActiveReservation(reservations), [reservations]);
 
   const filters = useMemo(
     () => buildFilters(vehicles.find((v) => v.id === activeVehicleId)),
@@ -99,6 +109,28 @@ export default function MapScreen() {
           onChangeText={setQuery}
           containerStyle={styles.search}
         />
+
+        {activeReservation && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Aktif rezervasyonu aç"
+            onPress={() =>
+              router.push({ pathname: '/booking/[id]', params: { id: activeReservation.id } })
+            }
+            style={({ pressed }) => [styles.reservationBanner, pressed && styles.bannerPressed]}>
+            <Ionicons name="calendar" size={18} color={colors.white} />
+            <View style={styles.bannerText}>
+              <Text style={styles.bannerTitle} numberOfLines={1}>
+                {activeReservation.stationName}
+              </Text>
+              <Text style={styles.bannerMeta}>
+                {formatTime(activeReservation.startsAt)} ·{' '}
+                {reservationStatusLabels[effectiveReservationStatus(activeReservation)]}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.white} />
+          </Pressable>
+        )}
       </SafeAreaView>
 
       <View style={[styles.sheet, shadows.sheet]}>
@@ -169,6 +201,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   search: { marginTop: spacing.lg },
+
+  reservationBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.button,
+    backgroundColor: colors.primary,
+  },
+  bannerPressed: { backgroundColor: colors.primaryDark },
+  bannerText: { flex: 1, marginHorizontal: spacing.md },
+  bannerTitle: { ...typography.captionStrong, color: colors.white },
+  bannerMeta: { ...typography.caption, color: 'rgba(255,255,255,0.85)', marginTop: 1 },
 
   sheet: {
     marginTop: 'auto',

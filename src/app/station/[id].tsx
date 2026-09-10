@@ -117,6 +117,21 @@ export default function StationDetailScreen() {
       </ScrollView>
 
       <SafeAreaView edges={['bottom']} style={[styles.actions, shadows.sheet]}>
+        {/* Spec bolum 7: birincil sarj, ikincil rezervasyon, ucuncul yol tarifi. */}
+        <Button
+          label="Rezerve Et"
+          variant="secondary"
+          disabled={!selectedConnector}
+          style={styles.secondaryAction}
+          onPress={() => {
+            if (!selectedConnector) return;
+            router.push({
+              pathname: '/booking/new',
+              params: { stationId: station.id, connectorId: selectedConnector.id },
+            });
+          }}
+        />
+
         <View style={styles.actionRow}>
           <Pressable
             accessibilityRole="button"
@@ -226,6 +241,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
   },
+  secondaryAction: { marginBottom: spacing.md },
   actionRow: { flexDirection: 'row', alignItems: 'center' },
   directionsButton: {
     width: 54,
