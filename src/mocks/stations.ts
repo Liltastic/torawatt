@@ -84,6 +84,92 @@ export const mockStations: Station[] = [
       { id: 'c14', type: 'TYPE_2', powerKw: 22, status: 'OFFLINE' },
     ],
   },
+
+  // Istanbul - Ankara koridoru: rota planlayicinin mola onerebilmesi icin.
+  {
+    id: 'st_gebze',
+    name: 'Gebze Dinlenme Tesisi',
+    latitude: 40.8021,
+    longitude: 29.4307,
+    address: 'TEM Otoyolu, Gebze/Kocaeli',
+    operator: 'TORA WATT',
+    isOpen24h: true,
+    amenities: ['WC', 'Kafe', 'Restoran'],
+    connectors: [
+      { id: 'c20', type: 'CCS2', powerKw: 180, status: 'AVAILABLE', pricePerKwh: 12.9 },
+      { id: 'c21', type: 'CCS2', powerKw: 180, status: 'AVAILABLE', pricePerKwh: 12.9 },
+    ],
+  },
+  {
+    id: 'st_sakarya',
+    name: 'Sakarya Batı Dinlenme',
+    latitude: 40.7654,
+    longitude: 30.4012,
+    address: 'TEM Otoyolu, Adapazarı/Sakarya',
+    operator: 'ZES',
+    isOpen24h: true,
+    amenities: ['WC', 'Market'],
+    connectors: [
+      { id: 'c22', type: 'CCS2', powerKw: 150, status: 'AVAILABLE', pricePerKwh: 13.4 },
+      { id: 'c23', type: 'CHADEMO', powerKw: 50, status: 'AVAILABLE', pricePerKwh: 12.1 },
+    ],
+  },
+  {
+    id: 'st_duzce',
+    name: 'Düzce Otoyol Plaza',
+    latitude: 40.8438,
+    longitude: 31.1565,
+    address: 'TEM Otoyolu, Düzce',
+    operator: 'Voltrun',
+    isOpen24h: true,
+    amenities: ['WC', 'Kafe'],
+    connectors: [
+      { id: 'c24', type: 'CCS2', powerKw: 90, status: 'OCCUPIED', pricePerKwh: 13.9 },
+      { id: 'c25', type: 'TYPE_2', powerKw: 22, status: 'AVAILABLE', pricePerKwh: 9.6 },
+    ],
+  },
+  {
+    id: 'st_bolu',
+    name: 'TORA WATT Bolu Dağı',
+    latitude: 40.7396,
+    longitude: 31.6112,
+    address: 'Bolu Dağı Geçişi, Bolu',
+    operator: 'TORA WATT',
+    isOpen24h: true,
+    amenities: ['WC', 'Restoran', 'Market', 'Otopark'],
+    connectors: [
+      { id: 'c26', type: 'CCS2', powerKw: 300, status: 'AVAILABLE', pricePerKwh: 14.2 },
+      { id: 'c27', type: 'CCS2', powerKw: 300, status: 'AVAILABLE', pricePerKwh: 14.2 },
+      { id: 'c28', type: 'NACS', powerKw: 250, status: 'AVAILABLE', pricePerKwh: 14.2 },
+    ],
+  },
+  {
+    id: 'st_gerede',
+    name: 'Gerede Kavşak',
+    latitude: 40.8005,
+    longitude: 32.1985,
+    address: 'D100 Karayolu, Gerede/Bolu',
+    operator: 'Trugo',
+    isOpen24h: false,
+    amenities: ['WC'],
+    connectors: [
+      { id: 'c29', type: 'CCS2', powerKw: 120, status: 'AVAILABLE', pricePerKwh: 13.1 },
+    ],
+  },
+  {
+    id: 'st_kizilcahamam',
+    name: 'Kızılcahamam Termal',
+    latitude: 40.4712,
+    longitude: 32.6489,
+    address: 'Ankara Yolu, Kızılcahamam/Ankara',
+    operator: 'TORA WATT',
+    isOpen24h: true,
+    amenities: ['WC', 'Kafe', 'Restoran'],
+    connectors: [
+      { id: 'c30', type: 'CCS2', powerKw: 180, status: 'AVAILABLE', pricePerKwh: 12.7 },
+      { id: 'c31', type: 'TYPE_2', powerKw: 22, status: 'AVAILABLE', pricePerKwh: 9.4 },
+    ],
+  },
 ];
 
 export function findMockStation(id: string): Station | undefined {
