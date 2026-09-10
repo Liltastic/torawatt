@@ -53,7 +53,7 @@ export default function MapScreen() {
 
   const activeVehicle = useActiveVehicle();
   const activeReservation = useActiveReservation();
-  const { data: allStations, isLoading, isError, refetch } = useStations();
+  const { data: allStations, isLoading, isError, error, refetch } = useStations();
 
   const toggleFilter = (id: string) =>
     setActiveFilters((prev) => (prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]));
@@ -163,7 +163,7 @@ export default function MapScreen() {
             <EmptyState
               icon="cloud-offline-outline"
               title="Sunucuya ulaşılamadı"
-              description="Backend çalışmıyor olabilir ya da ağ bağlantın yok. Tekrar dene."
+              description={error instanceof Error ? error.message : 'Bağlantını kontrol edip tekrar dene.'}
               action={
                 <Pressable
                   accessibilityRole="button"

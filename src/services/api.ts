@@ -28,20 +28,23 @@ async function request<T>(
 ): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
 
-  if (options.auth !== false) {
-    headers['x-device-id'] = await getDeviceId();
-  }
-
   let response: Response;
   try {
+    if (options.auth !== false) {
+      headers['x-device-id'] = await getDeviceId();
+    }
+
     response = await fetch(`${API_BASE_URL}${path}`, {
       method: options.method ?? 'GET',
       headers,
       body: options.body != null ? JSON.stringify(options.body) : undefined,
     });
-  } catch {
-    // fetch, sunucuya hic ulasamadiginda (kapali, yanlis IP, ag yok) TypeError firlatir.
-    throw new ApiError('Sunucuya ulaşılamadı. Bağlantını kontrol et.', 0);
+  } catch (error) {
+    // Gercek sebep (network hatasi, SecureStore hatasi, CORS vb.) loglanmazsa
+    // kullaniciya ve bize hep ayni jenerik mesaj gorunur, kok neden kaybolur.
+    console.error(`API isteği başarısız: ${API_BASE_URL}${path}`, error);
+    const detail = error instanceof Error ? ` (${error.message})` : '';
+    throw new ApiError(`Sunucuya ulaşılamadı${detail}. Bağlantını kontrol et.`, 0);
   }
 
   if (response.status === 204) return undefined as T;

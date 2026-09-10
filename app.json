@@ -40,6 +40,19 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "backgroundColor": "#EEF2FF"
+    "backgroundColor": "#EEF2FF",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "916c0134-ca3b-4b61-9d13-59153b5d926c"
+      }
+    },
+    "owner": "berat.polat",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/916c0134-ca3b-4b61-9d13-59153b5d926c"
+    }
   }
 }
