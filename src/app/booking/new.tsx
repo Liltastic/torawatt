@@ -1,12 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card, ConnectorBadge, EmptyState, FilterChip, PowerBadge } from '@/components';
-import { findMockStation } from '@/mocks/stations';
-import { useReservationStore } from '@/store/reservations';
+import { useCreateReservation, useSetReservationStatus } from '@/queries/reservations';
+import { useStation } from '@/queries/stations';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
 import { RESERVATION_GRACE_MINUTES, currentTypeOf } from '@/types/domain';
 import { formatTime } from '@/utils/format';
@@ -27,15 +27,26 @@ export default function NewReservationScreen() {
     connectorId: string;
   }>();
   const router = useRouter();
-  const create = useReservationStore((state) => state.create);
-  const confirm = useReservationStore((state) => state.confirm);
+  const createReservation = useCreateReservation();
+  const setStatus = useSetReservationStatus();
 
   const [startId, setStartId] = useState<string>('in15');
   const [duration, setDuration] = useState(45);
-  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string>();
 
-  const station = findMockStation(stationId);
+  const { data: station, isLoading } = useStation(stationId);
   const connector = station?.connectors.find((c) => c.id === connectorId);
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.root}>
+        <Header onClose={() => router.back()} />
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!station || !connector) {
     return (
@@ -54,17 +65,34 @@ export default function NewReservationScreen() {
   const option = START_OPTIONS.find((o) => o.id === startId) ?? START_OPTIONS[1];
   const startsAt = new Date(Date.now() + option.minutes * 60_000);
 
-  const handleReserve = async () => {
-    setSubmitting(true);
-    const reservation = create(station, connector, startsAt, duration);
-
-    // Sunucu onayini simule ediyoruz; gercekte POST /reservations yaniti beklenir.
-    setTimeout(() => {
-      confirm(reservation.id);
-      setSubmitting(false);
-      router.replace({ pathname: '/booking/[id]', params: { id: reservation.id } });
-    }, 900);
+  const handleReserve = () => {
+    setError(undefined);
+    createReservation.mutate(
+      {
+        stationId: station.id,
+        connectorId: connector.id,
+        startsAt: startsAt.toISOString(),
+        durationMinutes: duration,
+      },
+      {
+        onSuccess: (reservation) => {
+          // Sunucu onayini simule ediyoruz: gercekte bu adim backend'in
+          // kendi is kurallarina (soket musaitligi vb.) gore olur.
+          setStatus.mutate(
+            { id: reservation.id, status: 'CONFIRMED' },
+            {
+              onSettled: () => {
+                router.replace({ pathname: '/booking/[id]', params: { id: reservation.id } });
+              },
+            },
+          );
+        },
+        onError: (err) => setError(err instanceof Error ? err.message : 'Rezervasyon oluşturulamadı'),
+      },
+    );
   };
+
+  const submitting = createReservation.isPending || setStatus.isPending;
 
   return (
     <View style={styles.root}>
@@ -122,6 +150,13 @@ export default function NewReservationScreen() {
             süre içinde gelmezsen rezervasyon düşer. İptal ücretsizdir.
           </Text>
         </View>
+
+        {!!error && (
+          <View style={styles.errorBox}>
+            <Ionicons name="alert-circle-outline" size={16} color={colors.danger} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
       </ScrollView>
 
       <SafeAreaView edges={['bottom']} style={[styles.actions, shadows.sheet]}>
@@ -148,6 +183,7 @@ function Header({ onClose }: { onClose: () => void }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  loadingWrap: { flex: 1, justifyContent: 'center' },
   header: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
   headerButton: {
     width: 40,
@@ -189,6 +225,16 @@ const styles = StyleSheet.create({
     marginLeft: spacing.sm,
     lineHeight: 18,
   },
+
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: spacing.lg,
+    padding: spacing.md,
+    borderRadius: radius.badge,
+    backgroundColor: colors.dangerSoft,
+  },
+  errorText: { ...typography.caption, color: colors.danger, flex: 1, marginLeft: spacing.sm },
 
   actions: {
     backgroundColor: colors.surface,

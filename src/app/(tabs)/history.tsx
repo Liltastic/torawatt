@@ -1,11 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Card, EmptyState, FilterChip } from '@/components';
-import { useHistoryStore } from '@/store/history';
+import { useChargingHistory } from '@/queries/history';
 import { colors, radius, spacing, typography } from '@/theme';
 import type { ChargingHistoryDetail } from '@/types/domain';
 import { formatDate, formatEnergy, formatMinutes, formatPrice } from '@/utils/format';
@@ -35,12 +35,12 @@ const RANGES = [
 
 export default function HistoryScreen() {
   const router = useRouter();
-  const items = useHistoryStore((state) => state.items);
+  const { data: items, isLoading } = useChargingHistory();
   const [range, setRange] = useState<string>('all');
 
   const filtered = useMemo(() => {
     const active = RANGES.find((r) => r.id === range) ?? RANGES[0];
-    return items.filter(active.test);
+    return (items ?? []).filter(active.test);
   }, [items, range]);
 
   const totals = useMemo(
@@ -76,7 +76,11 @@ export default function HistoryScreen() {
         ))}
       </ScrollView>
 
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <View style={styles.emptyWrap}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      ) : filtered.length === 0 ? (
         <View style={styles.emptyWrap}>
           <EmptyState
             icon="time-outline"

@@ -82,6 +82,8 @@ export interface Vehicle {
   maxDcKw: number;
   connectors: ConnectorType[];
   averageConsumptionKwhPer100Km: number;
+  /** Filtreleme ve rota onerilerinde kullanilacak arac; sahibin en fazla bir aktif araci olur. */
+  isActive: boolean;
 }
 
 /** Kart verisi asla saklanmaz; yalnizca saglayici token'i ve maskelenmis alanlar. */

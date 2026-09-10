@@ -1,11 +1,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card, EmptyState, FilterChip } from '@/components';
-import { demoCardCatalog, usePaymentStore } from '@/store/payment';
+import { demoCardCatalog } from '@/mocks/paymentCatalog';
+import {
+  useAddPaymentMethod,
+  usePaymentMethods,
+  useRemovePaymentMethod,
+  useSetDefaultPaymentMethod,
+} from '@/queries/paymentMethods';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
@@ -13,17 +19,17 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
 /** Odeme yontemleri (spec bolum 12) - demo. */
 export default function PaymentMethodsScreen() {
   const router = useRouter();
-  const methods = usePaymentStore((state) => state.methods);
-  const addDemoCard = usePaymentStore((state) => state.addDemoCard);
-  const remove = usePaymentStore((state) => state.remove);
-  const setDefault = usePaymentStore((state) => state.setDefault);
+  const { data: methods, isLoading } = usePaymentMethods();
+  const addPaymentMethod = useAddPaymentMethod();
+  const remove = useRemovePaymentMethod();
+  const setDefault = useSetDefaultPaymentMethod();
 
   const [picking, setPicking] = useState(false);
 
   const confirmRemove = (id: string, label: string) =>
     Alert.alert('Kartı sil', `${label} kaldırılsın mı?`, [
       { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Sil', style: 'destructive', onPress: () => remove(id) },
+      { text: 'Sil', style: 'destructive', onPress: () => remove.mutate(id) },
     ]);
 
   return (
@@ -54,7 +60,9 @@ export default function PaymentMethodsScreen() {
           </Text>
         </View>
 
-        {methods.length === 0 ? (
+        {isLoading ? (
+          <ActivityIndicator color={colors.primary} style={styles.empty} />
+        ) : !methods || methods.length === 0 ? (
           <EmptyState
             icon="card-outline"
             title="Kayıtlı kart yok"
@@ -95,7 +103,7 @@ export default function PaymentMethodsScreen() {
               ) : (
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => setDefault(method.id)}
+                  onPress={() => setDefault.mutate(method.id)}
                   style={({ pressed }) => [styles.makeDefault, pressed && styles.makeDefaultPressed]}>
                   <Text style={styles.makeDefaultText}>Varsayılan yap</Text>
                 </Pressable>
@@ -108,12 +116,12 @@ export default function PaymentMethodsScreen() {
           <View style={styles.picker}>
             <Text style={styles.pickerTitle}>Hangi demo kart?</Text>
             <View style={styles.pickerChips}>
-              {demoCardCatalog.map((card, index) => (
+              {demoCardCatalog.map((card) => (
                 <FilterChip
                   key={card.last4}
                   label={`${card.brand} ···· ${card.last4}`}
                   onPress={() => {
-                    addDemoCard(index);
+                    addPaymentMethod.mutate(card);
                     setPicking(false);
                   }}
                   style={styles.pickerChip}

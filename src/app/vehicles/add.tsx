@@ -9,7 +9,7 @@ import { z } from 'zod';
 
 import { Button, FilterChip, TextField } from '@/components';
 import { vehicleCatalog, type VehiclePreset } from '@/mocks/vehicleCatalog';
-import { useVehicleStore } from '@/store/vehicles';
+import { useCreateVehicle } from '@/queries/vehicles';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
 import { connectorLabels, type ConnectorType } from '@/types/domain';
 
@@ -45,9 +45,10 @@ type VehicleFormOutput = z.output<typeof vehicleSchema>;
 
 export default function AddVehicleScreen() {
   const router = useRouter();
-  const addVehicle = useVehicleStore((state) => state.add);
+  const createVehicle = useCreateVehicle();
   const [connectors, setConnectors] = useState<ConnectorType[]>(['CCS2', 'TYPE_2']);
   const [connectorError, setConnectorError] = useState<string>();
+  const [submitError, setSubmitError] = useState<string>();
 
   const { control, handleSubmit, setValue, formState } = useForm<
     VehicleFormInput,
@@ -95,9 +96,16 @@ export default function AddVehicleScreen() {
       return;
     }
 
+    setSubmitError(undefined);
     // values zaten semadan gecmis halde: sayisal alanlar number.
-    addVehicle({ ...values, connectors });
-    router.back();
+    createVehicle.mutate(
+      { ...values, connectors },
+      {
+        onSuccess: () => router.back(),
+        onError: (err) =>
+          setSubmitError(err instanceof Error ? err.message : 'Araç kaydedilemedi'),
+      },
+    );
   });
 
   return (
@@ -205,10 +213,15 @@ export default function AddVehicleScreen() {
             ))}
           </View>
           {!!connectorError && <Text style={styles.connectorError}>{connectorError}</Text>}
+          {!!submitError && <Text style={styles.connectorError}>{submitError}</Text>}
         </ScrollView>
 
         <SafeAreaView edges={['bottom']} style={[styles.actions, shadows.sheet]}>
-          <Button label="Aracı kaydet" onPress={onSubmit} loading={formState.isSubmitting} />
+          <Button
+            label="Aracı kaydet"
+            onPress={onSubmit}
+            loading={formState.isSubmitting || createVehicle.isPending}
+          />
         </SafeAreaView>
       </KeyboardAvoidingView>
     </View>

@@ -1,0 +1,112 @@
+// TORA WATT backend - Prisma schema
+//
+// SQLite dev'de sifir kurulumla calisir. Uretimde DATABASE_URL'i bir
+// Postgres baglanti dizesine cevirip provider'i "postgresql" yapmak yeterli;
+// modeller degismez (SQLite'a ozgu tek sey String[] yerine JSON-metin kullanmak).
+//
+// Sahiplik: gercek auth (spec bolum 22: /auth/register, /auth/login) henuz
+// yok. Bu yuzden her kayit bir "ownerId" tasir - mobil uygulamanin
+// SecureStore'da tuttugu kalici, rastgele bir cihaz kimligi. Login eklendiginde
+// ownerId = gercek kullanici id'sine gecilecek; sema degismeyecek.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Station {
+  id         String      @id
+  name       String
+  latitude   Float
+  longitude  Float
+  address    String
+  operator   String
+  isOpen24h  Boolean
+  amenities  String // JSON string[] - SQLite'ta native dizi yok
+  connectors Connector[]
+}
+
+model Connector {
+  id            String  @id
+  stationId     String
+  station       Station @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  type          String // TYPE_2 | CCS2 | CHADEMO | NACS
+  powerKw       Float
+  status        String // AVAILABLE | OCCUPIED | FAULTED | OFFLINE | UNKNOWN
+  pricePerKwh   Float?
+  idleFeePerMin Float?
+
+  @@index([stationId])
+}
+
+model Vehicle {
+  id                            String   @id @default(cuid())
+  ownerId                       String
+  make                          String
+  model                         String
+  modelYear                     Int
+  batteryCapacityKwh            Float
+  maxAcKw                       Float
+  maxDcKw                       Float
+  connectors                    String // JSON string[] (ConnectorType[])
+  averageConsumptionKwhPer100Km Float
+  isActive                      Boolean  @default(false)
+  createdAt                     DateTime @default(now())
+
+  @@index([ownerId])
+}
+
+model Reservation {
+  id              String   @id @default(cuid())
+  ownerId         String
+  stationId       String
+  connectorId     String
+  stationName     String
+  connectorLabel  String
+  startsAt        DateTime
+  durationMinutes Int
+  // PENDING | CONFIRMED | ARRIVED | CANCELLED
+  // EXPIRED sunucuda saklanmiyor; bekleme suresi gectiginde istemci ve API
+  // yaniti bunu turetiyor (bkz. src/lib/reservationStatus.ts).
+  status          String   @default("PENDING")
+  createdAt       DateTime @default(now())
+
+  @@index([ownerId])
+}
+
+model ChargingHistoryEntry {
+  id              String   @id @default(cuid())
+  ownerId         String
+  stationId       String?
+  stationName     String
+  connectorLabel  String
+  startedAt       DateTime
+  endedAt         DateTime
+  durationMinutes Int
+  energyKwh       Float
+  pricePerKwh     Float
+  cost            Float
+  createdAt       DateTime @default(now())
+
+  @@index([ownerId])
+}
+
+model PaymentMethod {
+  id          String   @id @default(cuid())
+  ownerId     String
+  // DEMO veri: gercek kart numarasi hicbir zaman bu tabloya (ya da baska
+  // hicbir yere) yazilmaz. PCI saglayicisi baglaninca bu model saglayicinin
+  // dondurdugu token + maskelenmis alanlari tutacak sekilde genisleyecek.
+  brand       String
+  last4       String
+  expiryMonth Int
+  expiryYear  Int
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([ownerId])
+}

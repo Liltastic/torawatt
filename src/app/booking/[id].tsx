@@ -1,11 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AvailabilityBadge, Button, Card, EmptyState } from '@/components';
-import { useReservationStore } from '@/store/reservations';
+import { useReservations, useSetReservationStatus } from '@/queries/reservations';
 import { colors, radius, spacing, typography } from '@/theme';
 import {
   RESERVATION_GRACE_MINUTES,
@@ -29,9 +29,9 @@ export default function ReservationDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
-  const reservation = useReservationStore((state) => state.findById(id));
-  const cancel = useReservationStore((state) => state.cancel);
-  const markArrived = useReservationStore((state) => state.markArrived);
+  const { data: reservations, isLoading } = useReservations();
+  const setStatus = useSetReservationStatus();
+  const reservation = reservations?.find((r) => r.id === id);
 
   // Kalan sure geri saysin diye dakikada bir yeniden ciziyoruz.
   const [, setTick] = useState(0);
@@ -39,6 +39,17 @@ export default function ReservationDetailScreen() {
     const timer = setInterval(() => setTick((t) => t + 1), 30_000);
     return () => clearInterval(timer);
   }, []);
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.root}>
+        <Header onBack={() => router.back()} />
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!reservation) {
     return (
@@ -63,7 +74,11 @@ export default function ReservationDetailScreen() {
   const confirmCancel = () =>
     Alert.alert('Rezervasyonu iptal et', 'Bu rezervasyon iptal edilsin mi?', [
       { text: 'Vazgeç', style: 'cancel' },
-      { text: 'İptal et', style: 'destructive', onPress: () => cancel(reservation.id) },
+      {
+        text: 'İptal et',
+        style: 'destructive',
+        onPress: () => setStatus.mutate({ id: reservation.id, status: 'CANCELLED' }),
+      },
     ]);
 
   return (
@@ -131,7 +146,11 @@ export default function ReservationDetailScreen() {
 
       {isOpen && (
         <SafeAreaView edges={['bottom']} style={styles.actions}>
-          <Button label="Geldim" onPress={() => markArrived(reservation.id)} />
+          <Button
+            label="Geldim"
+            loading={setStatus.isPending}
+            onPress={() => setStatus.mutate({ id: reservation.id, status: 'ARRIVED' })}
+          />
           <Button
             label="Rezervasyonu iptal et"
             variant="ghost"
@@ -170,6 +189,7 @@ function Row({ label, value, last = false }: { label: string; value: string; las
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  loadingWrap: { flex: 1, justifyContent: 'center' },
   header: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
   headerButton: {
     width: 40,

@@ -1,12 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card, EmptyState } from '@/components';
+import { useChargingHistoryEntry } from '@/queries/history';
 import { shareInvoice } from '@/services/invoice';
-import { useHistoryStore } from '@/store/history';
 import { colors, radius, spacing, typography } from '@/theme';
 import {
   formatDate,
@@ -20,8 +20,19 @@ import {
 export default function HistoryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const item = useHistoryStore((state) => state.findById(id));
+  const { data: item, isLoading } = useChargingHistoryEntry(id);
   const [sharing, setSharing] = useState(false);
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.root}>
+        <Header onBack={() => router.back()} />
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!item) {
     return (
@@ -137,6 +148,7 @@ function Row({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  loadingWrap: { flex: 1, justifyContent: 'center' },
 
   header: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
   headerButton: {

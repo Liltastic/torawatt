@@ -1,11 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card, ConnectorBadge, EmptyState, PowerBadge } from '@/components';
-import { findMockStation } from '@/mocks/stations';
-import { selectDefaultMethod, usePaymentStore } from '@/store/payment';
+import { useDefaultPaymentMethod } from '@/queries/paymentMethods';
+import { useStation } from '@/queries/stations';
 import { useSessionStore } from '@/store/session';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
 import { currentTypeOf } from '@/types/domain';
@@ -19,11 +19,21 @@ export default function ChargeSummaryScreen() {
   }>();
   const router = useRouter();
   const startSession = useSessionStore((state) => state.start);
-  const methods = usePaymentStore((state) => state.methods);
-  const defaultMethod = selectDefaultMethod(methods);
+  const defaultMethod = useDefaultPaymentMethod();
 
-  const station = findMockStation(stationId);
+  const { data: station, isLoading } = useStation(stationId);
   const connector = station?.connectors.find((c) => c.id === connectorId);
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.root}>
+        <Header onClose={() => router.back()} />
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!station || !connector) {
     return (
@@ -145,6 +155,7 @@ function PriceRow({ label, value, last = false }: { label: string; value: string
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  loadingWrap: { flex: 1, justifyContent: 'center' },
 
   header: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
   headerButton: {

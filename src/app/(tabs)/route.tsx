@@ -14,10 +14,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card, EmptyState, TextField } from '@/components';
-import { mockStations } from '@/mocks/stations';
+import { useStations } from '@/queries/stations';
+import { useActiveVehicle, useVehicles } from '@/queries/vehicles';
 import { geocode, getRoute, type Place } from '@/services/routing';
 import { planTrip, type TripPlan } from '@/services/tripPlanner';
-import { useVehicleStore } from '@/store/vehicles';
 import { colors, radius, spacing, typography } from '@/theme';
 import { formatEnergy, formatMinutes, formatPrice } from '@/utils/format';
 
@@ -26,10 +26,9 @@ const RESERVE_PERCENT = 10;
 
 export default function RouteScreen() {
   const router = useRouter();
-  const vehicles = useVehicleStore((state) => state.vehicles);
-  const activeVehicleId = useVehicleStore((state) => state.activeVehicleId);
-  const hasHydrated = useVehicleStore((state) => state.hasHydrated);
-  const vehicle = vehicles.find((v) => v.id === activeVehicleId);
+  const { isLoading: vehiclesLoading } = useVehicles();
+  const vehicle = useActiveVehicle();
+  const { data: stations } = useStations();
 
   const [from, setFrom] = useState<Place>();
   const [to, setTo] = useState<Place>();
@@ -40,7 +39,7 @@ export default function RouteScreen() {
   const [plan, setPlan] = useState<{ trip: TripPlan; distanceKm: number; driveMinutes: number }>();
 
   // Kayitli araclar yuklenmeden "arac yok" gostermek yaniltici olurdu.
-  if (!hasHydrated) {
+  if (vehiclesLoading) {
     return (
       <SafeAreaView edges={['top']} style={styles.root}>
         <View style={styles.header}>
@@ -86,7 +85,7 @@ export default function RouteScreen() {
         vehicle,
         startPercent: Number.isFinite(percent) ? Math.min(100, Math.max(1, percent)) : 80,
         reservePercent: RESERVE_PERCENT,
-        stations: mockStations,
+        stations: stations ?? [],
       });
 
       setPlan({ trip, distanceKm: route.distanceKm, driveMinutes: route.durationMinutes });

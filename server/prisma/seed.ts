@@ -1,10 +1,38 @@
-import type { Station } from '@/types/domain';
+import { PrismaClient } from '@prisma/client';
 
 /**
- * GECICI: yalnizca UI gelistirme icin. Backend /stations ucu hazir olunca
- * bu dosya silinip TanStack Query ile gercek veri baglanacak.
+ * Istasyon verisini besler. Bu, mobil uygulamanin src/mocks/stations.ts
+ * dosyasindaki 11 istasyonla BIREBIR ayni veri - mobil taraf backend'e
+ * gectikten sonra o dosya silinecek (bkz. src/mocks/stations.ts yorumu).
+ *
+ * distanceKm burada yok: o istemci tarafinda kullanicinin konumuna gore
+ * hesaplanan bir alan, sunucuda saklanmaz.
  */
-export const mockStations: Station[] = [
+
+const prisma = new PrismaClient();
+
+interface SeedConnector {
+  id: string;
+  type: string;
+  powerKw: number;
+  status: string;
+  pricePerKwh?: number;
+  idleFeePerMin?: number;
+}
+
+interface SeedStation {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  address: string;
+  operator: string;
+  isOpen24h: boolean;
+  amenities: string[];
+  connectors: SeedConnector[];
+}
+
+const stations: SeedStation[] = [
   {
     id: 'st_maslak',
     name: 'TORA WATT Maslak',
@@ -14,7 +42,6 @@ export const mockStations: Station[] = [
     operator: 'TORA WATT',
     isOpen24h: true,
     amenities: ['WC', 'Kafe', 'Market'],
-    distanceKm: 1.2,
     connectors: [
       { id: 'c1', type: 'CCS2', powerKw: 180, status: 'AVAILABLE', pricePerKwh: 12.49, idleFeePerMin: 0.99 },
       { id: 'c2', type: 'CCS2', powerKw: 180, status: 'AVAILABLE', pricePerKwh: 12.49, idleFeePerMin: 0.99 },
@@ -31,7 +58,6 @@ export const mockStations: Station[] = [
     operator: 'Voltrun',
     isOpen24h: false,
     amenities: ['Otopark', 'Restoran'],
-    distanceKm: 2.4,
     connectors: [
       { id: 'c5', type: 'CCS2', powerKw: 60, status: 'OCCUPIED', pricePerKwh: 13.2 },
       { id: 'c6', type: 'TYPE_2', powerKw: 11, status: 'AVAILABLE', pricePerKwh: 8.9 },
@@ -46,7 +72,6 @@ export const mockStations: Station[] = [
     operator: 'ZES',
     isOpen24h: true,
     amenities: ['WC', 'Kafe', 'Market', 'Otopark'],
-    distanceKm: 3.8,
     connectors: [
       { id: 'c7', type: 'CCS2', powerKw: 300, status: 'AVAILABLE', pricePerKwh: 14.5, idleFeePerMin: 1.5 },
       { id: 'c8', type: 'CCS2', powerKw: 300, status: 'FAULTED' },
@@ -62,7 +87,6 @@ export const mockStations: Station[] = [
     operator: 'Trugo',
     isOpen24h: true,
     amenities: ['Kafe'],
-    distanceKm: 5.1,
     connectors: [
       { id: 'c10', type: 'CCS2', powerKw: 90, status: 'OCCUPIED', pricePerKwh: 12.8 },
       { id: 'c11', type: 'CCS2', powerKw: 90, status: 'OCCUPIED', pricePerKwh: 12.8 },
@@ -77,15 +101,12 @@ export const mockStations: Station[] = [
     operator: 'TORA WATT',
     isOpen24h: true,
     amenities: ['WC', 'Otopark'],
-    distanceKm: 8.6,
     connectors: [
       { id: 'c12', type: 'CCS2', powerKw: 150, status: 'AVAILABLE', pricePerKwh: 12.49 },
       { id: 'c13', type: 'NACS', powerKw: 150, status: 'AVAILABLE', pricePerKwh: 12.49 },
       { id: 'c14', type: 'TYPE_2', powerKw: 22, status: 'OFFLINE' },
     ],
   },
-
-  // Istanbul - Ankara koridoru: rota planlayicinin mola onerebilmesi icin.
   {
     id: 'st_gebze',
     name: 'Gebze Dinlenme Tesisi',
@@ -152,9 +173,7 @@ export const mockStations: Station[] = [
     operator: 'Trugo',
     isOpen24h: false,
     amenities: ['WC'],
-    connectors: [
-      { id: 'c29', type: 'CCS2', powerKw: 120, status: 'AVAILABLE', pricePerKwh: 13.1 },
-    ],
+    connectors: [{ id: 'c29', type: 'CCS2', powerKw: 120, status: 'AVAILABLE', pricePerKwh: 13.1 }],
   },
   {
     id: 'st_kizilcahamam',
@@ -172,6 +191,61 @@ export const mockStations: Station[] = [
   },
 ];
 
-export function findMockStation(id: string): Station | undefined {
-  return mockStations.find((station) => station.id === id);
+async function main() {
+  for (const station of stations) {
+    await prisma.station.upsert({
+      where: { id: station.id },
+      update: {
+        name: station.name,
+        latitude: station.latitude,
+        longitude: station.longitude,
+        address: station.address,
+        operator: station.operator,
+        isOpen24h: station.isOpen24h,
+        amenities: JSON.stringify(station.amenities),
+      },
+      create: {
+        id: station.id,
+        name: station.name,
+        latitude: station.latitude,
+        longitude: station.longitude,
+        address: station.address,
+        operator: station.operator,
+        isOpen24h: station.isOpen24h,
+        amenities: JSON.stringify(station.amenities),
+      },
+    });
+
+    for (const connector of station.connectors) {
+      await prisma.connector.upsert({
+        where: { id: connector.id },
+        update: {
+          stationId: station.id,
+          type: connector.type,
+          powerKw: connector.powerKw,
+          status: connector.status,
+          pricePerKwh: connector.pricePerKwh ?? null,
+          idleFeePerMin: connector.idleFeePerMin ?? null,
+        },
+        create: {
+          id: connector.id,
+          stationId: station.id,
+          type: connector.type,
+          powerKw: connector.powerKw,
+          status: connector.status,
+          pricePerKwh: connector.pricePerKwh ?? null,
+          idleFeePerMin: connector.idleFeePerMin ?? null,
+        },
+      });
+    }
+  }
+
+  console.log(`${stations.length} istasyon ve bağlı soketleri yüklendi.`);
 }
+
+main()
+  .catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  })
+  .finally(() => prisma.$disconnect());

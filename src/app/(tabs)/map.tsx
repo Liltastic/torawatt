@@ -1,21 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState, FilterChip, SearchBar, StationCard } from '@/components';
 import { StationMap } from '@/map';
-import { mockStations } from '@/mocks/stations';
+import { useActiveReservation } from '@/queries/reservations';
+import { useStations } from '@/queries/stations';
+import { useActiveVehicle } from '@/queries/vehicles';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
-import { selectActiveReservation, useReservationStore } from '@/store/reservations';
-import { useVehicleStore } from '@/store/vehicles';
-import {
-  effectiveReservationStatus,
-  reservationStatusLabels,
-  type Station,
-  type Vehicle,
-} from '@/types/domain';
+import { effectiveReservationStatus, reservationStatusLabels, type Station, type Vehicle } from '@/types/domain';
 import { formatTime } from '@/utils/format';
 
 interface MapFilter {
@@ -55,23 +50,19 @@ export default function MapScreen() {
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string>();
   const router = useRouter();
-  const vehicles = useVehicleStore((state) => state.vehicles);
-  const activeVehicleId = useVehicleStore((state) => state.activeVehicleId);
-  const reservations = useReservationStore((state) => state.items);
+
+  const activeVehicle = useActiveVehicle();
+  const activeReservation = useActiveReservation();
+  const { data: allStations, isLoading, isError, refetch } = useStations();
 
   const toggleFilter = (id: string) =>
     setActiveFilters((prev) => (prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]));
 
-  const activeReservation = useMemo(() => selectActiveReservation(reservations), [reservations]);
-
-  const filters = useMemo(
-    () => buildFilters(vehicles.find((v) => v.id === activeVehicleId)),
-    [vehicles, activeVehicleId],
-  );
+  const filters = useMemo(() => buildFilters(activeVehicle), [activeVehicle]);
 
   const stations = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase('tr');
-    return mockStations.filter((station) => {
+    return (allStations ?? []).filter((station) => {
       const matchesQuery =
         !normalized ||
         station.name.toLocaleLowerCase('tr').includes(normalized) ||
@@ -83,7 +74,7 @@ export default function MapScreen() {
 
       return matchesQuery && matchesFilters;
     });
-  }, [query, activeFilters, filters]);
+  }, [allStations, query, activeFilters, filters]);
 
   return (
     <View style={styles.root}>
@@ -137,26 +128,52 @@ export default function MapScreen() {
         <View style={styles.grabber} />
 
         <Text style={styles.sheetTitle}>
-          {stations.length > 0 ? `Yakınında ${stations.length} istasyon` : 'Eşleşen istasyon yok'}
+          {isLoading
+            ? 'Yükleniyor…'
+            : isError
+              ? 'İstasyonlar yüklenemedi'
+              : stations.length > 0
+                ? `Yakınında ${stations.length} istasyon`
+                : 'Eşleşen istasyon yok'}
         </Text>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chips}>
-          {filters.map((filter) => (
-            <FilterChip
-              key={filter.id}
-              label={filter.label}
-              selected={activeFilters.includes(filter.id)}
-              onPress={() => toggleFilter(filter.id)}
-              style={styles.chip}
-            />
-          ))}
-        </ScrollView>
+        {!isLoading && !isError && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chips}>
+            {filters.map((filter) => (
+              <FilterChip
+                key={filter.id}
+                label={filter.label}
+                selected={activeFilters.includes(filter.id)}
+                onPress={() => toggleFilter(filter.id)}
+                style={styles.chip}
+              />
+            ))}
+          </ScrollView>
+        )}
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
-          {stations.length === 0 ? (
+          {isLoading ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : isError ? (
+            <EmptyState
+              icon="cloud-offline-outline"
+              title="Sunucuya ulaşılamadı"
+              description="Backend çalışmıyor olabilir ya da ağ bağlantın yok. Tekrar dene."
+              action={
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => refetch()}
+                  style={({ pressed }) => [styles.retryButton, pressed && styles.retryButtonPressed]}>
+                  <Text style={styles.retryText}>Tekrar dene</Text>
+                </Pressable>
+              }
+            />
+          ) : stations.length === 0 ? (
             <EmptyState
               icon="search-outline"
               title="Sonuç bulunamadı"
@@ -243,4 +260,14 @@ const styles = StyleSheet.create({
   chips: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
   chip: { marginRight: spacing.sm },
   list: { paddingBottom: spacing.xl, paddingHorizontal: spacing.xs },
+  loadingWrap: { paddingVertical: spacing.xxxl, alignItems: 'center' },
+  retryButton: {
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: radius.button,
+    backgroundColor: colors.primarySoft,
+  },
+  retryButtonPressed: { backgroundColor: '#DCE6FF' },
+  retryText: { ...typography.body, color: colors.primaryDark, fontWeight: '600' },
 });

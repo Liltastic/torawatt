@@ -2,14 +2,17 @@ import { create } from 'zustand';
 
 import type { ChargingSession, Connector, Station } from '@/types/domain';
 
-import { useHistoryStore } from './history';
-
 /**
  * GECICI: aktif sarj oturumu simule ediliyor.
  *
  * Spec bolum 23'e gore gercek uygulamada bu veri WebSocket / SSE ile
  * CHARGING_SESSION_UPDATED eventlerinden gelecek. Buradaki tick yalnizca
  * backend hazir olana kadar aktif sarj ekranini gelistirebilmek icin var.
+ *
+ * Bu store gecmise yazma islemi YAPMAZ: oturum COMPLETED olunca
+ * src/app/(tabs)/charging.tsx, useCreateHistoryEntry ile backend'e POST
+ * atip React Query cache'ini gecersiz kilar. Sorumluluk boyle ayrilinca bu
+ * dosya API'den tamamen bagimsiz, test edilmesi kolay bir simulasyon olarak kalir.
  */
 
 /** Simulasyon hizi: gercek zamanin kac katinda ilerlesin. */
@@ -52,27 +55,6 @@ function powerAtBattery(ratedKw: number, batteryPercent: number): number {
   if (batteryPercent >= 80) return ratedKw * 0.35;
   if (batteryPercent >= 60) return ratedKw * 0.75;
   return ratedKw;
-}
-
-/**
- * Biten oturumu gecmise yazar. Hic enerji aktarilmadiysa kayit acmiyoruz;
- * baslamadan iptal edilen bir oturum gecmiste yer tutmamali.
- */
-function archive(session: ChargingSession, meta: SessionMeta, elapsedSeconds: number) {
-  if (session.energyKwh <= 0) return;
-
-  useHistoryStore.getState().add({
-    id: session.id,
-    stationId: session.stationId,
-    stationName: meta.stationName,
-    connectorLabel: meta.connectorLabel,
-    startedAt: session.startedAt,
-    endedAt: new Date().toISOString(),
-    durationMinutes: Math.max(1, Math.round(elapsedSeconds / 60)),
-    energyKwh: session.energyKwh,
-    pricePerKwh: meta.pricePerKwh,
-    cost: session.cost,
-  });
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -130,6 +112,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
       // 60 kWh'lik ortalama bir batarya varsayimi.
       const nextBattery = Math.min(100, battery + (powerKw * hours * 100) / 60);
+      const finished = nextBattery >= 100;
 
       set({
         elapsedSeconds: elapsedSeconds + TIME_SCALE,
@@ -139,33 +122,27 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           energyKwh,
           batteryPercent: nextBattery,
           cost: energyKwh * meta.pricePerKwh,
-          status: nextBattery >= 100 ? 'COMPLETED' : 'CHARGING',
+          status: finished ? 'COMPLETED' : 'CHARGING',
+          endedAt: finished ? new Date().toISOString() : undefined,
         },
       });
 
-      if (nextBattery >= 100) {
-        stopTimer();
-        const finished = get().session;
-        if (finished) archive(finished, meta, get().elapsedSeconds);
-      }
+      if (finished) stopTimer();
     }, TICK_MS);
   },
 
   stop: () => {
     stopTimer();
-    const { session, meta, elapsedSeconds } = get();
-    if (!session || !meta) return;
-    // Batarya %100'e ulasip kendiliginden bittiyse gecmise zaten yazildi.
-    if (session.status === 'COMPLETED') return;
+    const { session } = get();
+    if (!session || session.status === 'COMPLETED') return;
 
-    const completed: ChargingSession = {
-      ...session,
-      status: 'COMPLETED',
-      endedAt: new Date().toISOString(),
-    };
-
-    set({ session: completed });
-    archive(completed, meta, elapsedSeconds);
+    set({
+      session: {
+        ...session,
+        status: 'COMPLETED',
+        endedAt: new Date().toISOString(),
+      },
+    });
   },
 
   clear: () => {

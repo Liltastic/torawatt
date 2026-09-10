@@ -1,24 +1,23 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, ConnectorBadge, EmptyState } from '@/components';
-import { useVehicleStore } from '@/store/vehicles';
+import { useActivateVehicle, useRemoveVehicle, useVehicles } from '@/queries/vehicles';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
 
 /** Araclarim (spec bolum 14). */
 export default function VehiclesScreen() {
   const router = useRouter();
-  const vehicles = useVehicleStore((state) => state.vehicles);
-  const activeVehicleId = useVehicleStore((state) => state.activeVehicleId);
-  const setActive = useVehicleStore((state) => state.setActive);
-  const remove = useVehicleStore((state) => state.remove);
+  const { data: vehicles, isLoading } = useVehicles();
+  const activate = useActivateVehicle();
+  const remove = useRemoveVehicle();
 
   const confirmRemove = (id: string, label: string) => {
     Alert.alert('Aracı sil', `${label} silinsin mi?`, [
       { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Sil', style: 'destructive', onPress: () => remove(id) },
+      { text: 'Sil', style: 'destructive', onPress: () => remove.mutate(id) },
     ]);
   };
 
@@ -40,7 +39,11 @@ export default function VehiclesScreen() {
         </View>
       </SafeAreaView>
 
-      {vehicles.length === 0 ? (
+      {isLoading ? (
+        <View style={styles.emptyWrap}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      ) : !vehicles || vehicles.length === 0 ? (
         <View style={styles.emptyWrap}>
           <EmptyState
             icon="car-sport-outline"
@@ -56,13 +59,13 @@ export default function VehiclesScreen() {
           </Text>
 
           {vehicles.map((vehicle) => {
-            const isActive = vehicle.id === activeVehicleId;
+            const isActive = vehicle.isActive;
             return (
               <Pressable
                 key={vehicle.id}
                 accessibilityRole="button"
                 accessibilityState={{ selected: isActive }}
-                onPress={() => setActive(vehicle.id)}
+                onPress={() => activate.mutate(vehicle.id)}
                 style={({ pressed }) => [
                   styles.card,
                   isActive && styles.cardActive,
@@ -113,7 +116,7 @@ export default function VehiclesScreen() {
         </ScrollView>
       )}
 
-      {vehicles.length > 0 && (
+      {!!vehicles && vehicles.length > 0 && (
         <SafeAreaView edges={['bottom']} style={[styles.actions, shadows.sheet]}>
           <Button label="Araç ekle" onPress={() => router.push('/vehicles/add')} />
         </SafeAreaView>

@@ -1,31 +1,61 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AvailabilityBadge, Button, Card, ConnectorCard, EmptyState } from '@/components';
-import { findMockStation } from '@/mocks/stations';
+import { useStation } from '@/queries/stations';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
 import { stationAvailability } from '@/types/domain';
-import { formatDistance, formatPrice } from '@/utils/format';
+import { formatPrice } from '@/utils/format';
 
 export default function StationDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [selectedConnectorId, setSelectedConnectorId] = useState<string>();
 
-  const station = findMockStation(id);
+  const { data: station, isLoading, isError, refetch } = useStation(id);
 
-  if (!station) {
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.root}>
+        <ScreenHeader onBack={() => router.back()} />
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (isError || !station) {
     return (
       <SafeAreaView style={styles.root}>
         <ScreenHeader onBack={() => router.back()} />
         <EmptyState
-          icon="alert-circle-outline"
-          title="İstasyon bulunamadı"
-          description="Bu istasyon kaldırılmış veya bağlantı geçersiz olabilir."
-          action={<Button label="Geri dön" onPress={() => router.back()} />}
+          icon={isError ? 'cloud-offline-outline' : 'alert-circle-outline'}
+          title={isError ? 'Sunucuya ulaşılamadı' : 'İstasyon bulunamadı'}
+          description={
+            isError
+              ? 'Bağlantını kontrol edip tekrar dene.'
+              : 'Bu istasyon kaldırılmış veya bağlantı geçersiz olabilir.'
+          }
+          action={
+            isError ? (
+              <Button label="Tekrar dene" onPress={() => refetch()} />
+            ) : (
+              <Button label="Geri dön" onPress={() => router.back()} />
+            )
+          }
         />
       </SafeAreaView>
     );
@@ -60,7 +90,7 @@ export default function StationDetailScreen() {
         <Text style={styles.name}>{station.name}</Text>
         <Text style={styles.operator}>
           {station.operator}
-          {station.distanceKm != null ? ` · ${formatDistance(station.distanceKm)}` : ''}
+          {/* Mesafe artik backend'den gelmiyor; expo-location eklenince konum bazli hesaplanacak. */}
           {station.isOpen24h ? ' · 24 saat açık' : ''}
         </Text>
 
@@ -195,6 +225,7 @@ function InfoRow({ label, value, last = false }: { label: string; value: string;
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  loadingWrap: { flex: 1, justifyContent: 'center' },
 
   header: {
     flexDirection: 'row',

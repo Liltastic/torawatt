@@ -5,6 +5,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card, EmptyState } from '@/components';
+import { useCreateHistoryEntry } from '@/queries/history';
 import { useSessionStore } from '@/store/session';
 import { colors, radius, spacing, typography } from '@/theme';
 import { formatDuration, formatEnergy, formatPower, formatPrice } from '@/utils/format';
@@ -24,6 +25,8 @@ export default function ChargingScreen() {
 
   const [powerHistory, setPowerHistory] = useState<number[]>([]);
   const lastSampleRef = useRef<number | undefined>(undefined);
+  const createHistoryEntry = useCreateHistoryEntry();
+  const archivedSessionIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     if (!session || session.status !== 'CHARGING') return;
@@ -32,6 +35,28 @@ export default function ChargingScreen() {
     lastSampleRef.current = session.energyKwh;
     setPowerHistory((prev) => [...prev, session.powerKw].slice(-HISTORY_LIMIT));
   }, [session]);
+
+  // Oturum COMPLETED olunca gecmise TEK SEFERLIK yaz. Enerji aktarilmadiysa
+  // (baslamadan iptal) kayit acmiyoruz - session store'daki eski davranisla ayni.
+  useEffect(() => {
+    if (!session || !meta || session.status !== 'COMPLETED') return;
+    if (session.energyKwh <= 0) return;
+    if (archivedSessionIdRef.current === session.id) return;
+
+    archivedSessionIdRef.current = session.id;
+    createHistoryEntry.mutate({
+      stationId: session.stationId,
+      stationName: meta.stationName,
+      connectorLabel: meta.connectorLabel,
+      startedAt: session.startedAt,
+      endedAt: session.endedAt ?? new Date().toISOString(),
+      durationMinutes: Math.max(1, Math.round(elapsedSeconds / 60)),
+      energyKwh: session.energyKwh,
+      pricePerKwh: meta.pricePerKwh,
+      cost: session.cost,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, meta]);
 
   if (!session || !meta) {
     return (

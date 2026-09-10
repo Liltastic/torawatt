@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Card } from '@/components';
-import { useVehicleStore } from '@/store/vehicles';
+import { useActiveVehicle } from '@/queries/vehicles';
 import { colors, radius, spacing, typography } from '@/theme';
 import { connectorLabels } from '@/types/domain';
 
@@ -23,9 +23,7 @@ const MENU: { icon: IoniconName; label: string; href?: string; tag?: string }[] 
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const vehicles = useVehicleStore((state) => state.vehicles);
-  const activeVehicleId = useVehicleStore((state) => state.activeVehicleId);
-  const activeVehicle = vehicles.find((v) => v.id === activeVehicleId);
+  const activeVehicle = useActiveVehicle();
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
