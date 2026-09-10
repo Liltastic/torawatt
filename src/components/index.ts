@@ -6,3 +6,4 @@ export { FilterChip } from './FilterChip';
 export { SearchBar } from './SearchBar';
 export { StationCard } from './StationCard';
 export { PlaceholderScreen } from './PlaceholderScreen';
+export { ConnectorCard } from './ConnectorCard';

@@ -85,3 +85,7 @@ export const mockStations: Station[] = [
     ],
   },
 ];
+
+export function findMockStation(id: string): Station | undefined {
+  return mockStations.find((station) => station.id === id);
+}

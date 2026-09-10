@@ -46,3 +46,6 @@ example
 .env
 .env.*
 !.env.example
+
+# Rakip uygulama referans ekran goruntuleri - repoya girmesin
+erkan görüntüleri/

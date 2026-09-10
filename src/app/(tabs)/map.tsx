@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,6 +24,7 @@ export default function MapScreen() {
   const [query, setQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string>();
+  const router = useRouter();
 
   const toggleFilter = (id: string) =>
     setActiveFilters((prev) => (prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]));
@@ -104,7 +106,7 @@ export default function MapScreen() {
                 key={station.id}
                 station={station}
                 selected={station.id === selectedId}
-                onPress={() => setSelectedId(station.id)}
+                onPress={() => router.push({ pathname: '/station/[id]', params: { id: station.id } })}
               />
             ))
           )}
