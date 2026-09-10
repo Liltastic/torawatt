@@ -1,8 +1,11 @@
 // TORA WATT backend - Prisma schema
 //
-// SQLite dev'de sifir kurulumla calisir. Uretimde DATABASE_URL'i bir
-// Postgres baglanti dizesine cevirip provider'i "postgresql" yapmak yeterli;
-// modeller degismez (SQLite'a ozgu tek sey String[] yerine JSON-metin kullanmak).
+// Postgres (Neon) kullanir - Render'in ucretsiz web servisinde disk kalici
+// degil, SQLite dosyasi her deploy/restart'ta silinirdi. String[] yerine
+// hala JSON-metin kullaniliyor (Station.amenities, Vehicle.connectors):
+// SQLite'tan tasirken kod tarafinda (serialize.ts) degisiklik gerekmesin
+// diye, ayrica ileride tekrar SQLite'a donulmesi gerekirse de calismaya
+// devam eder.
 //
 // Sahiplik: gercek auth (spec bolum 22: /auth/register, /auth/login) henuz
 // yok. Bu yuzden her kayit bir "ownerId" tasir - mobil uygulamanin
@@ -14,7 +17,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
