@@ -28,6 +28,7 @@ export default function RouteScreen() {
   const router = useRouter();
   const vehicles = useVehicleStore((state) => state.vehicles);
   const activeVehicleId = useVehicleStore((state) => state.activeVehicleId);
+  const hasHydrated = useVehicleStore((state) => state.hasHydrated);
   const vehicle = vehicles.find((v) => v.id === activeVehicleId);
 
   const [from, setFrom] = useState<Place>();
@@ -37,6 +38,20 @@ export default function RouteScreen() {
   const [planning, setPlanning] = useState(false);
   const [error, setError] = useState<string>();
   const [plan, setPlan] = useState<{ trip: TripPlan; distanceKm: number; driveMinutes: number }>();
+
+  // Kayitli araclar yuklenmeden "arac yok" gostermek yaniltici olurdu.
+  if (!hasHydrated) {
+    return (
+      <SafeAreaView edges={['top']} style={styles.root}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Rota</Text>
+        </View>
+        <View style={styles.centered}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!vehicle) {
     return (

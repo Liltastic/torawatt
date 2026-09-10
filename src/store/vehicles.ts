@@ -1,63 +1,68 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 import type { Vehicle } from '@/types/domain';
 
+import { PERSIST_VERSION, storage } from './persist';
+
 /**
  * Kullanicinin araclari (spec bolum 14).
- *
- * GECICI: bellekte tutuluyor; backend /vehicles ucu baglanana kadar
- * uygulama yeniden yuklendiginde sifirlanir.
+ * Cihazda saklanir; backend /vehicles ucu baglandiginda sunucu ile eslenecek.
  */
 interface VehicleState {
   vehicles: Vehicle[];
   /** Filtreleme ve rota onerilerinde kullanilacak arac. */
   activeVehicleId?: string;
 
+  /** Kalici veri yuklendi mi; yuklenmeden "arac yok" gostermek yaniltici. */
+  hasHydrated: boolean;
+
   add: (vehicle: Omit<Vehicle, 'id'>) => Vehicle;
   remove: (id: string) => void;
   setActive: (id: string) => void;
-  activeVehicle: () => Vehicle | undefined;
 }
 
-export const useVehicleStore = create<VehicleState>((set, get) => ({
-  vehicles: [],
-  activeVehicleId: undefined,
+export const useVehicleStore = create<VehicleState>()(
+  persist(
+    (set) => ({
+      vehicles: [],
+      activeVehicleId: undefined,
+      hasHydrated: false,
 
-  add: (input) => {
-    const vehicle: Vehicle = { ...input, id: `veh_${Date.now()}` };
-    set((state) => ({
-      vehicles: [...state.vehicles, vehicle],
-      // Ilk arac otomatik olarak aktif olur; kullanici ayrica secmek zorunda kalmasin.
-      activeVehicleId: state.activeVehicleId ?? vehicle.id,
-    }));
-    return vehicle;
-  },
+      add: (input) => {
+        const vehicle: Vehicle = { ...input, id: `veh_${Date.now()}` };
+        set((state) => ({
+          vehicles: [...state.vehicles, vehicle],
+          // Ilk arac otomatik aktif olur; kullanici ayrica secmek zorunda kalmasin.
+          activeVehicleId: state.activeVehicleId ?? vehicle.id,
+        }));
+        return vehicle;
+      },
 
-  remove: (id) =>
-    set((state) => {
-      const vehicles = state.vehicles.filter((v) => v.id !== id);
-      return {
-        vehicles,
-        activeVehicleId:
-          state.activeVehicleId === id ? vehicles[0]?.id : state.activeVehicleId,
-      };
+      remove: (id) =>
+        set((state) => {
+          const vehicles = state.vehicles.filter((v) => v.id !== id);
+          return {
+            vehicles,
+            activeVehicleId:
+              state.activeVehicleId === id ? vehicles[0]?.id : state.activeVehicleId,
+          };
+        }),
+
+      setActive: (id) => set({ activeVehicleId: id }),
     }),
-
-  setActive: (id) => set({ activeVehicleId: id }),
-
-  activeVehicle: () => {
-    const { vehicles, activeVehicleId } = get();
-    return vehicles.find((v) => v.id === activeVehicleId);
-  },
-}));
-
-/**
- * Bir istasyonun soketlerinden en az biri araca uyuyor mu?
- * Hem fis tipi hem de aracin kabul ettigi guc dikkate alinir.
- */
-export function vehicleSupportsConnector(
-  vehicle: Vehicle,
-  connector: { type: Vehicle['connectors'][number]; powerKw: number },
-): boolean {
-  return vehicle.connectors.includes(connector.type);
-}
+    {
+      name: 'tora-watt-vehicles',
+      storage,
+      version: PERSIST_VERSION,
+      // Yalnizca veriyi sakla; aksiyonlar serilestirilemez.
+      partialize: (state) => ({
+        vehicles: state.vehicles,
+        activeVehicleId: state.activeVehicleId,
+      }),
+      onRehydrateStorage: () => (state) => {
+        if (state) state.hasHydrated = true;
+      },
+    },
+  ),
+);
