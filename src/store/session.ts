@@ -2,6 +2,8 @@ import { create } from 'zustand';
 
 import type { ChargingSession, Connector, Station } from '@/types/domain';
 
+import { useHistoryStore } from './history';
+
 /**
  * GECICI: aktif sarj oturumu simule ediliyor.
  *
@@ -50,6 +52,27 @@ function powerAtBattery(ratedKw: number, batteryPercent: number): number {
   if (batteryPercent >= 80) return ratedKw * 0.35;
   if (batteryPercent >= 60) return ratedKw * 0.75;
   return ratedKw;
+}
+
+/**
+ * Biten oturumu gecmise yazar. Hic enerji aktarilmadiysa kayit acmiyoruz;
+ * baslamadan iptal edilen bir oturum gecmiste yer tutmamali.
+ */
+function archive(session: ChargingSession, meta: SessionMeta, elapsedSeconds: number) {
+  if (session.energyKwh <= 0) return;
+
+  useHistoryStore.getState().add({
+    id: session.id,
+    stationId: session.stationId,
+    stationName: meta.stationName,
+    connectorLabel: meta.connectorLabel,
+    startedAt: session.startedAt,
+    endedAt: new Date().toISOString(),
+    durationMinutes: Math.max(1, Math.round(elapsedSeconds / 60)),
+    energyKwh: session.energyKwh,
+    pricePerKwh: meta.pricePerKwh,
+    cost: session.cost,
+  });
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -120,22 +143,29 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         },
       });
 
-      if (nextBattery >= 100) stopTimer();
+      if (nextBattery >= 100) {
+        stopTimer();
+        const finished = get().session;
+        if (finished) archive(finished, meta, get().elapsedSeconds);
+      }
     }, TICK_MS);
   },
 
   stop: () => {
     stopTimer();
-    const { session } = get();
-    if (!session) return;
+    const { session, meta, elapsedSeconds } = get();
+    if (!session || !meta) return;
+    // Batarya %100'e ulasip kendiliginden bittiyse gecmise zaten yazildi.
+    if (session.status === 'COMPLETED') return;
 
-    set({
-      session: {
-        ...session,
-        status: 'COMPLETED',
-        endedAt: new Date().toISOString(),
-      },
-    });
+    const completed: ChargingSession = {
+      ...session,
+      status: 'COMPLETED',
+      endedAt: new Date().toISOString(),
+    };
+
+    set({ session: completed });
+    archive(completed, meta, elapsedSeconds);
   },
 
   clear: () => {

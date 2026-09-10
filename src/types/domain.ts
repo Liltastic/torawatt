@@ -135,3 +135,11 @@ export function stationAvailability(station: Pick<Station, 'connectors'>): Stati
   if (available === usable.length) return 'AVAILABLE';
   return 'PARTIAL';
 }
+
+/** Gecmis detayinda gosterilen ek alanlar; liste karti icin gerekmez. */
+export interface ChargingHistoryDetail extends ChargingHistoryItem {
+  stationId?: string;
+  connectorLabel: string;
+  pricePerKwh: number;
+  idleFee?: number;
+}
