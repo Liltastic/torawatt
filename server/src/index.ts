@@ -9,6 +9,7 @@ import 'express-async-errors';
 import cors from 'cors';
 import express from 'express';
 
+import { favoritesRouter } from './routes/favorites.js';
 import { historyRouter } from './routes/history.js';
 import { paymentMethodsRouter } from './routes/paymentMethods.js';
 import { reservationsRouter } from './routes/reservations.js';
@@ -29,6 +30,7 @@ app.use('/vehicles', vehiclesRouter);
 app.use('/reservations', reservationsRouter);
 app.use('/charging-history', historyRouter);
 app.use('/payment-methods', paymentMethodsRouter);
+app.use('/favorites', favoritesRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'not_found' });

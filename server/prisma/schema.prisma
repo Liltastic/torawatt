@@ -31,6 +31,7 @@ model Station {
   isOpen24h  Boolean
   amenities  String // JSON string[] - SQLite'ta native dizi yok
   connectors Connector[]
+  favorites  Favorite[]
 }
 
 model Connector {
@@ -95,6 +96,18 @@ model ChargingHistoryEntry {
   cost            Float
   createdAt       DateTime @default(now())
 
+  @@index([ownerId])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  ownerId   String
+  stationId String
+  station   Station  @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  // Ayni istasyon bir sahip icin en fazla bir kez favorilenir; PUT idempotent kalir.
+  @@unique([ownerId, stationId])
   @@index([ownerId])
 }
 
