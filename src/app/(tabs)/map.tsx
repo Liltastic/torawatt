@@ -38,6 +38,7 @@ import {
   ConnectorCard,
   EmptyState,
   FilterChip,
+  Logo,
   SearchBar,
   SegmentedControl,
   StationCard,
@@ -384,14 +385,14 @@ export default function MapScreen() {
           <Ionicons
             name={locationStatus === 'denied' ? 'navigate-outline' : 'navigate'}
             size={20}
-            color={locationStatus === 'granted' ? colors.primary : colors.textSecondary}
+            color={locationStatus === 'granted' ? colors.location : colors.textSecondary}
           />
         </AnimatedPressable>
       </Animated.View>
 
       <SafeAreaView edges={['top']} style={styles.header} pointerEvents="box-none">
         <View style={styles.headerRow}>
-          <Text style={styles.brand}>TORA WATT</Text>
+          <Logo width={104} />
           <AnimatedPressable
             accessibilityRole="button"
             accessibilityLabel="Bildirimler"
@@ -701,7 +702,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: spacing.sm,
   },
-  brand: { ...typography.h3, letterSpacing: 1, color: colors.text },
   iconButton: {
     width: 40,
     height: 40,

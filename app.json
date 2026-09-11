@@ -12,7 +12,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#DCF6EF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -28,7 +28,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#0FB5A3",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
@@ -40,7 +40,7 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "backgroundColor": "#EEF2FF",
+    "backgroundColor": "#F2FBF6",
     "extra": {
       "router": {},
       "eas": {

@@ -6,6 +6,7 @@ export { EmptyState } from './EmptyState';
 export { FilterChip } from './FilterChip';
 export { SearchBar } from './SearchBar';
 export { StationCard } from './StationCard';
+export { Logo } from './Logo';
 export { PlaceholderScreen } from './PlaceholderScreen';
 export { ProgressRing } from './ProgressRing';
 export { SegmentedControl } from './SegmentedControl';

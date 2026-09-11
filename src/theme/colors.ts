@@ -2,31 +2,38 @@ import type { ChargerStatus, StationAvailability } from '@/types/domain';
 
 /**
  * TORA WATT renk tokenlari (spec bolum 17).
- * Erisilebilirlik testleri sonrasi kesinlesecek baslangic degerleri.
+ * "Solar Fresh" yonu: canli turkuaz/yesil enerji paleti, eski donuk lacivert
+ * yerine. Marka logosunun mavisi `location` olarak ayri tutuluyor - kullanici
+ * konum noktasi ve birkaç vurguda bu maviyi koruyoruz, geri kalan her yerde
+ * (buton, rozet, harita) turkuaz ana renk.
  */
 export const colors = {
-  background: '#EEF2FF',
+  background: '#F2FBF6',
   surface: '#FFFFFF',
-  surfaceMuted: '#F7F8FC',
+  surfaceMuted: '#EAF7F0',
 
-  text: '#0B0D12',
-  textSecondary: '#687080',
-  textTertiary: '#9AA1AF',
-  border: '#E7EAF0',
+  text: '#0F2A22',
+  textSecondary: '#5B7268',
+  textTertiary: '#93A79D',
+  border: '#DCEFE4',
 
-  primary: '#2F6BFF',
-  primaryDark: '#1650E8',
-  primarySoft: '#EAF0FF',
+  primary: '#0FB5A3',
+  primaryDark: '#0C8F82',
+  primarySoft: '#DCF6EF',
 
-  success: '#18B968',
-  successSoft: '#E6F7EF',
-  warning: '#F4A62A',
-  warningSoft: '#FEF4E4',
-  danger: '#E5484D',
-  dangerSoft: '#FDECEC',
+  success: '#16C784',
+  successSoft: '#E1FAEE',
+  warning: '#FF8A3D',
+  warningSoft: '#FFECDD',
+  danger: '#FF4D6D',
+  dangerSoft: '#FFE2E9',
 
-  neutral: '#9AA1AF',
-  neutralSoft: '#F0F2F6',
+  neutral: '#93A79D',
+  neutralSoft: '#E9F3EE',
+
+  /** Logonun mavisi; kullanici konum noktasi ve marka vurgularinda kullanilir. */
+  location: '#2F7DFF',
+  locationSoft: '#E3EDFF',
 
   black: '#050505',
   white: '#FFFFFF',

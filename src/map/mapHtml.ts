@@ -10,9 +10,15 @@ const MAPLIBRE_VERSION = '5.24.0';
 export const TILE_ORIGIN = 'https://tiles.openfreemap.org';
 const STYLE_URL = `${TILE_ORIGIN}/styles/positron`;
 
-/** Positron'un notr grilerini uygulamanin lavanta tonuna yaklastiriyoruz. */
-const LAND_COLOR = '#F4F6FD';
-const WATER_COLOR = '#DCE4F7';
+/**
+ * Positron'un notr grilerini "Solar Fresh" paletine cekiyoruz: canli nane
+ * yesili zemin, doygun gok mavisi su, yesil alanlar (park/orman/cim) daha
+ * belirgin bir yesile, binalar hafif sicak bir kreme boyaniyor.
+ */
+const LAND_COLOR = '#E4F7EC';
+const WATER_COLOR = '#BFE7F5';
+const PARK_COLOR = '#BFEBD2';
+const BUILDING_COLOR = '#FFF1DE';
 
 export interface MapHtmlOptions {
   centerLatitude: number;
@@ -81,7 +87,33 @@ export function buildMapHtml({ centerLatitude, centerLongitude, zoom }: MapHtmlO
 
   map.on('load', function () {
     if (map.getLayer('background')) map.setPaintProperty('background', 'background-color', '${LAND_COLOR}');
-    if (map.getLayer('water')) map.setPaintProperty('water', 'fill-color', '${WATER_COLOR}');
+
+    // Positron'un tam katman kimliklerini varsayamayiz (surum/CDN degisebilir);
+    // isimlerine gore eslesen dolgu katmanlarini tarayip Solar Fresh paletine
+    // ceviriyoruz. Beklenmeyen bir katman turu patlatirsa tek bir katman
+    // yuzunden haritanin tamami calismaz olmasin diye try/catch var.
+    map.getStyle().layers.forEach(function (layer) {
+      if (layer.type !== 'fill') return;
+      var id = layer.id.toLowerCase();
+      try {
+        if (id.indexOf('water') !== -1) {
+          map.setPaintProperty(layer.id, 'fill-color', '${WATER_COLOR}');
+        } else if (
+          id.indexOf('park') !== -1 ||
+          id.indexOf('wood') !== -1 ||
+          id.indexOf('forest') !== -1 ||
+          id.indexOf('grass') !== -1 ||
+          id.indexOf('landcover') !== -1
+        ) {
+          map.setPaintProperty(layer.id, 'fill-color', '${PARK_COLOR}');
+        } else if (id.indexOf('building') !== -1) {
+          map.setPaintProperty(layer.id, 'fill-color', '${BUILDING_COLOR}');
+          map.setPaintProperty(layer.id, 'fill-opacity', 0.6);
+        }
+      } catch (e) {
+        // Bu katman beklenen paint ozelligini desteklemiyor olabilir; digerlerini etkilemesin.
+      }
+    });
 
     map.addSource('stations', {
       type: 'geojson',
@@ -167,7 +199,9 @@ export function buildMapHtml({ centerLatitude, centerLongitude, zoom }: MapHtmlO
       paint: { 'text-color': '#FFFFFF' },
     });
 
-    // Kullanici konumu: nabiz gibi genisleyen hale + mavi nokta.
+    // Kullanici konumu: nabiz gibi genisleyen hale + mavi nokta. Marka mavisi
+    // (colors.location) kasitli olarak istasyon turkuazindan farkli - "ben
+    // buradayim" noktasi diger tum turkuaz/renkli pinlerden hemen ayrissin.
     map.addSource('user', { type: 'geojson', data: EMPTY });
     map.addLayer({
       id: 'user-pulse',
@@ -175,7 +209,7 @@ export function buildMapHtml({ centerLatitude, centerLongitude, zoom }: MapHtmlO
       source: 'user',
       paint: {
         'circle-radius': 14,
-        'circle-color': '${colors.primary}',
+        'circle-color': '${colors.location}',
         'circle-opacity': 0.25,
       },
     });
@@ -185,7 +219,7 @@ export function buildMapHtml({ centerLatitude, centerLongitude, zoom }: MapHtmlO
       source: 'user',
       paint: {
         'circle-radius': 7,
-        'circle-color': '${colors.primary}',
+        'circle-color': '${colors.location}',
         'circle-stroke-width': 2.5,
         'circle-stroke-color': '#FFFFFF',
       },
@@ -208,7 +242,7 @@ export function buildMapHtml({ centerLatitude, centerLongitude, zoom }: MapHtmlO
       paint: { 'line-color': '${colors.primary}', 'line-width': 5 },
     }, 'station-halo');
 
-    // Baslangic (koyu) ve varis (mavi) noktalari.
+    // Baslangic (koyu) ve varis (marka mavisi) noktalari.
     map.addSource('endpoints', { type: 'geojson', data: EMPTY });
     map.addLayer({
       id: 'endpoints',
@@ -216,7 +250,7 @@ export function buildMapHtml({ centerLatitude, centerLongitude, zoom }: MapHtmlO
       source: 'endpoints',
       paint: {
         'circle-radius': 7,
-        'circle-color': ['match', ['get', 'kind'], 'start', '${colors.text}', '${colors.primaryDark}'],
+        'circle-color': ['match', ['get', 'kind'], 'start', '${colors.text}', '${colors.location}'],
         'circle-stroke-width': 3,
         'circle-stroke-color': '#FFFFFF',
       },
