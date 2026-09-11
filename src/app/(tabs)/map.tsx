@@ -18,7 +18,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
   Extrapolation,
   FadeInDown,
@@ -170,7 +170,6 @@ export default function MapScreen() {
   const [selectedConnectorId, setSelectedConnectorId] = useState<string>();
   const [detailTab, setDetailTab] = useState<DetailTab>('station');
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const sheetRef = useRef<BottomSheet>(null);
   const mapRef = useRef<StationMapHandle>(null);
@@ -312,8 +311,11 @@ export default function MapScreen() {
       if (!selectedStation) return null;
       const connector = selectedStation.connectors.find((c) => c.id === selectedConnectorId);
 
+      // insets.bottom uygulanmiyor: bu ekran zaten sekme cubugunun ustunde
+      // duruyor, cubuk kendi safe-area payini kendisi ayirtiyor - ikisini
+      // toplarsak footer ile cubuk arasinda gereksiz bir bosluk olusuyordu.
       return (
-        <DetailFooter {...footerProps} bottomInset={insets.bottom}>
+        <DetailFooter {...footerProps} bottomInset={0}>
           <Button
             label="Rezerve Et"
             variant="secondary"
@@ -342,7 +344,7 @@ export default function MapScreen() {
         </DetailFooter>
       );
     },
-    [selectedStation, selectedConnectorId, router, insets.bottom],
+    [selectedStation, selectedConnectorId, router],
   );
 
   return (
