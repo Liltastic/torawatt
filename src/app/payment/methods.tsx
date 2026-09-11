@@ -1,10 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, {
+  FadeInDown,
+  FadeInUp,
+  FadeOutDown,
+  LinearTransition,
+} from 'react-native-reanimated';
 
-import { Button, Card, EmptyState, FilterChip } from '@/components';
+import { AnimatedPressable, Button, Card, EmptyState, FilterChip } from '@/components';
 import { demoCardCatalog } from '@/mocks/paymentCatalog';
 import {
   useAddPaymentMethod,
@@ -36,14 +42,15 @@ export default function PaymentMethodsScreen() {
     <View style={styles.root}>
       <SafeAreaView edges={['top']}>
         <View style={styles.header}>
-          <Pressable
+          <AnimatedPressable
             accessibilityRole="button"
             accessibilityLabel="Geri"
             hitSlop={10}
+            haptic="tap"
             onPress={() => router.back()}
             style={styles.headerButton}>
             <Ionicons name="chevron-back" size={22} color={colors.text} />
-          </Pressable>
+          </AnimatedPressable>
           <Text style={styles.headerTitle}>Ödeme yöntemleri</Text>
           <View style={styles.headerSpacer} />
         </View>
@@ -70,50 +77,61 @@ export default function PaymentMethodsScreen() {
             style={styles.empty}
           />
         ) : (
-          methods.map((method) => (
-            <Card key={method.id} style={styles.card}>
-              <View style={styles.cardRow}>
-                <View style={styles.brandBox}>
-                  <Ionicons name="card" size={18} color={colors.primaryDark} />
+          methods.map((method, index) => (
+            <Animated.View
+              key={method.id}
+              entering={FadeInDown.delay(index * 60).duration(300)}
+              exiting={FadeOutDown.duration(200)}
+              layout={LinearTransition.duration(220)}>
+              <Card style={styles.card}>
+                <View style={styles.cardRow}>
+                  <View style={styles.brandBox}>
+                    <Ionicons name="card" size={18} color={colors.primaryDark} />
+                  </View>
+
+                  <View style={styles.cardInfo}>
+                    <Text style={styles.cardBrand}>
+                      {method.brand} ···· {method.last4}
+                    </Text>
+                    <Text style={styles.cardExpiry}>
+                      Son kullanma {pad2(method.expiryMonth)}/{String(method.expiryYear).slice(-2)}
+                    </Text>
+                  </View>
+
+                  <AnimatedPressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${method.brand} kartını sil`}
+                    hitSlop={10}
+                    haptic="warning"
+                    onPress={() => confirmRemove(method.id, `${method.brand} ···· ${method.last4}`)}>
+                    <Ionicons name="trash-outline" size={18} color={colors.textTertiary} />
+                  </AnimatedPressable>
                 </View>
 
-                <View style={styles.cardInfo}>
-                  <Text style={styles.cardBrand}>
-                    {method.brand} ···· {method.last4}
-                  </Text>
-                  <Text style={styles.cardExpiry}>
-                    Son kullanma {pad2(method.expiryMonth)}/{String(method.expiryYear).slice(-2)}
-                  </Text>
-                </View>
-
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`${method.brand} kartını sil`}
-                  hitSlop={10}
-                  onPress={() => confirmRemove(method.id, `${method.brand} ···· ${method.last4}`)}>
-                  <Ionicons name="trash-outline" size={18} color={colors.textTertiary} />
-                </Pressable>
-              </View>
-
-              {method.isDefault ? (
-                <View style={styles.defaultBadge}>
-                  <Ionicons name="checkmark" size={13} color={colors.white} />
-                  <Text style={styles.defaultText}>Varsayılan</Text>
-                </View>
-              ) : (
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => setDefault.mutate(method.id)}
-                  style={({ pressed }) => [styles.makeDefault, pressed && styles.makeDefaultPressed]}>
-                  <Text style={styles.makeDefaultText}>Varsayılan yap</Text>
-                </Pressable>
-              )}
-            </Card>
+                {method.isDefault ? (
+                  <View style={styles.defaultBadge}>
+                    <Ionicons name="checkmark" size={13} color={colors.white} />
+                    <Text style={styles.defaultText}>Varsayılan</Text>
+                  </View>
+                ) : (
+                  <AnimatedPressable
+                    accessibilityRole="button"
+                    haptic="selection"
+                    onPress={() => setDefault.mutate(method.id)}
+                    style={({ pressed }) => [styles.makeDefault, pressed && styles.makeDefaultPressed]}>
+                    <Text style={styles.makeDefaultText}>Varsayılan yap</Text>
+                  </AnimatedPressable>
+                )}
+              </Card>
+            </Animated.View>
           ))
         )}
 
         {picking && (
-          <View style={styles.picker}>
+          <Animated.View
+            entering={FadeInUp.duration(280)}
+            exiting={FadeOutDown.duration(180)}
+            style={styles.picker}>
             <Text style={styles.pickerTitle}>Hangi demo kart?</Text>
             <View style={styles.pickerChips}>
               {demoCardCatalog.map((card) => (
@@ -128,7 +146,7 @@ export default function PaymentMethodsScreen() {
                 />
               ))}
             </View>
-          </View>
+          </Animated.View>
         )}
       </ScrollView>
 

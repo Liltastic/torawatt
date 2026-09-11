@@ -1,15 +1,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { Button, Card, ConnectorBadge, EmptyState, FilterChip, PowerBadge } from '@/components';
+import { AnimatedPressable, Button, Card, ConnectorBadge, EmptyState, FilterChip, PowerBadge } from '@/components';
 import { useCreateReservation, useSetReservationStatus } from '@/queries/reservations';
 import { useStation } from '@/queries/stations';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
 import { RESERVATION_GRACE_MINUTES, currentTypeOf } from '@/types/domain';
 import { formatTime } from '@/utils/format';
+import { haptics } from '@/utils/haptics';
 
 /** Hizli rezervasyon secenekleri (spec bolum 10). */
 const START_OPTIONS = [
@@ -81,13 +83,17 @@ export default function NewReservationScreen() {
           setStatus.mutate(
             { id: reservation.id, status: 'CONFIRMED' },
             {
+              onSuccess: () => haptics.success(),
               onSettled: () => {
                 router.replace({ pathname: '/booking/[id]', params: { id: reservation.id } });
               },
             },
           );
         },
-        onError: (err) => setError(err instanceof Error ? err.message : 'Rezervasyon oluşturulamadı'),
+        onError: (err) => {
+          haptics.error();
+          setError(err instanceof Error ? err.message : 'Rezervasyon oluşturulamadı');
+        },
       },
     );
   };
@@ -104,17 +110,19 @@ export default function NewReservationScreen() {
         <Text style={styles.title}>Rezervasyon</Text>
         <Text style={styles.subtitle}>Soketi sana ayıralım.</Text>
 
-        <Card style={styles.card}>
-          <Text style={styles.stationName}>{station.name}</Text>
-          <View style={styles.badges}>
-            <ConnectorBadge type={connector.type} />
-            <PowerBadge
-              currentType={currentTypeOf(connector)}
-              powerKw={connector.powerKw}
-              style={styles.badgeGap}
-            />
-          </View>
-        </Card>
+        <Animated.View entering={FadeInDown.duration(300)}>
+          <Card style={styles.card}>
+            <Text style={styles.stationName}>{station.name}</Text>
+            <View style={styles.badges}>
+              <ConnectorBadge type={connector.type} />
+              <PowerBadge
+                currentType={currentTypeOf(connector)}
+                powerKw={connector.powerKw}
+                style={styles.badgeGap}
+              />
+            </View>
+          </Card>
+        </Animated.View>
 
         <Text style={styles.sectionTitle}>Ne zaman?</Text>
         <View style={styles.chips}>
@@ -152,10 +160,10 @@ export default function NewReservationScreen() {
         </View>
 
         {!!error && (
-          <View style={styles.errorBox}>
+          <Animated.View entering={FadeInDown.duration(220)} style={styles.errorBox}>
             <Ionicons name="alert-circle-outline" size={16} color={colors.danger} />
             <Text style={styles.errorText}>{error}</Text>
-          </View>
+          </Animated.View>
         )}
       </ScrollView>
 
@@ -169,14 +177,15 @@ export default function NewReservationScreen() {
 function Header({ onClose }: { onClose: () => void }) {
   return (
     <View style={styles.header}>
-      <Pressable
+      <AnimatedPressable
         accessibilityRole="button"
         accessibilityLabel="Kapat"
         hitSlop={10}
+        haptic="tap"
         onPress={onClose}
         style={styles.headerButton}>
         <Ionicons name="close" size={22} color={colors.text} />
-      </Pressable>
+      </AnimatedPressable>
     </View>
   );
 }

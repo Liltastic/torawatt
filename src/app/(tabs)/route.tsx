@@ -5,21 +5,22 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { Button, Card, EmptyState, TextField } from '@/components';
+import { AnimatedPressable, Button, Card, EmptyState, TextField } from '@/components';
 import { useStations } from '@/queries/stations';
 import { useActiveVehicle, useVehicles } from '@/queries/vehicles';
 import { geocode, getRoute, type Place } from '@/services/routing';
 import { planTrip, type TripPlan } from '@/services/tripPlanner';
 import { colors, radius, spacing, typography } from '@/theme';
 import { formatEnergy, formatMinutes, formatPrice } from '@/utils/format';
+import { haptics } from '@/utils/haptics';
 
 /** Varista bataryada birakilmasi istenen pay. */
 const RESERVE_PERCENT = 10;
@@ -89,7 +90,9 @@ export default function RouteScreen() {
       });
 
       setPlan({ trip, distanceKm: route.distanceKm, driveMinutes: route.durationMinutes });
+      haptics.success();
     } catch (e) {
+      haptics.error();
       setError(e instanceof Error ? e.message : 'Rota hesaplanamadı');
     } finally {
       setPlanning(false);
@@ -129,13 +132,17 @@ export default function RouteScreen() {
           />
 
           {!!error && (
-            <View style={styles.errorBox}>
+            <Animated.View entering={FadeInDown.duration(220)} style={styles.errorBox}>
               <Ionicons name="alert-circle-outline" size={16} color={colors.danger} />
               <Text style={styles.errorText}>{error}</Text>
-            </View>
+            </Animated.View>
           )}
 
-          {plan && <PlanResult {...plan} />}
+          {plan && (
+            <Animated.View entering={FadeInDown.duration(320)}>
+              <PlanResult {...plan} />
+            </Animated.View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -195,30 +202,34 @@ function PlanResult({
         <>
           <Text style={styles.stopsTitle}>Önerilen şarj molaları</Text>
           {trip.stops.map((stop, index) => (
-            <Card key={stop.station.id} style={styles.stopCard}>
-              <View style={styles.stopHeader}>
-                <View style={styles.stopIndex}>
-                  <Text style={styles.stopIndexText}>{index + 1}</Text>
+            <Animated.View
+              key={stop.station.id}
+              entering={FadeInDown.delay(index * 70).duration(300)}>
+              <Card style={styles.stopCard}>
+                <View style={styles.stopHeader}>
+                  <View style={styles.stopIndex}>
+                    <Text style={styles.stopIndexText}>{index + 1}</Text>
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={styles.stopName}>{stop.station.name}</Text>
+                    <Text style={styles.stopMeta}>
+                      {Math.round(stop.distanceFromStartKm)} km · {stop.station.operator}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.flex}>
-                  <Text style={styles.stopName}>{stop.station.name}</Text>
-                  <Text style={styles.stopMeta}>
-                    {Math.round(stop.distanceFromStartKm)} km · {stop.station.operator}
-                  </Text>
-                </View>
-              </View>
 
-              <View style={styles.stopStats}>
-                <Text style={styles.stopStat}>
-                  %{Math.round(stop.arrivalPercent)} → %{Math.round(stop.departurePercent)}
-                </Text>
-                <Text style={styles.stopStat}>{formatEnergy(stop.addedKwh)}</Text>
-                <Text style={styles.stopStat}>
-                  {formatMinutes(Math.round(stop.chargeMinutes))}
-                </Text>
-                <Text style={[styles.stopStat, styles.stopCost]}>{formatPrice(stop.cost)}</Text>
-              </View>
-            </Card>
+                <View style={styles.stopStats}>
+                  <Text style={styles.stopStat}>
+                    %{Math.round(stop.arrivalPercent)} → %{Math.round(stop.departurePercent)}
+                  </Text>
+                  <Text style={styles.stopStat}>{formatEnergy(stop.addedKwh)}</Text>
+                  <Text style={styles.stopStat}>
+                    {formatMinutes(Math.round(stop.chargeMinutes))}
+                  </Text>
+                  <Text style={[styles.stopStat, styles.stopCost]}>{formatPrice(stop.cost)}</Text>
+                </View>
+              </Card>
+            </Animated.View>
           ))}
         </>
       )}
@@ -292,11 +303,12 @@ function PlaceSearch({
       {searching && <ActivityIndicator style={styles.searching} color={colors.primary} />}
 
       {results.length > 0 && (
-        <View style={styles.results}>
+        <Animated.View entering={FadeInDown.duration(220)} style={styles.results}>
           {results.map((place) => (
-            <Pressable
+            <AnimatedPressable
               key={place.id}
               accessibilityRole="button"
+              haptic="selection"
               onPress={() => {
                 onSelect(place);
                 setQuery(place.label);
@@ -307,9 +319,9 @@ function PlaceSearch({
               <Text style={styles.resultText} numberOfLines={2}>
                 {place.label}
               </Text>
-            </Pressable>
+            </AnimatedPressable>
           ))}
-        </View>
+        </Animated.View>
       )}
     </View>
   );

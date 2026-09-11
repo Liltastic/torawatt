@@ -1,3 +1,4 @@
+export { AnimatedPressable } from './AnimatedPressable';
 export { AvailabilityBadge, ConnectorBadge, PowerBadge } from './Badges';
 export { Button } from './Button';
 export { Card } from './Card';
@@ -6,5 +7,7 @@ export { FilterChip } from './FilterChip';
 export { SearchBar } from './SearchBar';
 export { StationCard } from './StationCard';
 export { PlaceholderScreen } from './PlaceholderScreen';
+export { ProgressRing } from './ProgressRing';
+export { SegmentedControl } from './SegmentedControl';
 export { ConnectorCard } from './ConnectorCard';
 export { TextField } from './TextField';

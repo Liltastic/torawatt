@@ -1,19 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Linking,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { AvailabilityBadge, Button, Card, ConnectorCard, EmptyState } from '@/components';
+import { AnimatedPressable, AvailabilityBadge, Button, Card, ConnectorCard, EmptyState } from '@/components';
 import { useStation } from '@/queries/stations';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
 import { stationAvailability } from '@/types/domain';
@@ -105,45 +97,52 @@ export default function StationDetailScreen() {
         <Text style={styles.sectionHint}>Şarj başlatmak için bir soket seç.</Text>
 
         {station.connectors.map((connector, index) => (
-          <ConnectorCard
+          <Animated.View
             key={connector.id}
-            connector={connector}
-            index={index + 1}
-            selected={connector.id === selectedConnectorId}
-            onPress={() => setSelectedConnectorId(connector.id)}
-          />
+            entering={FadeInDown.delay(index * 60).duration(280)}>
+            <ConnectorCard
+              connector={connector}
+              index={index + 1}
+              selected={connector.id === selectedConnectorId}
+              onPress={() => setSelectedConnectorId(connector.id)}
+            />
+          </Animated.View>
         ))}
 
         <Text style={styles.sectionTitle}>Ücretlendirme</Text>
-        <Card style={styles.infoCard}>
-          <InfoRow
-            label="Enerji"
-            value={
-              selectedConnector?.pricePerKwh != null
-                ? `${formatPrice(selectedConnector.pricePerKwh)} / kWh`
-                : 'Soket seçince görünür'
-            }
-          />
-          <InfoRow
-            label="Bekleme ücreti"
-            value={
-              selectedConnector?.idleFeePerMin != null
-                ? `${formatPrice(selectedConnector.idleFeePerMin)} / dk`
-                : 'Yok'
-            }
-          />
-          <InfoRow label="Başlatma ücreti" value="Yok" last />
-        </Card>
+        <Animated.View entering={FadeInDown.duration(280)}>
+          <Card style={styles.infoCard}>
+            <InfoRow
+              label="Enerji"
+              value={
+                selectedConnector?.pricePerKwh != null
+                  ? `${formatPrice(selectedConnector.pricePerKwh)} / kWh`
+                  : 'Soket seçince görünür'
+              }
+            />
+            <InfoRow
+              label="Bekleme ücreti"
+              value={
+                selectedConnector?.idleFeePerMin != null
+                  ? `${formatPrice(selectedConnector.idleFeePerMin)} / dk`
+                  : 'Yok'
+              }
+            />
+            <InfoRow label="Başlatma ücreti" value="Yok" last />
+          </Card>
+        </Animated.View>
 
         <Text style={styles.sectionTitle}>Konum ve olanaklar</Text>
-        <Card style={styles.infoCard}>
-          <InfoRow label="Adres" value={station.address} />
-          <InfoRow
-            label="Olanaklar"
-            value={station.amenities.length > 0 ? station.amenities.join(', ') : 'Belirtilmemiş'}
-            last
-          />
-        </Card>
+        <Animated.View entering={FadeInDown.duration(280)}>
+          <Card style={styles.infoCard}>
+            <InfoRow label="Adres" value={station.address} />
+            <InfoRow
+              label="Olanaklar"
+              value={station.amenities.length > 0 ? station.amenities.join(', ') : 'Belirtilmemiş'}
+              last
+            />
+          </Card>
+        </Animated.View>
       </ScrollView>
 
       <SafeAreaView edges={['bottom']} style={[styles.actions, shadows.sheet]}>
@@ -163,13 +162,14 @@ export default function StationDetailScreen() {
         />
 
         <View style={styles.actionRow}>
-          <Pressable
+          <AnimatedPressable
             accessibilityRole="button"
             accessibilityLabel="Yol tarifi"
+            haptic="tap"
             onPress={openDirections}
             style={({ pressed }) => [styles.directionsButton, pressed && styles.directionsPressed]}>
             <Ionicons name="navigate" size={20} color={colors.primaryDark} />
-          </Pressable>
+          </AnimatedPressable>
 
           <Button
             label={selectedConnector ? 'Şarj Başlat' : 'Önce soket seç'}
@@ -194,22 +194,24 @@ export default function StationDetailScreen() {
 function ScreenHeader({ onBack }: { onBack: () => void }) {
   return (
     <View style={styles.header}>
-      <Pressable
+      <AnimatedPressable
         accessibilityRole="button"
         accessibilityLabel="Geri"
         hitSlop={10}
+        haptic="tap"
         onPress={onBack}
         style={styles.headerButton}>
         <Ionicons name="chevron-back" size={22} color={colors.text} />
-      </Pressable>
+      </AnimatedPressable>
 
-      <Pressable
+      <AnimatedPressable
         accessibilityRole="button"
         accessibilityLabel="Favorilere ekle"
         hitSlop={10}
+        haptic="tap"
         style={styles.headerButton}>
         <Ionicons name="heart-outline" size={20} color={colors.text} />
-      </Pressable>
+      </AnimatedPressable>
     </View>
   );
 }

@@ -1,12 +1,18 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { Card } from '@/components';
+import { useMemo } from 'react';
+
+import { AnimatedPressable, Card } from '@/components';
+import { useChargingHistory } from '@/queries/history';
 import { useActiveVehicle } from '@/queries/vehicles';
 import { colors, radius, spacing, typography } from '@/theme';
 import { connectorLabels } from '@/types/domain';
+import { getRunningUpdateLabel } from '@/utils/buildInfo';
+import { formatEnergy, formatPrice } from '@/utils/format';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -14,7 +20,7 @@ type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 const MENU: { icon: IoniconName; label: string; href?: string; tag?: string }[] = [
   { icon: 'car-sport-outline', label: 'Araçlarım', href: '/vehicles' },
   { icon: 'card-outline', label: 'Ödeme yöntemleri', href: '/payment/methods', tag: 'demo' },
-  { icon: 'heart-outline', label: 'Favoriler' },
+  { icon: 'heart-outline', label: 'Favoriler', href: '/favorites' },
   { icon: 'notifications-outline', label: 'Bildirimler' },
   { icon: 'pricetag-outline', label: 'Kampanyalar' },
   { icon: 'help-buoy-outline', label: 'Yardım ve destek' },
@@ -24,90 +30,140 @@ const MENU: { icon: IoniconName; label: string; href?: string; tag?: string }[] 
 export default function ProfileScreen() {
   const router = useRouter();
   const activeVehicle = useActiveVehicle();
+  const { data: history } = useChargingHistory();
+
+  const stats = useMemo(() => {
+    if (!history || history.length === 0) return null;
+    return history.reduce(
+      (acc, item) => ({
+        sessions: acc.sessions + 1,
+        energyKwh: acc.energyKwh + item.energyKwh,
+        cost: acc.cost + item.cost,
+      }),
+      { sessions: 0, energyKwh: 0, cost: 0 },
+    );
+  }, [history]);
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Profil</Text>
 
-        <Card style={styles.vehicleCard}>
-          <Text style={styles.vehicleCardLabel}>Aktif araç</Text>
+        <Animated.View entering={FadeInDown.duration(320)}>
+          <Card style={styles.vehicleCard}>
+            <Text style={styles.vehicleCardLabel}>Aktif araç</Text>
 
-          {activeVehicle ? (
-            <>
-              <Text style={styles.vehicleName}>
-                {activeVehicle.make} {activeVehicle.model}
-              </Text>
-              <Text style={styles.vehicleSpecs}>
-                {activeVehicle.batteryCapacityKwh} kWh ·{' '}
-                {activeVehicle.connectors.map((c) => connectorLabels[c]).join(', ')}
-              </Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.vehicleEmpty}>Henüz araç eklemedin</Text>
-              <Text style={styles.vehicleSpecs}>
-                Araç ekleyince uyumlu istasyonları filtreleyebilirsin.
-              </Text>
-            </>
-          )}
+            {activeVehicle ? (
+              <>
+                <Text style={styles.vehicleName}>
+                  {activeVehicle.make} {activeVehicle.model}
+                </Text>
+                <Text style={styles.vehicleSpecs}>
+                  {activeVehicle.batteryCapacityKwh} kWh ·{' '}
+                  {activeVehicle.connectors.map((c) => connectorLabels[c]).join(', ')}
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.vehicleEmpty}>Henüz araç eklemedin</Text>
+                <Text style={styles.vehicleSpecs}>
+                  Araç ekleyince uyumlu istasyonları filtreleyebilirsin.
+                </Text>
+              </>
+            )}
 
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/vehicles')}
-            style={({ pressed }) => [styles.vehicleAction, pressed && styles.vehicleActionPressed]}>
-            <Text style={styles.vehicleActionText}>
-              {activeVehicle ? 'Araçları yönet' : 'Araç ekle'}
-            </Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.primaryDark} />
-          </Pressable>
-        </Card>
+            <AnimatedPressable
+              accessibilityRole="button"
+              haptic="tap"
+              onPress={() => router.push('/vehicles')}
+              style={({ pressed }) => [styles.vehicleAction, pressed && styles.vehicleActionPressed]}>
+              <Text style={styles.vehicleActionText}>
+                {activeVehicle ? 'Araçları yönet' : 'Araç ekle'}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.primaryDark} />
+            </AnimatedPressable>
+          </Card>
+        </Animated.View>
+
+        {stats && (
+          <Animated.View entering={FadeInDown.delay(60).duration(320)}>
+            <Card style={styles.statsCard}>
+              <Text style={styles.vehicleCardLabel}>Şarj özetin</Text>
+              <View style={styles.statsRow}>
+                <Stat value={String(stats.sessions)} label="oturum" />
+                <Stat value={formatEnergy(stats.energyKwh)} label="enerji" />
+                <Stat value={formatPrice(stats.cost, 0)} label="harcama" />
+              </View>
+            </Card>
+          </Animated.View>
+        )}
 
         <View style={styles.menu}>
           {MENU.map((item, index) => {
             const enabled = !!item.href;
             return (
-              <Pressable
+              <Animated.View
                 key={item.label}
-                accessibilityRole="button"
-                accessibilityState={{ disabled: !enabled }}
-                disabled={!enabled}
-                onPress={() => item.href && router.push(item.href as never)}
-                style={({ pressed }) => [
-                  styles.menuRow,
-                  index < MENU.length - 1 && styles.menuRowDivider,
-                  pressed && enabled && styles.menuRowPressed,
-                ]}>
-                <Ionicons
-                  name={item.icon}
-                  size={20}
-                  color={enabled ? colors.text : colors.textTertiary}
-                />
-                <Text style={[styles.menuLabel, !enabled && styles.menuLabelDisabled]}>
-                  {item.label}
-                </Text>
+                entering={FadeInDown.delay(80 + index * 40).duration(280)}>
+                <AnimatedPressable
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: !enabled }}
+                  disabled={!enabled}
+                  haptic="selection"
+                  scaleTo={0.98}
+                  onPress={() => item.href && router.push(item.href as never)}
+                  style={({ pressed }) => [
+                    styles.menuRow,
+                    index < MENU.length - 1 && styles.menuRowDivider,
+                    pressed && enabled && styles.menuRowPressed,
+                  ]}>
+                  <Ionicons
+                    name={item.icon}
+                    size={20}
+                    color={enabled ? colors.text : colors.textTertiary}
+                  />
+                  <Text style={[styles.menuLabel, !enabled && styles.menuLabelDisabled]}>
+                    {item.label}
+                  </Text>
 
-                {item.tag ? (
-                  <Text style={styles.tag}>{item.tag}</Text>
-                ) : null}
-                {enabled ? (
-                  <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-                ) : (
-                  <Text style={styles.soon}>yakında</Text>
-                )}
-              </Pressable>
+                  {item.tag ? (
+                    <Text style={styles.tag}>{item.tag}</Text>
+                  ) : null}
+                  {enabled ? (
+                    <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+                  ) : (
+                    <Text style={styles.soon}>yakında</Text>
+                  )}
+                </AnimatedPressable>
+              </Animated.View>
             );
           })}
         </View>
 
-        <Text style={styles.version}>TORA WATT · v0.1.0 · dev build</Text>
+        <Text style={styles.version}>TORA WATT · {getRunningUpdateLabel()}</Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+function Stat({ value, label }: { value: string; label: string }) {
+  return (
+    <View style={styles.stat}>
+      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+        {value}
+      </Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  statsCard: { marginTop: spacing.md },
+  statsRow: { flexDirection: 'row', marginTop: spacing.md },
+  stat: { flex: 1 },
+  statValue: { ...typography.h3, color: colors.text },
+  statLabel: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
   content: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl },
   title: { ...typography.h2, color: colors.text, paddingTop: spacing.sm },
 

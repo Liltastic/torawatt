@@ -136,7 +136,8 @@ export function buildMapHtml({ centerLatitude, centerLongitude, zoom }: MapHtmlO
       source: 'stations',
       filter: ['!', ['has', 'point_count']],
       paint: {
-        'circle-radius': 10,
+        // Secili pin belirgin sekilde buyur; icindeki musait soket sayisi okunur kalsin.
+        'circle-radius': ['case', ['==', ['get', 'selected'], true], 17, 13],
         'circle-color': [
           'match',
           ['get', 'status'],
@@ -149,6 +150,66 @@ export function buildMapHtml({ centerLatitude, centerLongitude, zoom }: MapHtmlO
         'circle-stroke-color': '#FFFFFF',
       },
     });
+
+    // Pinin icinde musait soket sayisi (referans tasarimdaki sayili rozetler).
+    map.addLayer({
+      id: 'station-count',
+      type: 'symbol',
+      source: 'stations',
+      filter: ['!', ['has', 'point_count']],
+      layout: {
+        'text-field': ['to-string', ['get', 'available']],
+        'text-font': ['Noto Sans Bold'],
+        'text-size': ['case', ['==', ['get', 'selected'], true], 14, 12],
+        'text-allow-overlap': true,
+        'text-ignore-placement': true,
+      },
+      paint: { 'text-color': '#FFFFFF' },
+    });
+
+    // Kullanici konumu: nabiz gibi genisleyen hale + mavi nokta.
+    map.addSource('user', { type: 'geojson', data: EMPTY });
+    map.addLayer({
+      id: 'user-pulse',
+      type: 'circle',
+      source: 'user',
+      paint: {
+        'circle-radius': 14,
+        'circle-color': '${colors.primary}',
+        'circle-opacity': 0.25,
+      },
+    });
+    map.addLayer({
+      id: 'user-dot',
+      type: 'circle',
+      source: 'user',
+      paint: {
+        'circle-radius': 7,
+        'circle-color': '${colors.primary}',
+        'circle-stroke-width': 2.5,
+        'circle-stroke-color': '#FFFFFF',
+      },
+    });
+
+    var pulseStart = null;
+    var hasUser = false;
+    function pulse(ts) {
+      if (hasUser) {
+        if (pulseStart === null) pulseStart = ts;
+        var t = ((ts - pulseStart) % 2000) / 2000;
+        map.setPaintProperty('user-pulse', 'circle-radius', 10 + t * 18);
+        map.setPaintProperty('user-pulse', 'circle-opacity', 0.35 * (1 - t));
+      }
+      requestAnimationFrame(pulse);
+    }
+    requestAnimationFrame(pulse);
+    window.__twSetUser = function (lng, lat) {
+      hasUser = true;
+      map.getSource('user').setData({
+        type: 'FeatureCollection',
+        features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [lng, lat] }, properties: {} }],
+      });
+    };
 
     map.on('click', 'stations', function (e) {
       var f = e.features && e.features[0];
@@ -163,6 +224,14 @@ export function buildMapHtml({ centerLatitude, centerLongitude, zoom }: MapHtmlO
       }).catch(function () {});
     });
 
+    // Bos harita alanina (istasyon/cluster disi) dokunuldugunda RN tarafina
+    // haber ver; boylece uygulama alt sheet'i kapatabilir - haritayla
+    // etkilesim niyeti listeyle degil haritayla oldugunu gosterir.
+    map.on('click', function (e) {
+      var hits = map.queryRenderedFeatures(e.point, { layers: ['stations', 'clusters'] });
+      if (hits.length === 0) post({ type: 'mapPress' });
+    });
+
     post({ type: 'ready' });
   });
 
@@ -172,8 +241,18 @@ export function buildMapHtml({ centerLatitude, centerLongitude, zoom }: MapHtmlO
       var src = map.getSource('stations');
       if (src) src.setData(geojson);
     },
-    flyTo: function (lng, lat, z) {
-      map.flyTo({ center: [lng, lat], zoom: z || map.getZoom(), duration: 600 });
+    setUserLocation: function (lng, lat) {
+      if (window.__twSetUser) window.__twSetUser(lng, lat);
+    },
+    // offsetY (dp): hedef, ekran merkezinin bu kadar ustunde ortalanir.
+    flyTo: function (lng, lat, z, offsetY) {
+      map.flyTo({
+        center: [lng, lat],
+        zoom: z || map.getZoom(),
+        offset: [0, -(offsetY || 0)],
+        duration: 700,
+        essential: true,
+      });
     },
     fitTo: function (bounds) {
       map.fitBounds(bounds, { padding: 64, duration: 600, maxZoom: 14 });

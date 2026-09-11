@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeInDown, FadeOutLeft, LinearTransition } from 'react-native-reanimated';
 
-import { Button, ConnectorBadge, EmptyState } from '@/components';
+import { AnimatedPressable, Button, ConnectorBadge, EmptyState } from '@/components';
 import { useActivateVehicle, useRemoveVehicle, useVehicles } from '@/queries/vehicles';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
 
@@ -25,14 +26,15 @@ export default function VehiclesScreen() {
     <View style={styles.root}>
       <SafeAreaView edges={['top']}>
         <View style={styles.header}>
-          <Pressable
+          <AnimatedPressable
             accessibilityRole="button"
             accessibilityLabel="Geri"
             hitSlop={10}
+            haptic="tap"
             onPress={() => router.back()}
             style={styles.headerButton}>
             <Ionicons name="chevron-back" size={22} color={colors.text} />
-          </Pressable>
+          </AnimatedPressable>
           <Text style={styles.headerTitle}>Araçlarım</Text>
           {/* Basligi ortalamak icin denge bosluğu; buton gibi gorunmemeli. */}
           <View style={styles.headerSpacer} />
@@ -58,59 +60,69 @@ export default function VehiclesScreen() {
             Aktif araç, &quot;Aracıma uygun&quot; filtresinde ve rota önerilerinde kullanılır.
           </Text>
 
-          {vehicles.map((vehicle) => {
+          {vehicles.map((vehicle, index) => {
             const isActive = vehicle.isActive;
             return (
-              <Pressable
+              <Animated.View
                 key={vehicle.id}
-                accessibilityRole="button"
-                accessibilityState={{ selected: isActive }}
-                onPress={() => activate.mutate(vehicle.id)}
-                style={({ pressed }) => [
-                  styles.card,
-                  isActive && styles.cardActive,
-                  pressed && styles.cardPressed,
-                ]}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.cardTitleWrap}>
-                    <Text style={styles.cardTitle}>
-                      {vehicle.make} {vehicle.model}
-                    </Text>
-                    <Text style={styles.cardYear}>{vehicle.modelYear}</Text>
+                entering={FadeInDown.delay(index * 60).duration(300)}
+                exiting={FadeOutLeft.duration(200)}
+                layout={LinearTransition.duration(220)}>
+                <AnimatedPressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isActive }}
+                  haptic="selection"
+                  scaleTo={0.98}
+                  onPress={() => activate.mutate(vehicle.id)}
+                  style={({ pressed }) => [
+                    styles.card,
+                    isActive && styles.cardActive,
+                    pressed && styles.cardPressed,
+                  ]}>
+                  <View style={styles.cardHeader}>
+                    <View style={styles.cardTitleWrap}>
+                      <Text style={styles.cardTitle}>
+                        {vehicle.make} {vehicle.model}
+                      </Text>
+                      <Text style={styles.cardYear}>{vehicle.modelYear}</Text>
+                    </View>
+
+                    {isActive ? (
+                      <Animated.View
+                        entering={FadeInDown.duration(200)}
+                        style={styles.activeBadge}>
+                        <Ionicons name="checkmark" size={13} color={colors.white} />
+                        <Text style={styles.activeBadgeText}>Aktif</Text>
+                      </Animated.View>
+                    ) : (
+                      <AnimatedPressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`${vehicle.make} ${vehicle.model} aracını sil`}
+                        hitSlop={10}
+                        haptic="warning"
+                        onPress={() => confirmRemove(vehicle.id, `${vehicle.make} ${vehicle.model}`)}>
+                        <Ionicons name="trash-outline" size={18} color={colors.textTertiary} />
+                      </AnimatedPressable>
+                    )}
                   </View>
 
-                  {isActive ? (
-                    <View style={styles.activeBadge}>
-                      <Ionicons name="checkmark" size={13} color={colors.white} />
-                      <Text style={styles.activeBadgeText}>Aktif</Text>
-                    </View>
-                  ) : (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`${vehicle.make} ${vehicle.model} aracını sil`}
-                      hitSlop={10}
-                      onPress={() => confirmRemove(vehicle.id, `${vehicle.make} ${vehicle.model}`)}>
-                      <Ionicons name="trash-outline" size={18} color={colors.textTertiary} />
-                    </Pressable>
-                  )}
-                </View>
+                  <View style={styles.specs}>
+                    <Spec label="Batarya" value={`${vehicle.batteryCapacityKwh} kWh`} />
+                    <Spec label="AC" value={`${vehicle.maxAcKw} kW`} />
+                    <Spec label="DC" value={`${vehicle.maxDcKw} kW`} />
+                    <Spec
+                      label="Tüketim"
+                      value={`${vehicle.averageConsumptionKwhPer100Km} kWh/100km`}
+                    />
+                  </View>
 
-                <View style={styles.specs}>
-                  <Spec label="Batarya" value={`${vehicle.batteryCapacityKwh} kWh`} />
-                  <Spec label="AC" value={`${vehicle.maxAcKw} kW`} />
-                  <Spec label="DC" value={`${vehicle.maxDcKw} kW`} />
-                  <Spec
-                    label="Tüketim"
-                    value={`${vehicle.averageConsumptionKwhPer100Km} kWh/100km`}
-                  />
-                </View>
-
-                <View style={styles.connectors}>
-                  {vehicle.connectors.map((type) => (
-                    <ConnectorBadge key={type} type={type} style={styles.connectorBadge} />
-                  ))}
-                </View>
-              </Pressable>
+                  <View style={styles.connectors}>
+                    {vehicle.connectors.map((type) => (
+                      <ConnectorBadge key={type} type={type} style={styles.connectorBadge} />
+                    ))}
+                  </View>
+                </AnimatedPressable>
+              </Animated.View>
             );
           })}
         </ScrollView>

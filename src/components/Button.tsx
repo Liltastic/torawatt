@@ -1,6 +1,5 @@
 import {
   ActivityIndicator,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -9,6 +8,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { AnimatedPressable } from '@/components/AnimatedPressable';
 import { colors, radius, spacing, typography } from '@/theme';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -37,10 +37,12 @@ export function Button({
   const isDisabled = disabled || loading;
 
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityRole="button"
       accessibilityState={{ disabled: !!isDisabled, busy: loading }}
       disabled={isDisabled}
+      haptic={variant === 'danger' ? 'heavy' : 'press'}
+      scaleTo={0.97}
       style={({ pressed }) => [
         styles.base,
         styles[`size_${size}`],
@@ -60,7 +62,7 @@ export function Button({
           </Text>
         </View>
       )}
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 

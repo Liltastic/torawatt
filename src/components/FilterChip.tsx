@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 
+import { AnimatedPressable } from '@/components/AnimatedPressable';
 import { colors, radius, spacing, typography } from '@/theme';
 
 interface FilterChipProps {
@@ -12,10 +13,12 @@ interface FilterChipProps {
 /** Harita ustundeki birinci seviye filtreler (spec bolum 6). */
 export function FilterChip({ label, selected = false, onPress, style }: FilterChipProps) {
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
       hitSlop={8}
+      haptic="selection"
+      scaleTo={0.93}
       onPress={onPress}
       style={({ pressed }) => [
         styles.chip,
@@ -24,7 +27,7 @@ export function FilterChip({ label, selected = false, onPress, style }: FilterCh
         style,
       ]}>
       <Text style={[styles.label, selected && styles.labelSelected]}>{label}</Text>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 

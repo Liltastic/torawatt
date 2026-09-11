@@ -1,10 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeInDown, FadeInRight, LinearTransition } from 'react-native-reanimated';
 
-import { Card, EmptyState, FilterChip } from '@/components';
+import { AnimatedPressable, Card, EmptyState, FilterChip } from '@/components';
 import { useChargingHistory } from '@/queries/history';
 import { colors, radius, spacing, typography } from '@/theme';
 import type { ChargingHistoryDetail } from '@/types/domain';
@@ -90,42 +91,51 @@ export default function HistoryScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-          <Card style={styles.summary}>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Toplam enerji</Text>
-              <Text style={styles.summaryValue}>{formatEnergy(totals.energy)}</Text>
-            </View>
-            <View style={styles.summaryDivider} />
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Toplam tutar</Text>
-              <Text style={styles.summaryValue}>{formatPrice(totals.cost)}</Text>
-            </View>
-          </Card>
+          <Animated.View entering={FadeInDown.duration(320)}>
+            <Card style={styles.summary}>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Toplam enerji</Text>
+                <Text style={styles.summaryValue}>{formatEnergy(totals.energy)}</Text>
+              </View>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Toplam tutar</Text>
+                <Text style={styles.summaryValue}>{formatPrice(totals.cost)}</Text>
+              </View>
+            </Card>
+          </Animated.View>
 
-          {filtered.map((item) => (
-            <Pressable
+          {filtered.map((item, index) => (
+            <Animated.View
               key={item.id}
-              accessibilityRole="button"
-              accessibilityLabel={`${item.stationName}, ${formatDate(item.startedAt)}`}
-              onPress={() =>
-                router.push({ pathname: '/history/[id]', params: { id: item.id } })
-              }
-              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-              <View style={styles.rowMain}>
-                <Text style={styles.station} numberOfLines={1}>
-                  {item.stationName}
-                </Text>
-                <Text style={styles.meta}>
-                  {formatDate(item.startedAt)} · {formatMinutes(item.durationMinutes)}
-                </Text>
-                <Text style={styles.energy}>{formatEnergy(item.energyKwh)}</Text>
-              </View>
+              entering={FadeInRight.delay(Math.min(index, 8) * 40)
+                .duration(300)}
+              layout={LinearTransition.duration(220)}>
+              <AnimatedPressable
+                accessibilityRole="button"
+                accessibilityLabel={`${item.stationName}, ${formatDate(item.startedAt)}`}
+                haptic="tap"
+                scaleTo={0.98}
+                onPress={() =>
+                  router.push({ pathname: '/history/[id]', params: { id: item.id } })
+                }
+                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+                <View style={styles.rowMain}>
+                  <Text style={styles.station} numberOfLines={1}>
+                    {item.stationName}
+                  </Text>
+                  <Text style={styles.meta}>
+                    {formatDate(item.startedAt)} · {formatMinutes(item.durationMinutes)}
+                  </Text>
+                  <Text style={styles.energy}>{formatEnergy(item.energyKwh)}</Text>
+                </View>
 
-              <View style={styles.rowTrailing}>
-                <Text style={styles.cost}>{formatPrice(item.cost)}</Text>
-                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-              </View>
-            </Pressable>
+                <View style={styles.rowTrailing}>
+                  <Text style={styles.cost}>{formatPrice(item.cost)}</Text>
+                  <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+                </View>
+              </AnimatedPressable>
+            </Animated.View>
           ))}
         </ScrollView>
       )}

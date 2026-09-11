@@ -1,22 +1,140 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import BottomSheet, {
+  BottomSheetFooter,
+  BottomSheetScrollView,
+  useBottomSheet,
+  type BottomSheetBackgroundProps,
+  type BottomSheetFooterProps,
+} from '@gorhom/bottom-sheet';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  InteractionManager,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, {
+  Extrapolation,
+  FadeInDown,
+  FadeOutUp,
+  LinearTransition,
+  interpolate,
+  runOnJS,
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 
-import { EmptyState, FilterChip, SearchBar, StationCard } from '@/components';
-import { StationMap } from '@/map';
+import {
+  AnimatedPressable,
+  AvailabilityBadge,
+  Button,
+  ConnectorCard,
+  EmptyState,
+  FilterChip,
+  SearchBar,
+  SegmentedControl,
+  StationCard,
+} from '@/components';
+import { StationMap, type StationMapHandle } from '@/map';
+import { useIsFavorite, useToggleFavorite } from '@/queries/favorites';
 import { useActiveReservation } from '@/queries/reservations';
 import { useStations } from '@/queries/stations';
 import { useActiveVehicle } from '@/queries/vehicles';
+import { haversineKm } from '@/services/routing';
+import { useLocationStore } from '@/store/location';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
-import { effectiveReservationStatus, reservationStatusLabels, type Station, type Vehicle } from '@/types/domain';
-import { formatTime } from '@/utils/format';
+import {
+  effectiveReservationStatus,
+  reservationStatusLabels,
+  stationAvailability,
+  type Station,
+  type Vehicle,
+} from '@/types/domain';
+import { formatPrice, formatTime } from '@/utils/format';
+import { haptics } from '@/utils/haptics';
 
 interface MapFilter {
   id: string;
   label: string;
   test: (station: Station) => boolean;
+}
+
+/**
+ * Kapali (peek): haritanin cogu gorunur ve etkilesim orada olur.
+ * Yari: liste + haritayi paylasir. Acik: liste veya istasyon detayi tum dikkati alir.
+ */
+const SHEET_SNAP_POINTS = ['15%', '46%', '82%'];
+
+const DETAIL_TABS = [
+  { value: 'station' as const, label: 'İstasyon' },
+  { value: 'location' as const, label: 'Konum' },
+];
+type DetailTab = (typeof DETAIL_TABS)[number]['value'];
+
+/**
+ * Sheet yukari cekildikce arka planini kademeli opaklastirir: kapaliyken
+ * altindaki harita hafifce sezilir, acikken liste/detay tek basina one cikar.
+ */
+function SheetBackground({ animatedIndex, style }: BottomSheetBackgroundProps) {
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(animatedIndex.value, [0, 1, 2], [0.88, 0.97, 1], Extrapolation.CLAMP),
+  }));
+
+  return <Animated.View pointerEvents="none" style={[style, styles.sheetBackground, animatedStyle]} />;
+}
+
+/** Bu indeksin altinda (peek'e yakin) footer gizlenir; sheet kucukken basligin ustune binmesin. */
+const FOOTER_VISIBLE_FROM_INDEX = 0.6;
+
+const LOCATE_FAB_SIZE = 48;
+
+/**
+ * Kutuphanenin footer'i sheet'in gorunur alaninin altina yapisir; sheet
+ * peek konumundayken bu alan o kadar kucuk ki footer basligin ustune
+ * cikiyordu. Sheet asagi indikce footer'i soluklastirip dokunmaya kapatiyoruz.
+ */
+function DetailFooter({
+  animatedFooterPosition,
+  bottomInset,
+  children,
+}: BottomSheetFooterProps & { bottomInset: number; children: React.ReactNode }) {
+  const { animatedIndex } = useBottomSheet();
+  const [interactive, setInteractive] = useState(true);
+
+  useAnimatedReaction(
+    () => animatedIndex.value >= FOOTER_VISIBLE_FROM_INDEX,
+    (visible, previous) => {
+      if (visible !== previous) runOnJS(setInteractive)(visible);
+    },
+  );
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      animatedIndex.value,
+      [0, FOOTER_VISIBLE_FROM_INDEX, 1],
+      [0, 0, 1],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
+  return (
+    <BottomSheetFooter animatedFooterPosition={animatedFooterPosition} bottomInset={bottomInset}>
+      <Animated.View
+        pointerEvents={interactive ? 'auto' : 'none'}
+        style={[styles.detailFooter, animatedStyle]}>
+        {children}
+      </Animated.View>
+    </BottomSheetFooter>
+  );
 }
 
 /**
@@ -49,11 +167,38 @@ export default function MapScreen() {
   const [query, setQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string>();
+  const [selectedConnectorId, setSelectedConnectorId] = useState<string>();
+  const [detailTab, setDetailTab] = useState<DetailTab>('station');
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const sheetRef = useRef<BottomSheet>(null);
+  const mapRef = useRef<StationMapHandle>(null);
+  // Sheet bu iki degeri kendisi yazar; "konumuma git" butonu sheet'in ustunde onunla birlikte kayar.
+  const sheetIndex = useSharedValue(1);
+  const sheetPosition = useSharedValue(windowHeight);
 
   const activeVehicle = useActiveVehicle();
   const activeReservation = useActiveReservation();
   const { data: allStations, isLoading, isError, error, refetch } = useStations();
+
+  const userLocation = useLocationStore((s) => s.coords);
+  const locationStatus = useLocationStore((s) => s.status);
+  const ensureLocation = useLocationStore((s) => s.ensure);
+  const refreshLocation = useLocationStore((s) => s.refresh);
+  const hasCenteredOnUser = useRef(false);
+
+  useEffect(() => {
+    ensureLocation();
+  }, [ensureLocation]);
+
+  // Ilk konum geldiginde kamerayi kullaniciya getir (yalnizca bir kez; kullanici
+  // haritada bir yere bakiyorsa sonraki konum guncellemeleri onu surtuklemesin).
+  useEffect(() => {
+    if (!userLocation || hasCenteredOnUser.current) return;
+    hasCenteredOnUser.current = true;
+    mapRef.current?.flyTo(userLocation, { zoom: 12.5, offsetY: windowHeight * 0.12 });
+  }, [userLocation, windowHeight]);
 
   const toggleFilter = (id: string) =>
     setActiveFilters((prev) => (prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]));
@@ -62,7 +207,7 @@ export default function MapScreen() {
 
   const stations = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase('tr');
-    return (allStations ?? []).filter((station) => {
+    const matching = (allStations ?? []).filter((station) => {
       const matchesQuery =
         !normalized ||
         station.name.toLocaleLowerCase('tr').includes(normalized) ||
@@ -74,24 +219,182 @@ export default function MapScreen() {
 
       return matchesQuery && matchesFilters;
     });
-  }, [allStations, query, activeFilters, filters]);
+
+    if (!userLocation) return matching;
+
+    // Mesafe istemcide hesaplanir (backend konum bilmiyor); en yakin en ustte.
+    return matching
+      .map((station) => ({ ...station, distanceKm: haversineKm(userLocation, station) }))
+      .sort((a, b) => a.distanceKm - b.distanceKm);
+  }, [allStations, query, activeFilters, filters, userLocation]);
+
+  const selectedStation = useMemo(
+    () => stations.find((s) => s.id === selectedId),
+    [stations, selectedId],
+  );
+
+  const openStation = useCallback(
+    (station: Station) => {
+      setSelectedId(station.id);
+      setSelectedConnectorId(undefined);
+      setDetailTab('station');
+      // Yari acik: detay okunur, secili pin ustteki harita alaninda ortada kalir.
+      sheetRef.current?.snapToIndex(1);
+      mapRef.current?.flyTo(station, { zoom: 14, offsetY: windowHeight * 0.2 });
+    },
+    [windowHeight],
+  );
+
+  // Favoriler gibi baska ekranlardan "haritada ac": /map?stationId=... ile gelinir.
+  // Ayni parametre ekran her odaklandiginda tekrar acilmasin diye son isleneni tutuyoruz.
+  const { stationId: requestedStationId } = useLocalSearchParams<{ stationId?: string }>();
+  const handledRequestRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!requestedStationId || handledRequestRef.current === requestedStationId) return;
+    const station = allStations?.find((s) => s.id === requestedStationId);
+    if (!station) return;
+    handledRequestRef.current = requestedStationId;
+    // Sekme gecis animasyonu bitmeden sheet'i ve kamerayi oynatmak takilma yaratiyor.
+    const task = InteractionManager.runAfterInteractions(() => openStation(station));
+    return () => task.cancel();
+  }, [requestedStationId, allStations, openStation]);
+
+  const handleLocate = useCallback(async () => {
+    if (locationStatus === 'denied') {
+      Linking.openSettings();
+      return;
+    }
+    const coords = await refreshLocation();
+    if (!coords) return;
+    haptics.tap();
+    mapRef.current?.flyTo(coords, { zoom: 13.5, offsetY: windowHeight * 0.12 });
+  }, [locationStatus, refreshLocation, windowHeight]);
+
+  const locateFabStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: sheetPosition.value - LOCATE_FAB_SIZE - spacing.lg }],
+    opacity: interpolate(sheetIndex.value, [1, 1.5], [1, 0], Extrapolation.CLAMP),
+  }));
+
+  const closeStationDetail = useCallback(() => {
+    setSelectedId(undefined);
+    setSelectedConnectorId(undefined);
+    sheetRef.current?.snapToIndex(1);
+  }, []);
+
+  // Bos harita alanina dokunuldugunda niyet haritayla etkilesim kurmaktir;
+  // sheet'i (ve varsa acik istasyon detayini) geri cekip haritaya yer aciyoruz.
+  const handleMapPress = useCallback(() => {
+    setSelectedId(undefined);
+    setSelectedConnectorId(undefined);
+    sheetRef.current?.snapToIndex(0);
+  }, []);
+
+  const openDirections = useCallback((station: Station) => {
+    const { latitude: lat, longitude: lng, name } = station;
+    const webFallback = `https://www.openstreetmap.org/directions?to=${lat},${lng}`;
+
+    // Her iki platformda da cihazin varsayilan harita uygulamasini acar.
+    const url = Platform.select({
+      ios: `maps://?daddr=${lat},${lng}`,
+      android: `geo:${lat},${lng}?q=${lat},${lng}(${encodeURIComponent(name)})`,
+      default: webFallback,
+    });
+
+    // Harita uygulamasi kurulu degilse tarayiciya dus.
+    Linking.openURL(url).catch(() => Linking.openURL(webFallback));
+  }, []);
+
+  const renderFooter = useCallback(
+    (footerProps: BottomSheetFooterProps) => {
+      if (!selectedStation) return null;
+      const connector = selectedStation.connectors.find((c) => c.id === selectedConnectorId);
+
+      return (
+        <DetailFooter {...footerProps} bottomInset={insets.bottom}>
+          <Button
+            label="Rezerve Et"
+            variant="secondary"
+            disabled={!connector}
+            style={styles.secondaryAction}
+            onPress={() =>
+              connector &&
+              router.push({
+                pathname: '/booking/new',
+                params: { stationId: selectedStation.id, connectorId: connector.id },
+              })
+            }
+          />
+          <Button
+            label={connector ? 'Şarj Başlat' : 'Önce soket seç'}
+            disabled={!connector}
+            style={styles.primaryAction}
+            onPress={() =>
+              connector &&
+              router.push({
+                pathname: '/charger/[connectorId]',
+                params: { connectorId: connector.id, stationId: selectedStation.id },
+              })
+            }
+          />
+        </DetailFooter>
+      );
+    },
+    [selectedStation, selectedConnectorId, router, insets.bottom],
+  );
 
   return (
     <View style={styles.root}>
       {/* Harita en altta; arama ve alt sheet uzerine biniyor. */}
       <StationMap
+        ref={mapRef}
         stations={stations}
         selectedId={selectedId}
-        onSelectStation={setSelectedId}
+        userLocation={userLocation}
+        onSelectStation={(id) => {
+          const station = stations.find((s) => s.id === id);
+          if (station) openStation(station);
+        }}
+        onMapPress={handleMapPress}
         style={styles.map}
       />
+
+      {/* Ust baslik harita etiketlerinin ustune binmesin diye yumusak bir solma. */}
+      <LinearGradient
+        colors={[colors.background, 'rgba(238,242,255,0.85)', 'rgba(238,242,255,0)']}
+        locations={[0, 0.55, 1]}
+        style={styles.headerFade}
+        pointerEvents="none"
+      />
+
+      {/* Sheet'in hemen ustunde durur, onunla birlikte kayar; sheet buyuyunce kaybolur. */}
+      <Animated.View style={[styles.locateFab, locateFabStyle]} pointerEvents="box-none">
+        <AnimatedPressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            locationStatus === 'denied' ? 'Konum izni ayarlarını aç' : 'Konumuma git'
+          }
+          haptic="none"
+          onPress={handleLocate}
+          style={styles.locateButton}>
+          <Ionicons
+            name={locationStatus === 'denied' ? 'navigate-outline' : 'navigate'}
+            size={20}
+            color={locationStatus === 'granted' ? colors.primary : colors.textSecondary}
+          />
+        </AnimatedPressable>
+      </Animated.View>
 
       <SafeAreaView edges={['top']} style={styles.header} pointerEvents="box-none">
         <View style={styles.headerRow}>
           <Text style={styles.brand}>TORA WATT</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Bildirimler" hitSlop={10} style={styles.iconButton}>
+          <AnimatedPressable
+            accessibilityRole="button"
+            accessibilityLabel="Bildirimler"
+            hitSlop={10}
+            haptic="tap"
+            style={styles.iconButton}>
             <Ionicons name="notifications-outline" size={20} color={colors.text} />
-          </Pressable>
+          </AnimatedPressable>
         </View>
 
         <SearchBar
@@ -102,95 +405,280 @@ export default function MapScreen() {
         />
 
         {activeReservation && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Aktif rezervasyonu aç"
-            onPress={() =>
-              router.push({ pathname: '/booking/[id]', params: { id: activeReservation.id } })
-            }
-            style={({ pressed }) => [styles.reservationBanner, pressed && styles.bannerPressed]}>
-            <Ionicons name="calendar" size={18} color={colors.white} />
-            <View style={styles.bannerText}>
-              <Text style={styles.bannerTitle} numberOfLines={1}>
-                {activeReservation.stationName}
-              </Text>
-              <Text style={styles.bannerMeta}>
-                {formatTime(activeReservation.startsAt)} ·{' '}
-                {reservationStatusLabels[effectiveReservationStatus(activeReservation)]}
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.white} />
-          </Pressable>
+          <Animated.View entering={FadeInDown} exiting={FadeOutUp.duration(150)}>
+            <AnimatedPressable
+              accessibilityRole="button"
+              accessibilityLabel="Aktif rezervasyonu aç"
+              haptic="tap"
+              scaleTo={0.98}
+              onPress={() =>
+                router.push({ pathname: '/booking/[id]', params: { id: activeReservation.id } })
+              }
+              style={({ pressed }) => [styles.reservationBanner, pressed && styles.bannerPressed]}>
+              <Ionicons name="calendar" size={18} color={colors.white} />
+              <View style={styles.bannerText}>
+                <Text style={styles.bannerTitle} numberOfLines={1}>
+                  {activeReservation.stationName}
+                </Text>
+                <Text style={styles.bannerMeta}>
+                  {formatTime(activeReservation.startsAt)} ·{' '}
+                  {reservationStatusLabels[effectiveReservationStatus(activeReservation)]}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.white} />
+            </AnimatedPressable>
+          </Animated.View>
         )}
       </SafeAreaView>
 
-      <View style={[styles.sheet, shadows.sheet]}>
-        <View style={styles.grabber} />
+      <BottomSheet
+        ref={sheetRef}
+        snapPoints={SHEET_SNAP_POINTS}
+        index={1}
+        animatedIndex={sheetIndex}
+        animatedPosition={sheetPosition}
+        enableDynamicSizing={false}
+        backgroundComponent={SheetBackground}
+        handleIndicatorStyle={styles.grabber}
+        handleStyle={styles.handle}
+        footerComponent={selectedStation ? renderFooter : undefined}
+        style={shadows.sheet}>
+        {selectedStation ? (
+          <StationDetail
+            station={selectedStation}
+            tab={detailTab}
+            onTabChange={setDetailTab}
+            selectedConnectorId={selectedConnectorId}
+            onSelectConnector={setSelectedConnectorId}
+            onBack={closeStationDetail}
+            onDirections={() => openDirections(selectedStation)}
+          />
+        ) : (
+          <>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>
+                {isLoading
+                  ? 'Yükleniyor…'
+                  : isError
+                    ? 'İstasyonlar yüklenemedi'
+                    : stations.length === 0
+                      ? 'Eşleşen istasyon yok'
+                      : userLocation
+                        ? `Sana en yakın ${stations.length} istasyon`
+                        : `${stations.length} istasyon`}
+              </Text>
 
-        <Text style={styles.sheetTitle}>
-          {isLoading
-            ? 'Yükleniyor…'
-            : isError
-              ? 'İstasyonlar yüklenemedi'
-              : stations.length > 0
-                ? `Yakınında ${stations.length} istasyon`
-                : 'Eşleşen istasyon yok'}
-        </Text>
+              {!isLoading && !isError && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.chips}>
+                  {filters.map((filter) => (
+                    <FilterChip
+                      key={filter.id}
+                      label={filter.label}
+                      selected={activeFilters.includes(filter.id)}
+                      onPress={() => toggleFilter(filter.id)}
+                      style={styles.chip}
+                    />
+                  ))}
+                </ScrollView>
+              )}
+            </View>
 
-        {!isLoading && !isError && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chips}>
-            {filters.map((filter) => (
-              <FilterChip
-                key={filter.id}
-                label={filter.label}
-                selected={activeFilters.includes(filter.id)}
-                onPress={() => toggleFilter(filter.id)}
-                style={styles.chip}
+            {isLoading ? (
+              <View style={styles.loadingWrap}>
+                <ActivityIndicator color={colors.primary} />
+              </View>
+            ) : isError ? (
+              <View style={styles.list}>
+                <EmptyState
+                  icon="cloud-offline-outline"
+                  title="Sunucuya ulaşılamadı"
+                  description={
+                    error instanceof Error ? error.message : 'Bağlantını kontrol edip tekrar dene.'
+                  }
+                  action={
+                    <AnimatedPressable
+                      accessibilityRole="button"
+                      haptic="press"
+                      onPress={() => refetch()}
+                      style={({ pressed }) => [
+                        styles.retryButton,
+                        pressed && styles.retryButtonPressed,
+                      ]}>
+                      <Text style={styles.retryText}>Tekrar dene</Text>
+                    </AnimatedPressable>
+                  }
+                />
+              </View>
+            ) : stations.length === 0 ? (
+              <View style={styles.list}>
+                <EmptyState
+                  icon="search-outline"
+                  title="Sonuç bulunamadı"
+                  description="Filtreleri gevşetmeyi veya farklı bir arama yapmayı dene."
+                />
+              </View>
+            ) : (
+              <BottomSheetScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.list}>
+                {stations.map((station, index) => (
+                  <Animated.View
+                    key={station.id}
+                    entering={FadeInDown.delay(Math.min(index, 8) * 45).duration(320)}
+                    layout={LinearTransition.duration(220)}>
+                    <StationCard station={station} onPress={() => openStation(station)} />
+                  </Animated.View>
+                ))}
+              </BottomSheetScrollView>
+            )}
+          </>
+        )}
+      </BottomSheet>
+    </View>
+  );
+}
+
+/** Istasyon detayi - referans tasarimda oldugu gibi haritadan ayrilmadan sheet icinde acilir. */
+function StationDetail({
+  station,
+  tab,
+  onTabChange,
+  selectedConnectorId,
+  onSelectConnector,
+  onBack,
+  onDirections,
+}: {
+  station: Station;
+  tab: DetailTab;
+  onTabChange: (tab: DetailTab) => void;
+  selectedConnectorId?: string;
+  onSelectConnector: (id: string) => void;
+  onBack: () => void;
+  onDirections: () => void;
+}) {
+  const availability = stationAvailability(station);
+  const availableCount = station.connectors.filter((c) => c.status === 'AVAILABLE').length;
+  const selectedConnector = station.connectors.find((c) => c.id === selectedConnectorId);
+  const isFavorite = useIsFavorite(station.id);
+  const toggleFavorite = useToggleFavorite();
+
+  return (
+    <>
+      <View style={styles.detailHeader}>
+        <AnimatedPressable
+          accessibilityRole="button"
+          accessibilityLabel="Listeye dön"
+          hitSlop={10}
+          haptic="tap"
+          onPress={onBack}
+          style={styles.detailBackButton}>
+          <Ionicons name="chevron-back" size={20} color={colors.text} />
+        </AnimatedPressable>
+
+        <View style={styles.detailHeaderText}>
+          <Text style={styles.detailName} numberOfLines={1}>
+            {station.name}
+          </Text>
+          <View style={styles.detailStatusRow}>
+            <AvailabilityBadge status={availability} />
+            <Text style={styles.detailStatusText}>
+              {availableCount}/{station.connectors.length} müsait
+            </Text>
+          </View>
+        </View>
+
+        <AnimatedPressable
+          accessibilityRole="button"
+          accessibilityLabel={isFavorite ? 'Favorilerden çıkar' : 'Favorilere ekle'}
+          accessibilityState={{ selected: isFavorite }}
+          hitSlop={10}
+          haptic={isFavorite ? 'tap' : 'success'}
+          scaleTo={0.85}
+          onPress={() => toggleFavorite.mutate({ stationId: station.id, favorite: !isFavorite })}
+          style={styles.favoriteIconButton}>
+          <Ionicons
+            name={isFavorite ? 'heart' : 'heart-outline'}
+            size={19}
+            color={isFavorite ? colors.danger : colors.text}
+          />
+        </AnimatedPressable>
+
+        <AnimatedPressable
+          accessibilityRole="button"
+          accessibilityLabel="Yol tarifi"
+          hitSlop={10}
+          haptic="tap"
+          onPress={onDirections}
+          style={styles.directionsIconButton}>
+          <Ionicons name="navigate" size={17} color={colors.white} />
+        </AnimatedPressable>
+      </View>
+
+      <SegmentedControl options={DETAIL_TABS} value={tab} onChange={onTabChange} style={styles.detailTabs} />
+
+      <BottomSheetScrollView
+        showsVerticalScrollIndicator={false}
+        enableFooterMarginAdjustment
+        contentContainerStyle={styles.detailContent}>
+        {tab === 'station' ? (
+          <>
+            <Text style={styles.detailSectionHint}>Şarj başlatmak için bir soket seç.</Text>
+            {station.connectors.map((connector, index) => (
+              <ConnectorCard
+                key={connector.id}
+                connector={connector}
+                index={index + 1}
+                selected={connector.id === selectedConnectorId}
+                onPress={() => onSelectConnector(connector.id)}
               />
             ))}
-          </ScrollView>
-        )}
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
-          {isLoading ? (
-            <View style={styles.loadingWrap}>
-              <ActivityIndicator color={colors.primary} />
-            </View>
-          ) : isError ? (
-            <EmptyState
-              icon="cloud-offline-outline"
-              title="Sunucuya ulaşılamadı"
-              description={error instanceof Error ? error.message : 'Bağlantını kontrol edip tekrar dene.'}
-              action={
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => refetch()}
-                  style={({ pressed }) => [styles.retryButton, pressed && styles.retryButtonPressed]}>
-                  <Text style={styles.retryText}>Tekrar dene</Text>
-                </Pressable>
-              }
-            />
-          ) : stations.length === 0 ? (
-            <EmptyState
-              icon="search-outline"
-              title="Sonuç bulunamadı"
-              description="Filtreleri gevşetmeyi veya farklı bir arama yapmayı dene."
-            />
-          ) : (
-            stations.map((station) => (
-              <StationCard
-                key={station.id}
-                station={station}
-                selected={station.id === selectedId}
-                onPress={() => router.push({ pathname: '/station/[id]', params: { id: station.id } })}
+            <Text style={styles.detailSectionTitle}>Ücretlendirme</Text>
+            <View style={styles.detailInfoCard}>
+              <InfoRow
+                label="Enerji"
+                value={
+                  selectedConnector?.pricePerKwh != null
+                    ? `${formatPrice(selectedConnector.pricePerKwh)} / kWh`
+                    : 'Soket seçince görünür'
+                }
               />
-            ))
-          )}
-        </ScrollView>
-      </View>
+              <InfoRow
+                label="Bekleme ücreti"
+                value={
+                  selectedConnector?.idleFeePerMin != null
+                    ? `${formatPrice(selectedConnector.idleFeePerMin)} / dk`
+                    : 'Yok'
+                }
+                last
+              />
+            </View>
+          </>
+        ) : (
+          <View style={styles.detailInfoCard}>
+            <InfoRow label="İşletmeci" value={station.operator} />
+            <InfoRow label="Adres" value={station.address} />
+            <InfoRow label="Çalışma saatleri" value={station.isOpen24h ? '7/24 açık' : 'Belirtilmemiş'} />
+            <InfoRow
+              label="Olanaklar"
+              value={station.amenities.length > 0 ? station.amenities.join(', ') : 'Belirtilmemiş'}
+              last
+            />
+          </View>
+        )}
+      </BottomSheetScrollView>
+    </>
+  );
+}
+
+function InfoRow({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
+  return (
+    <View style={[styles.infoRow, !last && styles.infoRowDivider]}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue}>{value}</Text>
     </View>
   );
 }
@@ -219,6 +707,19 @@ const styles = StyleSheet.create({
   },
   search: { marginTop: spacing.lg },
 
+  locateFab: { position: 'absolute', top: 0, right: spacing.xl },
+  locateButton: {
+    width: LOCATE_FAB_SIZE,
+    height: LOCATE_FAB_SIZE,
+    borderRadius: LOCATE_FAB_SIZE / 2,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.card,
+  },
+
   reservationBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -233,23 +734,20 @@ const styles = StyleSheet.create({
   bannerTitle: { ...typography.captionStrong, color: colors.white },
   bannerMeta: { ...typography.caption, color: 'rgba(255,255,255,0.85)', marginTop: 1 },
 
-  sheet: {
-    marginTop: 'auto',
+  sheetBackground: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderTopWidth: 1,
     borderColor: colors.border,
-    paddingTop: spacing.md,
-    maxHeight: '52%',
   },
+  handle: { paddingTop: spacing.sm, paddingBottom: 0 },
+  sheetHeader: { paddingTop: spacing.xs },
   grabber: {
     width: 40,
     height: 4,
     borderRadius: 2,
     backgroundColor: colors.border,
-    alignSelf: 'center',
-    marginBottom: spacing.md,
   },
   sheetTitle: {
     ...typography.h3,
@@ -270,4 +768,68 @@ const styles = StyleSheet.create({
   },
   retryButtonPressed: { backgroundColor: '#DCE6FF' },
   retryText: { ...typography.body, color: colors.primaryDark, fontWeight: '600' },
+
+  detailHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xs,
+  },
+  detailBackButton: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.chip,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detailHeaderText: { flex: 1, marginHorizontal: spacing.md },
+  detailName: { ...typography.h3, color: colors.text },
+  detailStatusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  detailStatusText: { ...typography.caption, color: colors.textSecondary, marginLeft: spacing.sm },
+  favoriteIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.chip,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
+  directionsIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.chip,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerFade: { position: 'absolute', top: 0, left: 0, right: 0, height: 210 },
+
+  detailTabs: { marginHorizontal: spacing.xl, marginTop: spacing.lg },
+  detailContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.xl },
+  detailSectionHint: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.md },
+  detailSectionTitle: { ...typography.h3, color: colors.text, marginTop: spacing.lg, marginBottom: spacing.sm },
+  detailInfoCard: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.card,
+    paddingHorizontal: spacing.lg,
+  },
+  infoRow: { paddingVertical: spacing.md },
+  infoRowDivider: { borderBottomWidth: 1, borderBottomColor: colors.border },
+  infoLabel: { ...typography.caption, color: colors.textSecondary },
+  infoValue: { ...typography.body, color: colors.text, marginTop: 2 },
+
+  detailFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderColor: colors.border,
+  },
+  secondaryAction: { flex: 1, marginRight: spacing.md },
+  primaryAction: { flex: 1 },
 });

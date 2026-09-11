@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import { AnimatedPressable } from '@/components/AnimatedPressable';
 import { colors, radius, spacing, typography } from '@/theme';
 import { currentTypeOf, stationAvailability, type Station } from '@/types/domain';
 import { formatDistance, formatPrice } from '@/utils/format';
@@ -37,9 +38,11 @@ export function StationCard({
   const availability = stationAvailability(station);
 
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityRole="button"
       accessibilityLabel={`${station.name}, ${total} soketten ${available} tanesi müsait`}
+      haptic="tap"
+      scaleTo={0.98}
       onPress={onPress}
       style={({ pressed }) => [styles.row, selected && styles.selected, pressed && styles.pressed]}>
       <View style={styles.main}>
@@ -74,7 +77,7 @@ export function StationCard({
         )}
         <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
       </View>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 

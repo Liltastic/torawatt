@@ -1,36 +1,61 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
 import { colors, radius, spacing, typography } from '@/theme';
-import { stationAvailability, type Station } from '@/types/domain';
+import { stationAvailability, type Coordinate, type Station } from '@/types/domain';
 
 import { buildMapHtml, TILE_ORIGIN } from './mapHtml';
 
 /** Arama kutusunun altina denk gelir; harita basligin arkasina kadar uzaniyor. */
 const ERROR_BANNER_TOP = 130;
 
-/** Istanbul merkezi; konum izni eklenene kadar varsayilan kamera. */
+/** Istanbul merkezi; konum alinana kadar varsayilan kamera. */
 const DEFAULT_CENTER = { centerLatitude: 41.055, centerLongitude: 29.0, zoom: 10.5 };
+
+export interface FlyToOptions {
+  zoom?: number;
+  /**
+   * Hedefi ekran merkezinden kac piksel (dp) yukari kaydirarak ortalayacagi.
+   * Alt sheet haritanin yarisini kapatirken pin gorunur alanin ortasina gelsin diye.
+   */
+  offsetY?: number;
+}
+
+export interface StationMapHandle {
+  flyTo: (target: Coordinate, options?: FlyToOptions) => void;
+}
 
 interface StationMapProps {
   stations: Station[];
   selectedId?: string;
+  /** Kullanicinin konumu; verilirse haritada mavi nokta olarak cizilir. */
+  userLocation?: Coordinate;
   onSelectStation?: (id: string) => void;
+  /** Istasyon/cluster disindaki bos harita alanina dokunulunca tetiklenir. */
+  onMapPress?: () => void;
   style?: StyleProp<ViewStyle>;
 }
 
 type BridgeMessage =
   | { type: 'ready' }
   | { type: 'stationPress'; id: string }
+  | { type: 'mapPress' }
   | { type: 'error'; message: string };
 
-export function StationMap({ stations, selectedId, onSelectStation, style }: StationMapProps) {
+export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function StationMap(
+  { stations, selectedId, userLocation, onSelectStation, onMapPress, style },
+  ref,
+) {
   const webViewRef = useRef<WebView>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const html = useMemo(() => buildMapHtml(DEFAULT_CENTER), []);
+
+  const inject = useCallback((script: string) => {
+    webViewRef.current?.injectJavaScript(`window.__tw && (${script}); true;`);
+  }, []);
 
   const geojson = useMemo(
     () => ({
@@ -44,6 +69,7 @@ export function StationMap({ stations, selectedId, onSelectStation, style }: Sta
         properties: {
           id: station.id,
           status: stationAvailability(station),
+          available: station.connectors.filter((c) => c.status === 'AVAILABLE').length,
           selected: station.id === selectedId,
         },
       })),
@@ -52,15 +78,34 @@ export function StationMap({ stations, selectedId, onSelectStation, style }: Sta
   );
 
   const pushStations = useCallback(() => {
-    webViewRef.current?.injectJavaScript(
-      `window.__tw && window.__tw.setStations(${JSON.stringify(geojson)}); true;`,
-    );
-  }, [geojson]);
+    inject(`window.__tw.setStations(${JSON.stringify(geojson)})`);
+  }, [geojson, inject]);
+
+  const pushUserLocation = useCallback(() => {
+    if (!userLocation) return;
+    inject(`window.__tw.setUserLocation(${userLocation.longitude}, ${userLocation.latitude})`);
+  }, [userLocation, inject]);
 
   // Istasyon listesi veya secim degistiginde haritayi tazele.
   useEffect(() => {
     if (ready) pushStations();
   }, [ready, pushStations]);
+
+  useEffect(() => {
+    if (ready) pushUserLocation();
+  }, [ready, pushUserLocation]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      flyTo: (target, options) => {
+        inject(
+          `window.__tw.flyTo(${target.longitude}, ${target.latitude}, ${options?.zoom ?? 'null'}, ${options?.offsetY ?? 0})`,
+        );
+      },
+    }),
+    [inject],
+  );
 
   const handleMessage = useCallback(
     (event: WebViewMessageEvent) => {
@@ -74,13 +119,16 @@ export function StationMap({ stations, selectedId, onSelectStation, style }: Sta
       if (message.type === 'ready') {
         setReady(true);
         pushStations();
+        pushUserLocation();
       } else if (message.type === 'stationPress') {
         onSelectStation?.(message.id);
+      } else if (message.type === 'mapPress') {
+        onMapPress?.();
       } else if (message.type === 'error') {
         setError(message.message);
       }
     },
-    [onSelectStation, pushStations],
+    [onSelectStation, onMapPress, pushStations, pushUserLocation],
   );
 
   return (
@@ -119,7 +167,7 @@ export function StationMap({ stations, selectedId, onSelectStation, style }: Sta
       )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1, overflow: 'hidden', backgroundColor: colors.background },

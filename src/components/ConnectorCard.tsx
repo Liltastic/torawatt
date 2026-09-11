@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import { AnimatedPressable } from '@/components/AnimatedPressable';
 import { colors, radius, spacing, typography } from '@/theme';
 import { connectorLabels, currentTypeOf, type Connector } from '@/types/domain';
 import { formatPrice } from '@/utils/format';
@@ -20,11 +21,13 @@ export function ConnectorCard({ connector, index, selected = false, onPress }: C
   const selectable = connector.status === 'AVAILABLE';
 
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityRole="button"
       accessibilityState={{ selected, disabled: !selectable }}
       accessibilityLabel={`${index}. soket, ${connectorLabels[connector.type]}, ${connector.powerKw} kilovat`}
       disabled={!selectable}
+      haptic="selection"
+      scaleTo={0.97}
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
@@ -62,7 +65,7 @@ export function ConnectorCard({ connector, index, selected = false, onPress }: C
           <Text style={styles.priceUnit}>Fiyat bilgisi yok</Text>
         )}
       </View>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 

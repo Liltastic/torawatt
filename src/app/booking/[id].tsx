@@ -1,10 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { AvailabilityBadge, Button, Card, EmptyState } from '@/components';
+import { AnimatedPressable, AvailabilityBadge, Button, Card, EmptyState } from '@/components';
 import { useReservations, useSetReservationStatus } from '@/queries/reservations';
 import { colors, radius, spacing, typography } from '@/theme';
 import {
@@ -14,6 +15,7 @@ import {
   type ReservationStatus,
 } from '@/types/domain';
 import { formatDate, formatMinutes, formatTime } from '@/utils/format';
+import { haptics } from '@/utils/haptics';
 
 /** Durum -> rozet tonu. Rozet paleti soket durumlariyla ortak. */
 const STATUS_TONE: Record<ReservationStatus, 'AVAILABLE' | 'OCCUPIED' | 'FAULTED' | 'UNKNOWN'> = {
@@ -105,34 +107,36 @@ export default function ReservationDetailScreen() {
           </Text>
         )}
 
-        <Card style={styles.card}>
-          <Row label="Tarih" value={formatDate(reservation.startsAt)} />
-          <Row label="Başlangıç" value={formatTime(reservation.startsAt)} />
-          <Row label="Süre" value={formatMinutes(reservation.durationMinutes)} />
-          <Row
-            label="Bekleme sınırı"
-            value={`${formatTime(deadline.toISOString())} (${RESERVATION_GRACE_MINUTES} dk)`}
-            last
-          />
-        </Card>
+        <Animated.View entering={FadeInDown.duration(300)}>
+          <Card style={styles.card}>
+            <Row label="Tarih" value={formatDate(reservation.startsAt)} />
+            <Row label="Başlangıç" value={formatTime(reservation.startsAt)} />
+            <Row label="Süre" value={formatMinutes(reservation.durationMinutes)} />
+            <Row
+              label="Bekleme sınırı"
+              value={`${formatTime(deadline.toISOString())} (${RESERVATION_GRACE_MINUTES} dk)`}
+              last
+            />
+          </Card>
+        </Animated.View>
 
         {status === 'EXPIRED' && (
-          <View style={styles.warnBox}>
+          <Animated.View entering={FadeInDown.duration(250)} style={styles.warnBox}>
             <Ionicons name="time-outline" size={16} color={colors.danger} />
             <Text style={styles.warnText}>
               Bekleme süresi doldu ve soket serbest bırakıldı. Yeni bir rezervasyon
               oluşturabilirsin.
             </Text>
-          </View>
+          </Animated.View>
         )}
 
         {status === 'ARRIVED' && (
-          <View style={styles.okBox}>
+          <Animated.View entering={FadeInDown.duration(250)} style={styles.okBox}>
             <Ionicons name="checkmark-circle-outline" size={16} color={colors.success} />
             <Text style={styles.okText}>
               Geldiğini bildirdin. Soketi takıp şarjı başlatabilirsin.
             </Text>
-          </View>
+          </Animated.View>
         )}
 
         <View style={styles.notice}>
@@ -149,7 +153,12 @@ export default function ReservationDetailScreen() {
           <Button
             label="Geldim"
             loading={setStatus.isPending}
-            onPress={() => setStatus.mutate({ id: reservation.id, status: 'ARRIVED' })}
+            onPress={() =>
+              setStatus.mutate(
+                { id: reservation.id, status: 'ARRIVED' },
+                { onSuccess: () => haptics.success() },
+              )
+            }
           />
           <Button
             label="Rezervasyonu iptal et"
@@ -166,14 +175,15 @@ export default function ReservationDetailScreen() {
 function Header({ onBack }: { onBack: () => void }) {
   return (
     <View style={styles.header}>
-      <Pressable
+      <AnimatedPressable
         accessibilityRole="button"
         accessibilityLabel="Geri"
         hitSlop={10}
+        haptic="tap"
         onPress={onBack}
         style={styles.headerButton}>
         <Ionicons name="chevron-back" size={22} color={colors.text} />
-      </Pressable>
+      </AnimatedPressable>
     </View>
   );
 }

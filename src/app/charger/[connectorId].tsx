@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { Button, Card, ConnectorBadge, EmptyState, PowerBadge } from '@/components';
+import { AnimatedPressable, Button, Card, ConnectorBadge, EmptyState, PowerBadge } from '@/components';
 import { useDefaultPaymentMethod } from '@/queries/paymentMethods';
 import { useStation } from '@/queries/stations';
 import { useSessionStore } from '@/store/session';
@@ -65,56 +66,62 @@ export default function ChargeSummaryScreen() {
         <Text style={styles.title}>Şarj özeti</Text>
         <Text style={styles.subtitle}>Başlatmadan önce ücretleri kontrol et.</Text>
 
-        <Card style={styles.card}>
-          <Text style={styles.stationName}>{station.name}</Text>
-          <Text style={styles.stationAddress} numberOfLines={2}>
-            {station.address}
-          </Text>
+        <Animated.View entering={FadeInDown.duration(300)}>
+          <Card style={styles.card}>
+            <Text style={styles.stationName}>{station.name}</Text>
+            <Text style={styles.stationAddress} numberOfLines={2}>
+              {station.address}
+            </Text>
 
-          <View style={styles.badges}>
-            <ConnectorBadge type={connector.type} />
-            <PowerBadge
-              currentType={currentTypeOf(connector)}
-              powerKw={connector.powerKw}
-              style={styles.badgeGap}
+            <View style={styles.badges}>
+              <ConnectorBadge type={connector.type} />
+              <PowerBadge
+                currentType={currentTypeOf(connector)}
+                powerKw={connector.powerKw}
+                style={styles.badgeGap}
+              />
+            </View>
+          </Card>
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(60).duration(300)}>
+          <Card style={styles.card}>
+            <PriceRow
+              label="Enerji"
+              value={
+                connector.pricePerKwh != null
+                  ? `${formatPrice(connector.pricePerKwh)} / kWh`
+                  : 'Belirtilmemiş'
+              }
             />
-          </View>
-        </Card>
+            <PriceRow
+              label="Bekleme ücreti"
+              value={
+                connector.idleFeePerMin != null ? `${formatPrice(connector.idleFeePerMin)} / dk` : 'Yok'
+              }
+            />
+            <PriceRow label="Başlatma ücreti" value="Yok" />
+            <PriceRow
+              label="Ödeme yöntemi"
+              value={
+                defaultMethod
+                  ? `${defaultMethod.brand} ···· ${defaultMethod.last4} (demo)`
+                  : 'Tanımlı değil'
+              }
+              last
+            />
+          </Card>
+        </Animated.View>
 
-        <Card style={styles.card}>
-          <PriceRow
-            label="Enerji"
-            value={
-              connector.pricePerKwh != null
-                ? `${formatPrice(connector.pricePerKwh)} / kWh`
-                : 'Belirtilmemiş'
-            }
-          />
-          <PriceRow
-            label="Bekleme ücreti"
-            value={
-              connector.idleFeePerMin != null ? `${formatPrice(connector.idleFeePerMin)} / dk` : 'Yok'
-            }
-          />
-          <PriceRow label="Başlatma ücreti" value="Yok" />
-          <PriceRow
-            label="Ödeme yöntemi"
-            value={
-              defaultMethod
-                ? `${defaultMethod.brand} ···· ${defaultMethod.last4} (demo)`
-                : 'Tanımlı değil'
-            }
-            last
-          />
-        </Card>
-
-        <View style={styles.notice}>
+        <Animated.View
+          entering={FadeInDown.delay(120).duration(300)}
+          style={styles.notice}>
           <Ionicons name="flask-outline" size={16} color={colors.warning} />
           <Text style={styles.noticeText}>
             Bu akış simülasyon çalışıyor. Gerçek şarj başlatma ve ödeme, backend bağlandığında
             devreye girecek.
           </Text>
-        </View>
+        </Animated.View>
 
         <Text style={styles.legal}>
           Nihai tutar, aracına aktarılan enerji miktarı üzerinden hesaplanır. Şarj başladığı andaki
@@ -132,14 +139,15 @@ export default function ChargeSummaryScreen() {
 function Header({ onClose }: { onClose: () => void }) {
   return (
     <View style={styles.header}>
-      <Pressable
+      <AnimatedPressable
         accessibilityRole="button"
         accessibilityLabel="Kapat"
         hitSlop={10}
+        haptic="tap"
         onPress={onClose}
         style={styles.headerButton}>
         <Ionicons name="close" size={22} color={colors.text} />
-      </Pressable>
+      </AnimatedPressable>
     </View>
   );
 }

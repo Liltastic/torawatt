@@ -126,6 +126,15 @@ export const historyApi = {
     request<ChargingHistoryDetail>('/charging-history', { method: 'POST', body: input }),
 };
 
+// --- Favori istasyonlar ---
+
+export const favoritesApi = {
+  /** Favori istasyon id'leri; istasyon verisi zaten /stations'tan geliyor. */
+  list: () => request<string[]>('/favorites'),
+  add: (stationId: string) => request<void>(`/favorites/${stationId}`, { method: 'PUT' }),
+  remove: (stationId: string) => request<void>(`/favorites/${stationId}`, { method: 'DELETE' }),
+};
+
 // --- Odeme yontemleri (demo) ---
 
 export interface CreatePaymentMethodInput {

@@ -3,12 +3,22 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, {
+  Easing,
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 
-import { Button, Card, EmptyState } from '@/components';
+import { Button, Card, EmptyState, ProgressRing } from '@/components';
 import { useCreateHistoryEntry } from '@/queries/history';
 import { useSessionStore } from '@/store/session';
 import { colors, radius, spacing, typography } from '@/theme';
 import { formatDuration, formatEnergy, formatPower, formatPrice } from '@/utils/format';
+import { haptics } from '@/utils/haptics';
 
 /** Grafikte tutulan en fazla ornek sayisi. */
 const HISTORY_LIMIT = 40;
@@ -27,6 +37,40 @@ export default function ChargingScreen() {
   const lastSampleRef = useRef<number | undefined>(undefined);
   const createHistoryEntry = useCreateHistoryEntry();
   const archivedSessionIdRef = useRef<string | undefined>(undefined);
+  const wasFinishedRef = useRef(false);
+
+  const battery = Math.round(session?.batteryPercent ?? 0);
+  const isFinished = session?.status === 'COMPLETED';
+  const isCharging = session?.status === 'CHARGING';
+
+  const pulse = useSharedValue(1);
+
+  useEffect(() => {
+    if (isCharging) {
+      pulse.value = withRepeat(
+        withSequence(
+          withTiming(0.4, { duration: 700, easing: Easing.inOut(Easing.ease) }),
+          withTiming(1, { duration: 700, easing: Easing.inOut(Easing.ease) }),
+        ),
+        -1,
+        true,
+      );
+    } else {
+      pulse.value = withTiming(1, { duration: 200 });
+    }
+  }, [isCharging, pulse]);
+
+  // Sarj tam bu render'da bitmisse (ve daha once bildirmediysek) basari titresimi ver.
+  useEffect(() => {
+    if (isFinished && !wasFinishedRef.current) {
+      wasFinishedRef.current = true;
+      haptics.success();
+    } else if (!isFinished) {
+      wasFinishedRef.current = false;
+    }
+  }, [isFinished]);
+
+  const pulseStyle = useAnimatedStyle(() => ({ opacity: pulse.value }));
 
   useEffect(() => {
     if (!session || session.status !== 'CHARGING') return;
@@ -76,8 +120,6 @@ export default function ChargingScreen() {
     );
   }
 
-  const battery = Math.round(session.batteryPercent ?? 0);
-  const isFinished = session.status === 'COMPLETED';
   const isStarting = session.status === 'STARTING';
 
   const remainingKwh = ((100 - battery) / 100) * ASSUMED_BATTERY_KWH;
@@ -88,19 +130,24 @@ export default function ChargingScreen() {
     <SafeAreaView edges={['top']} style={styles.root}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>{isFinished ? 'Şarj tamamlandı' : 'Aktif şarj'}</Text>
+          <View style={styles.headerTitleRow}>
+            <Text style={styles.headerTitle}>{isFinished ? 'Şarj tamamlandı' : 'Aktif şarj'}</Text>
+            {isCharging && (
+              <Animated.View style={pulseStyle}>
+                <Ionicons name="flash" size={18} color={colors.primary} />
+              </Animated.View>
+            )}
+          </View>
           <Text style={styles.headerSubtitle} numberOfLines={1}>
             {meta.stationName} · {meta.connectorLabel}
           </Text>
         </View>
 
         <View style={styles.hero}>
-          <Text style={styles.battery}>{battery}%</Text>
-          <Text style={styles.batteryLabel}>Batarya doluluk</Text>
-
-          <View style={styles.batteryTrack}>
-            <View style={[styles.batteryFill, { width: `${battery}%` }]} />
-          </View>
+          <ProgressRing progress={battery} color={isFinished ? colors.success : colors.primary}>
+            <Text style={styles.battery}>{battery}%</Text>
+            <Text style={styles.batteryLabel}>batarya</Text>
+          </ProgressRing>
 
           {isStarting ? (
             <Text style={styles.statusLine}>İstasyonla el sıkışılıyor…</Text>
@@ -112,20 +159,22 @@ export default function ChargingScreen() {
         </View>
 
         <View style={styles.metrics}>
-          <Metric label="Anlık güç" value={formatPower(session.powerKw)} />
-          <Metric label="Alınan enerji" value={formatEnergy(session.energyKwh)} />
-          <Metric label="Geçen süre" value={formatDuration(elapsedSeconds)} />
-          <Metric label="Tahmini tutar" value={formatPrice(session.cost)} highlight />
+          <Metric index={0} label="Anlık güç" value={formatPower(session.powerKw)} />
+          <Metric index={1} label="Alınan enerji" value={formatEnergy(session.energyKwh)} />
+          <Metric index={2} label="Geçen süre" value={formatDuration(elapsedSeconds)} />
+          <Metric index={3} label="Tahmini tutar" value={formatPrice(session.cost)} highlight />
         </View>
 
         {powerHistory.length > 1 && (
-          <Card style={styles.chartCard}>
-            <Text style={styles.chartTitle}>Güç eğrisi</Text>
-            <PowerChart values={powerHistory} peak={meta.ratedPowerKw} />
-            <Text style={styles.chartCaption}>
-              Batarya doldukça güç düşer; bu normaldir.
-            </Text>
-          </Card>
+          <Animated.View entering={FadeInDown.duration(300)}>
+            <Card style={styles.chartCard}>
+              <Text style={styles.chartTitle}>Güç eğrisi</Text>
+              <PowerChart values={powerHistory} peak={meta.ratedPowerKw} />
+              <Text style={styles.chartCaption}>
+                Batarya doldukça güç düşer; bu normaldir.
+              </Text>
+            </Card>
+          </Animated.View>
         )}
 
         <View style={styles.notice}>
@@ -150,17 +199,22 @@ export default function ChargingScreen() {
 function Metric({
   label,
   value,
+  index,
   highlight = false,
 }: {
   label: string;
   value: string;
+  index: number;
   highlight?: boolean;
 }) {
   return (
-    <View style={styles.metricTile}>
+    <Animated.View
+      style={styles.metricTile}
+      entering={FadeInDown.delay(index * 60)
+        .duration(280)}>
       <Text style={styles.metricLabel}>{label}</Text>
       <Text style={[styles.metricValue, highlight && styles.metricValueHighlight]}>{value}</Text>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -185,24 +239,22 @@ const styles = StyleSheet.create({
   content: { paddingBottom: spacing.xxl },
 
   header: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
-  headerTitle: { ...typography.h2, color: colors.text },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center' },
+  headerTitle: { ...typography.h2, color: colors.text, marginRight: spacing.sm },
   headerSubtitle: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
 
   emptyWrap: { flex: 1, justifyContent: 'center' },
 
-  hero: { alignItems: 'center', paddingHorizontal: spacing.xl, marginTop: spacing.xxl },
-  battery: { fontSize: 64, lineHeight: 70, fontWeight: '800', color: colors.text },
-  batteryLabel: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
-  batteryTrack: {
-    width: '100%',
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.primarySoft,
-    marginTop: spacing.lg,
-    overflow: 'hidden',
+  hero: { alignItems: 'center', paddingHorizontal: spacing.xl, marginTop: spacing.xl },
+  battery: { fontSize: 52, lineHeight: 58, fontWeight: '800', color: colors.text },
+  batteryLabel: {
+    ...typography.captionStrong,
+    color: colors.textSecondary,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    marginTop: spacing.xs,
   },
-  batteryFill: { height: '100%', borderRadius: 4, backgroundColor: colors.primary },
-  statusLine: { ...typography.body, color: colors.textSecondary, marginTop: spacing.md },
+  statusLine: { ...typography.body, color: colors.textSecondary, marginTop: spacing.lg },
 
   metrics: {
     flexDirection: 'row',
