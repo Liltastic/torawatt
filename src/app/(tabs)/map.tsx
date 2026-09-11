@@ -252,9 +252,13 @@ export default function MapScreen() {
     if (!requestedStationId) return;
     const station = allStations?.find((s) => s.id === requestedStationId);
     if (!station) return;
-    consumeMapIntent();
     // Sekme gecisi ilk karesini cizmeden sheet'i ve kamerayi oynatmak takilma yaratiyor.
-    const frame = requestAnimationFrame(() => openStation(station));
+    // Istek, acildiktan SONRA tuketilir: once tuketilseydi bagimlilik degisip
+    // temizleme calisir ve bekleyen kare iptal olurdu.
+    const frame = requestAnimationFrame(() => {
+      openStation(station);
+      consumeMapIntent();
+    });
     return () => cancelAnimationFrame(frame);
   }, [requestedStationId, allStations, openStation, consumeMapIntent]);
 
