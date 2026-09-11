@@ -1,11 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInRight, LinearTransition } from 'react-native-reanimated';
 
-import { AnimatedPressable, Card, EmptyState, FilterChip } from '@/components';
+import { AnimatedPressable, Card, EmptyState, FilterChip, StationCardSkeleton } from '@/components';
 import { useChargingHistory } from '@/queries/history';
 import { colors, radius, spacing, typography } from '@/theme';
 import type { ChargingHistoryDetail } from '@/types/domain';
@@ -78,8 +78,10 @@ export default function HistoryScreen() {
       </ScrollView>
 
       {isLoading ? (
-        <View style={styles.emptyWrap}>
-          <ActivityIndicator color={colors.primary} />
+        <View style={styles.list}>
+          <StationCardSkeleton />
+          <StationCardSkeleton />
+          <StationCardSkeleton />
         </View>
       ) : filtered.length === 0 ? (
         <View style={styles.emptyWrap}>

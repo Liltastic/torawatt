@@ -1,9 +1,11 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 import { Button } from '@/components';
 import { colors, spacing, typography } from '@/theme';
+import { getRunningUpdateLabel } from '@/utils/buildInfo';
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -12,20 +14,22 @@ export default function WelcomeScreen() {
     <View style={styles.root}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.hero}>
-          <View style={styles.logoBlock}>
+          <Animated.View entering={FadeInDown.duration(500)} style={styles.logoBlock}>
             <View style={styles.accentBar} />
             <Text style={styles.wordmarkTop}>TORA</Text>
             <Text style={styles.wordmarkBottom}>W A T T</Text>
-          </View>
+          </Animated.View>
 
-          <Text style={styles.tagline}>Enerjine bağlan.</Text>
-          <Text style={styles.subtitle}>
+          <Animated.Text entering={FadeInDown.delay(140).duration(450)} style={styles.tagline}>
+            Enerjine bağlan.
+          </Animated.Text>
+          <Animated.Text entering={FadeInDown.delay(240).duration(450)} style={styles.subtitle}>
             Bul. Bağlan. Devam et. Elektrikli aracın için en yakın şarj noktası birkaç dokunuş
             uzağında.
-          </Text>
+          </Animated.Text>
         </View>
 
-        <View style={styles.actions}>
+        <Animated.View entering={FadeInUp.delay(360).duration(450)} style={styles.actions}>
           <Button label="Hadi başlayalım" onPress={() => router.replace('/map')} />
           <Button
             label="Zaten hesabım var"
@@ -34,8 +38,8 @@ export default function WelcomeScreen() {
             // Giris ekrani Faz 1'in auth adiminda eklenecek.
             disabled
           />
-          <Text style={styles.footer}>TORA WATT · v0.1.0 · dev build</Text>
-        </View>
+          <Text style={styles.footer}>TORA WATT · {getRunningUpdateLabel()}</Text>
+        </Animated.View>
       </SafeAreaView>
     </View>
   );

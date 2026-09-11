@@ -191,6 +191,37 @@ export function buildMapHtml({ centerLatitude, centerLongitude, zoom }: MapHtmlO
       },
     });
 
+    // Rota cizgisi pinlerin altinda kalsin diye station-halo'nun onune ekleniyor.
+    map.addSource('route', { type: 'geojson', data: EMPTY });
+    map.addLayer({
+      id: 'route-casing',
+      type: 'line',
+      source: 'route',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#FFFFFF', 'line-width': 9 },
+    }, 'station-halo');
+    map.addLayer({
+      id: 'route-line',
+      type: 'line',
+      source: 'route',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '${colors.primary}', 'line-width': 5 },
+    }, 'station-halo');
+
+    // Baslangic (koyu) ve varis (mavi) noktalari.
+    map.addSource('endpoints', { type: 'geojson', data: EMPTY });
+    map.addLayer({
+      id: 'endpoints',
+      type: 'circle',
+      source: 'endpoints',
+      paint: {
+        'circle-radius': 7,
+        'circle-color': ['match', ['get', 'kind'], 'start', '${colors.text}', '${colors.primaryDark}'],
+        'circle-stroke-width': 3,
+        'circle-stroke-color': '#FFFFFF',
+      },
+    });
+
     var pulseStart = null;
     var hasUser = false;
     function pulse(ts) {
@@ -243,6 +274,38 @@ export function buildMapHtml({ centerLatitude, centerLongitude, zoom }: MapHtmlO
     },
     setUserLocation: function (lng, lat) {
       if (window.__twSetUser) window.__twSetUser(lng, lat);
+    },
+    // coords: [[lng, lat], ...]; endpoints: [{lng, lat, kind: 'start'|'end'}]
+    setRoute: function (coords, endpoints) {
+      var routeSrc = map.getSource('route');
+      var endSrc = map.getSource('endpoints');
+      if (!routeSrc || !endSrc) return;
+
+      if (!coords || coords.length < 2) {
+        routeSrc.setData(EMPTY);
+        endSrc.setData(EMPTY);
+        return;
+      }
+
+      routeSrc.setData({
+        type: 'FeatureCollection',
+        features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} }],
+      });
+      endSrc.setData({
+        type: 'FeatureCollection',
+        features: (endpoints || []).map(function (p) {
+          return { type: 'Feature', geometry: { type: 'Point', coordinates: [p.lng, p.lat] }, properties: { kind: p.kind } };
+        }),
+      });
+
+      var minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+      coords.forEach(function (c) {
+        if (c[0] < minLng) minLng = c[0];
+        if (c[0] > maxLng) maxLng = c[0];
+        if (c[1] < minLat) minLat = c[1];
+        if (c[1] > maxLat) maxLat = c[1];
+      });
+      map.fitBounds([[minLng, minLat], [maxLng, maxLat]], { padding: 36, duration: 0, maxZoom: 14 });
     },
     // offsetY (dp): hedef, ekran merkezinin bu kadar ustunde ortalanir.
     flyTo: function (lng, lat, z, offsetY) {

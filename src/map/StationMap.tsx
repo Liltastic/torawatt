@@ -26,11 +26,22 @@ export interface StationMapHandle {
   flyTo: (target: Coordinate, options?: FlyToOptions) => void;
 }
 
+export interface MapRoute {
+  /** [lng, lat] dizisi (OSRM cikisi ile ayni sira). */
+  geometry: [number, number][];
+  start: Coordinate;
+  end: Coordinate;
+}
+
 interface StationMapProps {
   stations: Station[];
   selectedId?: string;
   /** Kullanicinin konumu; verilirse haritada mavi nokta olarak cizilir. */
   userLocation?: Coordinate;
+  /** Cizilecek rota; verildiginde kamera rotayi cerceveler. */
+  route?: MapRoute;
+  /** false: salt onizleme, dokunma/kaydirma haritaya gitmez (ScrollView icinde kart olarak). */
+  interactive?: boolean;
   onSelectStation?: (id: string) => void;
   /** Istasyon/cluster disindaki bos harita alanina dokunulunca tetiklenir. */
   onMapPress?: () => void;
@@ -44,7 +55,7 @@ type BridgeMessage =
   | { type: 'error'; message: string };
 
 export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function StationMap(
-  { stations, selectedId, userLocation, onSelectStation, onMapPress, style },
+  { stations, selectedId, userLocation, route, interactive = true, onSelectStation, onMapPress, style },
   ref,
 ) {
   const webViewRef = useRef<WebView>(null);
@@ -95,6 +106,22 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
     if (ready) pushUserLocation();
   }, [ready, pushUserLocation]);
 
+  const pushRoute = useCallback(() => {
+    if (!route) {
+      inject('window.__tw.setRoute(null, [])');
+      return;
+    }
+    const endpoints = [
+      { lng: route.start.longitude, lat: route.start.latitude, kind: 'start' },
+      { lng: route.end.longitude, lat: route.end.latitude, kind: 'end' },
+    ];
+    inject(`window.__tw.setRoute(${JSON.stringify(route.geometry)}, ${JSON.stringify(endpoints)})`);
+  }, [route, inject]);
+
+  useEffect(() => {
+    if (ready) pushRoute();
+  }, [ready, pushRoute]);
+
   useImperativeHandle(
     ref,
     () => ({
@@ -120,6 +147,7 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
         setReady(true);
         pushStations();
         pushUserLocation();
+        pushRoute();
       } else if (message.type === 'stationPress') {
         onSelectStation?.(message.id);
       } else if (message.type === 'mapPress') {
@@ -128,11 +156,11 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
         setError(message.message);
       }
     },
-    [onSelectStation, onMapPress, pushStations, pushUserLocation],
+    [onSelectStation, onMapPress, pushStations, pushUserLocation, pushRoute],
   );
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, style]} pointerEvents={interactive ? 'auto' : 'none'}>
       <WebView
         ref={webViewRef}
         // baseUrl olmadan Android WebView'in origin'i null kalir ve uzak

@@ -10,6 +10,7 @@ import { useFavoriteIds, useToggleFavorite } from '@/queries/favorites';
 import { useStations } from '@/queries/stations';
 import { haversineKm } from '@/services/routing';
 import { useLocationStore } from '@/store/location';
+import { useMapIntentStore } from '@/store/mapIntent';
 import { colors, radius, spacing, typography } from '@/theme';
 
 /** Favori istasyonlar; secilen istasyon harita sekmesinde sheet icinde acilir. */
@@ -19,6 +20,7 @@ export default function FavoritesScreen() {
   const { data: favoriteIds, isLoading: favoritesLoading } = useFavoriteIds();
   const toggleFavorite = useToggleFavorite();
   const userLocation = useLocationStore((s) => s.coords);
+  const requestStationOnMap = useMapIntentStore((s) => s.openStation);
 
   const favorites = useMemo(() => {
     if (!stations || !favoriteIds) return [];
@@ -73,9 +75,13 @@ export default function FavoritesScreen() {
               <View style={styles.rowMain}>
                 <StationCard
                   station={station}
-                  onPress={() =>
-                    router.navigate({ pathname: '/map', params: { stationId: station.id } })
-                  }
+                  onPress={() => {
+                    requestStationOnMap(station.id);
+                    // Once bu ekrani kapat, sonra sekme degistir: sekme grubu yeniden
+                    // kurulmaz, harita yuklu kalir.
+                    router.back();
+                    router.navigate('/map');
+                  }}
                 />
               </View>
               <AnimatedPressable

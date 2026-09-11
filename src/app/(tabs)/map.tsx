@@ -7,11 +7,9 @@ import BottomSheet, {
   type BottomSheetFooterProps,
 } from '@gorhom/bottom-sheet';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  InteractionManager,
   Linking,
   Platform,
   ScrollView,
@@ -43,6 +41,7 @@ import {
   SearchBar,
   SegmentedControl,
   StationCard,
+  StationCardSkeleton,
 } from '@/components';
 import { StationMap, type StationMapHandle } from '@/map';
 import { useIsFavorite, useToggleFavorite } from '@/queries/favorites';
@@ -51,6 +50,7 @@ import { useStations } from '@/queries/stations';
 import { useActiveVehicle } from '@/queries/vehicles';
 import { haversineKm } from '@/services/routing';
 import { useLocationStore } from '@/store/location';
+import { useMapIntentStore } from '@/store/mapIntent';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
 import {
   effectiveReservationStatus,
@@ -245,19 +245,18 @@ export default function MapScreen() {
     [windowHeight],
   );
 
-  // Favoriler gibi baska ekranlardan "haritada ac": /map?stationId=... ile gelinir.
-  // Ayni parametre ekran her odaklandiginda tekrar acilmasin diye son isleneni tutuyoruz.
-  const { stationId: requestedStationId } = useLocalSearchParams<{ stationId?: string }>();
-  const handledRequestRef = useRef<string | undefined>(undefined);
+  // Favoriler gibi baska ekranlardan gelen "haritada ac" istegi (bkz. store/mapIntent).
+  const requestedStationId = useMapIntentStore((s) => s.stationId);
+  const consumeMapIntent = useMapIntentStore((s) => s.consume);
   useEffect(() => {
-    if (!requestedStationId || handledRequestRef.current === requestedStationId) return;
+    if (!requestedStationId) return;
     const station = allStations?.find((s) => s.id === requestedStationId);
     if (!station) return;
-    handledRequestRef.current = requestedStationId;
-    // Sekme gecis animasyonu bitmeden sheet'i ve kamerayi oynatmak takilma yaratiyor.
-    const task = InteractionManager.runAfterInteractions(() => openStation(station));
-    return () => task.cancel();
-  }, [requestedStationId, allStations, openStation]);
+    consumeMapIntent();
+    // Sekme gecisi ilk karesini cizmeden sheet'i ve kamerayi oynatmak takilma yaratiyor.
+    const frame = requestAnimationFrame(() => openStation(station));
+    return () => cancelAnimationFrame(frame);
+  }, [requestedStationId, allStations, openStation, consumeMapIntent]);
 
   const handleLocate = useCallback(async () => {
     if (locationStatus === 'denied') {
@@ -487,8 +486,10 @@ export default function MapScreen() {
             </View>
 
             {isLoading ? (
-              <View style={styles.loadingWrap}>
-                <ActivityIndicator color={colors.primary} />
+              <View style={styles.list}>
+                <StationCardSkeleton />
+                <StationCardSkeleton />
+                <StationCardSkeleton />
               </View>
             ) : isError ? (
               <View style={styles.list}>

@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { AnimatedPressable, Button, Card, EmptyState, TextField } from '@/components';
+import { StationMap, type MapRoute } from '@/map';
 import { useStations } from '@/queries/stations';
 import { useActiveVehicle, useVehicles } from '@/queries/vehicles';
 import { geocode, getRoute, type Place } from '@/services/routing';
@@ -37,7 +38,12 @@ export default function RouteScreen() {
 
   const [planning, setPlanning] = useState(false);
   const [error, setError] = useState<string>();
-  const [plan, setPlan] = useState<{ trip: TripPlan; distanceKm: number; driveMinutes: number }>();
+  const [plan, setPlan] = useState<{
+    trip: TripPlan;
+    distanceKm: number;
+    driveMinutes: number;
+    route: MapRoute;
+  }>();
 
   // Kayitli araclar yuklenmeden "arac yok" gostermek yaniltici olurdu.
   if (vehiclesLoading) {
@@ -89,7 +95,12 @@ export default function RouteScreen() {
         stations: stations ?? [],
       });
 
-      setPlan({ trip, distanceKm: route.distanceKm, driveMinutes: route.durationMinutes });
+      setPlan({
+        trip,
+        distanceKm: route.distanceKm,
+        driveMinutes: route.durationMinutes,
+        route: { geometry: route.geometry, start: from, end: to },
+      });
       haptics.success();
     } catch (e) {
       haptics.error();
@@ -153,13 +164,27 @@ function PlanResult({
   trip,
   distanceKm,
   driveMinutes,
+  route,
 }: {
   trip: TripPlan;
   distanceKm: number;
   driveMinutes: number;
+  route: MapRoute;
 }) {
+  const stopStations = useMemo(() => trip.stops.map((stop) => stop.station), [trip]);
+
   return (
     <View style={styles.result}>
+      {/* Salt onizleme: kaydirma ScrollView'a kalsin, harita rotayi kendisi cerceveler. */}
+      <Card padded={false} style={styles.mapCard}>
+        <StationMap
+          stations={stopStations}
+          route={route}
+          interactive={false}
+          style={styles.mapPreview}
+        />
+      </Card>
+
       <Card style={styles.summaryCard}>
         <View style={styles.summaryGrid}>
           <Summary label="Mesafe" value={`${Math.round(distanceKm)} km`} />
@@ -368,6 +393,8 @@ const styles = StyleSheet.create({
   errorText: { ...typography.caption, color: colors.danger, flex: 1, marginLeft: spacing.sm },
 
   result: { marginTop: spacing.xxl },
+  mapCard: { overflow: 'hidden', marginBottom: spacing.md },
+  mapPreview: { height: 240 },
   summaryCard: { paddingBottom: spacing.lg },
   summaryGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   summaryItem: { width: '50%', paddingVertical: spacing.sm },

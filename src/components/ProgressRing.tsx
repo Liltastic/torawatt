@@ -30,7 +30,8 @@ export function ProgressRing({
   size = 220,
   strokeWidth = 14,
   color = colors.primary,
-  trackColor = colors.primarySoft,
+  // primarySoft arka planla neredeyse ayni tonda kaliyordu; iz belli belirsiz gorunmeli.
+  trackColor = '#DCE3F9',
   children,
   style,
 }: ProgressRingProps) {

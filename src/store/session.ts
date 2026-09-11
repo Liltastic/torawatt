@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import type { ChargingSession, Connector, Station } from '@/types/domain';
+import { connectorLabels, type ChargingSession, type Connector, type Station } from '@/types/domain';
 
 /**
  * GECICI: aktif sarj oturumu simule ediliyor.
@@ -70,7 +70,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       elapsedSeconds: 0,
       meta: {
         stationName: station.name,
-        connectorLabel: `${connector.type} · ${connector.powerKw} kW`,
+        connectorLabel: `${connectorLabels[connector.type]} · ${connector.powerKw} kW`,
         pricePerKwh: connector.pricePerKwh ?? 0,
         ratedPowerKw: connector.powerKw,
       },
