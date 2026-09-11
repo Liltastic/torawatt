@@ -6,7 +6,6 @@ import BottomSheet, {
   type BottomSheetBackgroundProps,
   type BottomSheetFooterProps,
 } from '@gorhom/bottom-sheet';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -362,14 +361,6 @@ export default function MapScreen() {
         }}
         onMapPress={handleMapPress}
         style={styles.map}
-      />
-
-      {/* Ust baslik harita etiketlerinin ustune binmesin diye yumusak bir solma. */}
-      <LinearGradient
-        colors={[colors.background, 'rgba(238,242,255,0.85)', 'rgba(238,242,255,0)']}
-        locations={[0, 0.55, 1]}
-        style={styles.headerFade}
-        pointerEvents="none"
       />
 
       {/* Sheet'in hemen ustunde durur, onunla birlikte kayar; sheet buyuyunce kaybolur. */}
@@ -811,7 +802,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerFade: { position: 'absolute', top: 0, left: 0, right: 0, height: 210 },
 
   detailTabs: { marginHorizontal: spacing.xl, marginTop: spacing.lg },
   detailContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.xl },
