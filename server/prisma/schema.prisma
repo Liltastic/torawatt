@@ -120,6 +120,15 @@ model Favorite {
   @@index([ownerId])
 }
 
+model SupportRequest {
+  id        String   @id @default(cuid())
+  ownerId   String
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([ownerId])
+}
+
 model PaymentMethod {
   id          String   @id @default(cuid())
   ownerId     String

@@ -24,7 +24,7 @@ const MENU: { icon: IoniconName; label: string; href?: string; tag?: string }[] 
   { icon: 'heart-outline', label: 'Favoriler', href: '/favorites' },
   { icon: 'notifications-outline', label: 'Bildirimler', href: '/notifications' },
   { icon: 'pricetag-outline', label: 'Kampanyalar' },
-  { icon: 'help-buoy-outline', label: 'Yardım ve destek' },
+  { icon: 'help-buoy-outline', label: 'Yardım ve destek', href: '/support' },
   { icon: 'settings-outline', label: 'Ayarlar', href: '/settings' },
 ];
 

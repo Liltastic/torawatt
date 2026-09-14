@@ -202,6 +202,13 @@ export const favoritesApi = {
   remove: (stationId: string) => request<void>(`/favorites/${stationId}`, { method: 'DELETE' }),
 };
 
+// --- Destek talepleri ---
+
+export const supportApi = {
+  send: (message: string) =>
+    request<{ id: string; createdAt: string }>('/support', { method: 'POST', body: { message } }),
+};
+
 // --- Odeme yontemleri (demo) ---
 
 export interface CreatePaymentMethodInput {

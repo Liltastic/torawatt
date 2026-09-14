@@ -15,6 +15,7 @@ import { historyRouter } from './routes/history.js';
 import { paymentMethodsRouter } from './routes/paymentMethods.js';
 import { reservationsRouter } from './routes/reservations.js';
 import { stationsRouter } from './routes/stations.js';
+import { supportRouter } from './routes/support.js';
 import { vehiclesRouter } from './routes/vehicles.js';
 
 const app = express();
@@ -33,6 +34,7 @@ app.use('/reservations', reservationsRouter);
 app.use('/charging-history', historyRouter);
 app.use('/payment-methods', paymentMethodsRouter);
 app.use('/favorites', favoritesRouter);
+app.use('/support', supportRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'not_found' });
