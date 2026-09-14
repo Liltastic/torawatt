@@ -2,10 +2,11 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import { ActivityIndicator, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
+import { useMapStyleStore } from '@/store/mapStyle';
 import { colors, radius, spacing, typography } from '@/theme';
 import { stationAvailability, type Coordinate, type Station } from '@/types/domain';
 
-import { buildMapHtml, TILE_ORIGIN } from './mapHtml';
+import { BASEMAPS, buildMapHtml } from './mapHtml';
 
 /** Arama kutusunun altina denk gelir; harita basligin arkasina kadar uzaniyor. */
 const ERROR_BANNER_TOP = 130;
@@ -52,6 +53,7 @@ type BridgeMessage =
   | { type: 'ready' }
   | { type: 'stationPress'; id: string }
   | { type: 'mapPress' }
+  | { type: 'camera'; lng: number; lat: number; zoom: number }
   | { type: 'error'; message: string };
 
 export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function StationMap(
@@ -62,7 +64,18 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const html = useMemo(() => buildMapHtml(DEFAULT_CENTER), []);
+  // Taban harita degisince WebView bastan kuruluyor (iki farkli GL kutuphanesi).
+  // Harita kendi kamerasini her hareket sonunda bildiriyor; yeni harita
+  // Istanbul'a sicramak yerine kullanicinin baktigi yerden acilsin diye.
+  const basemap = useMapStyleStore((s) => s.basemap);
+  const cameraRef = useRef(DEFAULT_CENTER);
+
+  const html = useMemo(() => buildMapHtml({ ...cameraRef.current, basemap }), [basemap]);
+
+  useEffect(() => {
+    setReady(false);
+    setError(null);
+  }, [basemap]);
 
   const inject = useCallback((script: string) => {
     webViewRef.current?.injectJavaScript(`window.__tw && (${script}); true;`);
@@ -152,6 +165,12 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
         onSelectStation?.(message.id);
       } else if (message.type === 'mapPress') {
         onMapPress?.();
+      } else if (message.type === 'camera') {
+        cameraRef.current = {
+          centerLatitude: message.lat,
+          centerLongitude: message.lng,
+          zoom: message.zoom,
+        };
       } else if (message.type === 'error') {
         setError(message.message);
       }
@@ -162,10 +181,12 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
   return (
     <View style={[styles.container, style]} pointerEvents={interactive ? 'auto' : 'none'}>
       <WebView
+        // Katman degisiminde eski GL kutuphanesi bellekte kalmasin diye tam remount.
+        key={basemap}
         ref={webViewRef}
         // baseUrl olmadan Android WebView'in origin'i null kalir ve uzak
         // kaynaklara yapilan istekler CORS'a takilir.
-        source={{ html, baseUrl: TILE_ORIGIN }}
+        source={{ html, baseUrl: BASEMAPS[basemap].tileOrigin }}
         originWhitelist={['*']}
         javaScriptEnabled
         domStorageEnabled

@@ -43,7 +43,7 @@ import {
   StationCard,
   StationCardSkeleton,
 } from '@/components';
-import { StationMap, type StationMapHandle } from '@/map';
+import { BASEMAPS, StationMap, type StationMapHandle } from '@/map';
 import { useIsFavorite, useToggleFavorite } from '@/queries/favorites';
 import { useActiveReservation } from '@/queries/reservations';
 import { useStations } from '@/queries/stations';
@@ -51,6 +51,7 @@ import { useActiveVehicle } from '@/queries/vehicles';
 import { haversineKm } from '@/services/routing';
 import { useLocationStore } from '@/store/location';
 import { useMapIntentStore } from '@/store/mapIntent';
+import { useMapStyleStore } from '@/store/mapStyle';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
 import {
   effectiveReservationStatus,
@@ -75,13 +76,13 @@ interface MapFilter {
 const SHEET_SNAP_POINTS = ['15%', '46%', '82%'];
 
 /**
- * expo-router'in native sekme cubugu (NativeTabs), sadece duz bir ScrollView'i
- * otomatik guvenli-alan payiyla genisletiyor - @gorhom/bottom-sheet'in kendi
- * BottomSheetScrollView'i bu otomatik ayarlamayi almiyor. Onsuz, en alt (82%)
- * snap noktasinda listenin son ogesi sekme cubugunun arkasinda kalip
- * gorunmuyordu; bu sabit pay onu telafi ediyor.
+ * Yalnizca iOS: orada sekme cubugu NativeTabs ile native cizilyor ve sadece duz
+ * bir ScrollView'i otomatik guvenli-alan payiyla genisletiyor - @gorhom/bottom-sheet'in
+ * kendi BottomSheetScrollView'i bu ayarlamayi almiyor. Onsuz, en alt (82%) snap
+ * noktasinda listenin son ogesi cubugun arkasinda kalip gorunmuyordu. Android'de
+ * cubuk React Navigation'in kendi cubugu ve bu paya ihtiyac yok (bkz. (tabs)/_layout.tsx).
  */
-const LIST_TAB_BAR_CLEARANCE = 90;
+const LIST_TAB_BAR_CLEARANCE = Platform.select({ ios: 90, default: 0 });
 
 const DETAIL_TABS = [
   { value: 'station' as const, label: 'İstasyon' },
@@ -104,7 +105,9 @@ function SheetBackground({ animatedIndex, style }: BottomSheetBackgroundProps) {
 /** Bu indeksin altinda (peek'e yakin) footer gizlenir; sheet kucukken basligin ustune binmesin. */
 const FOOTER_VISIBLE_FROM_INDEX = 0.6;
 
-const LOCATE_FAB_SIZE = 48;
+/** Harita uzerindeki yuvarlak butonlar (katman secici + konumuma git). */
+const MAP_FAB_SIZE = 48;
+const MAP_FAB_STACK_HEIGHT = MAP_FAB_SIZE * 2 + spacing.sm;
 
 /**
  * Kutuphanenin footer'i sheet'in gorunur alaninin altina yapisir; sheet
@@ -189,6 +192,9 @@ export default function MapScreen() {
   const activeVehicle = useActiveVehicle();
   const activeReservation = useActiveReservation();
   const { data: allStations, isLoading, isError, error, refetch } = useStations();
+
+  const basemap = useMapStyleStore((s) => s.basemap);
+  const toggleBasemap = useMapStyleStore((s) => s.toggle);
 
   const userLocation = useLocationStore((s) => s.coords);
   const locationStatus = useLocationStore((s) => s.status);
@@ -281,8 +287,8 @@ export default function MapScreen() {
     mapRef.current?.flyTo(coords, { zoom: 13.5, offsetY: windowHeight * 0.12 });
   }, [locationStatus, refreshLocation, windowHeight]);
 
-  const locateFabStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: sheetPosition.value - LOCATE_FAB_SIZE - spacing.lg }],
+  const mapFabsStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: sheetPosition.value - MAP_FAB_STACK_HEIGHT - spacing.lg }],
     opacity: interpolate(sheetIndex.value, [1, 1.5], [1, 0], Extrapolation.CLAMP),
   }));
 
@@ -373,7 +379,20 @@ export default function MapScreen() {
       />
 
       {/* Sheet'in hemen ustunde durur, onunla birlikte kayar; sheet buyuyunce kaybolur. */}
-      <Animated.View style={[styles.locateFab, locateFabStyle]} pointerEvents="box-none">
+      <Animated.View style={[styles.mapFabs, mapFabsStyle]} pointerEvents="box-none">
+        <AnimatedPressable
+          accessibilityRole="button"
+          accessibilityLabel={`Harita görünümü: ${BASEMAPS[basemap].label}. Değiştirmek için dokun.`}
+          haptic="tap"
+          onPress={toggleBasemap}
+          style={[styles.mapFab, styles.basemapFab]}>
+          <Ionicons
+            name={basemap === 'studio' ? 'layers' : 'layers-outline'}
+            size={20}
+            color={basemap === 'studio' ? colors.primary : colors.textSecondary}
+          />
+        </AnimatedPressable>
+
         <AnimatedPressable
           accessibilityRole="button"
           accessibilityLabel={
@@ -381,7 +400,7 @@ export default function MapScreen() {
           }
           haptic="none"
           onPress={handleLocate}
-          style={styles.locateButton}>
+          style={styles.mapFab}>
           <Ionicons
             name={locationStatus === 'denied' ? 'navigate-outline' : 'navigate'}
             size={20}
@@ -715,11 +734,11 @@ const styles = StyleSheet.create({
   },
   search: { marginTop: spacing.lg },
 
-  locateFab: { position: 'absolute', top: 0, right: spacing.xl },
-  locateButton: {
-    width: LOCATE_FAB_SIZE,
-    height: LOCATE_FAB_SIZE,
-    borderRadius: LOCATE_FAB_SIZE / 2,
+  mapFabs: { position: 'absolute', top: 0, right: spacing.xl },
+  mapFab: {
+    width: MAP_FAB_SIZE,
+    height: MAP_FAB_SIZE,
+    borderRadius: MAP_FAB_SIZE / 2,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -727,6 +746,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...shadows.card,
   },
+  basemapFab: { marginBottom: spacing.sm },
 
   reservationBanner: {
     flexDirection: 'row',

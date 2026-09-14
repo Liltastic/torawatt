@@ -1,54 +1,167 @@
 import { colors, statusColors } from '@/theme';
 
-/** Mapbox GL JS surumu CDN'de sabitlenir. */
+/**
+ * Uygulamada iki taban harita var, kullanici haritadaki katman butonuyla
+ * arasinda geciyor (bkz. src/store/mapStyle.ts):
+ *
+ *  - "classic": OpenFreeMap positron (acik kaynak, anahtar/kota yok), zemin ve
+ *    su renkleri TORA WATT paletine cekilerek. MapLibre GL JS ile cizilir.
+ *  - "studio":  kullanicinin Mapbox Studio'da elle tasarladigi ozel stil.
+ *    Bu bir "Standard" stili: `imports: ['basemap']` ile mapbox://styles/mapbox/standard'i
+ *    temel alip aydinlatma/renk konfigurasyonu uzerine kuruluyor - Mapbox GL JS
+ *    v3'e ozel bir mekanizma. MapLibre bu "imports" sistemini hic desteklemiyor,
+ *    klasik "Raster Tiles" ucu da bu stil turunu isleyemeyip her zaman bos/beyaz
+ *    karo donduruyor (denendi, dogrulandi). Bu yuzden gercek Mapbox GL JS ile
+ *    dogrudan `mapbox://styles/...` olarak yukleniyor.
+ *
+ * Iki kutuphane ayni Style Spec API'sini konustugu icin asagidaki katman/pin/rota
+ * kodu ikisinde de degismeden calisiyor; yalnizca CDN, global ad, stil URL'i ve
+ * glif (font) adi degisiyor. Kutuphaneleri bilerek ayri tutuyoruz: Mapbox GL JS
+ * v3 kendi lisansi geregi Mapbox disi karolarla kullanilamaz.
+ */
+export type BasemapId = 'classic' | 'studio';
+
+/** MapLibre GL JS surumu CDN'de sabitlenir; UMD build yalnizca 5.x'te var. */
+const MAPLIBRE_VERSION = '5.24.0';
 const MAPBOX_GL_VERSION = '3.9.0';
 
-/**
- * Mapbox Studio'da elle tasarlanmis ozel stil (raxyizm/cmu1946s600gj01s75bta4r79).
- * Bu bir "Standard" stili: `imports: ['basemap']` ile mapbox://styles/mapbox/standard'i
- * temel alip aydinlatma/renk konfigurasyonu (lightPreset: dawn vb.) uzerine
- * kuruluyor - Mapbox GL JS v3'e ozel bir mekanizma. MapLibre bu "imports"
- * sistemini hic desteklemiyor, klasik "Raster Tiles" ucu da bu stil turunu
- * islenmis goruntuye ceviremeyip her zaman bos/beyaz karo donduruyor (denendi,
- * dogrulandi). Bu yuzden burada MapLibre yerine gercek Mapbox GL JS kullanip
- * stili doğrudan `mapbox://styles/...` ile yukluyoruz.
- */
-export const TILE_ORIGIN = 'https://api.mapbox.com';
 const MAPBOX_USERNAME = 'raxyizm';
 const MAPBOX_STYLE_ID = 'cmu1946s600gj01s75bta4r79';
 // Public token (pk.) - Mapbox'ta client tarafinda kullanilmasi normal, ama
 // koda gomulu bir token GitHub'in secret-scanning korumasini tetikliyor; env
 // degiskeninde tutup derleme zamaninda gomduruyoruz (bkz. .env.example).
 const MAPBOX_ACCESS_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '';
-const MAPBOX_STYLE_URL = `mapbox://styles/${MAPBOX_USERNAME}/${MAPBOX_STYLE_ID}`;
 
 if (__DEV__ && !MAPBOX_ACCESS_TOKEN) {
   console.warn(
-    'EXPO_PUBLIC_MAPBOX_TOKEN tanımlı değil, harita yüklenemeyecek. .env dosyasına ekle (bkz. .env.example).',
+    'EXPO_PUBLIC_MAPBOX_TOKEN tanımlı değil, detaylı harita yüklenemeyecek. .env dosyasına ekle (bkz. .env.example).',
   );
 }
+
+/**
+ * Positron'un notr grilerini "Solar Fresh" paletine cekiyoruz: canli nane
+ * yesili zemin, doygun gok mavisi su, yesil alanlar (park/orman/cim) daha
+ * belirgin bir yesile, binalar hafif sicak bir kreme boyaniyor.
+ */
+const LAND_COLOR = '#E4F7EC';
+const WATER_COLOR = '#BFE7F5';
+const PARK_COLOR = '#BFEBD2';
+const BUILDING_COLOR = '#FFF1DE';
+
+/**
+ * Positron'un tam katman kimliklerini varsayamayiz (surum/CDN degisebilir);
+ * isimlerine gore eslesen dolgu katmanlarini tarayip Solar Fresh paletine
+ * ceviriyoruz. Beklenmeyen bir katman turu patlatirsa tek bir katman yuzunden
+ * haritanin tamami calismaz olmasin diye try/catch var.
+ */
+const RECOLOR_SCRIPT = `
+    if (map.getLayer('background')) map.setPaintProperty('background', 'background-color', '${LAND_COLOR}');
+
+    map.getStyle().layers.forEach(function (layer) {
+      if (layer.type !== 'fill') return;
+      var id = layer.id.toLowerCase();
+      try {
+        if (id.indexOf('water') !== -1) {
+          map.setPaintProperty(layer.id, 'fill-color', '${WATER_COLOR}');
+        } else if (
+          id.indexOf('park') !== -1 ||
+          id.indexOf('wood') !== -1 ||
+          id.indexOf('forest') !== -1 ||
+          id.indexOf('grass') !== -1 ||
+          id.indexOf('landcover') !== -1
+        ) {
+          map.setPaintProperty(layer.id, 'fill-color', '${PARK_COLOR}');
+        } else if (id.indexOf('building') !== -1) {
+          map.setPaintProperty(layer.id, 'fill-color', '${BUILDING_COLOR}');
+          map.setPaintProperty(layer.id, 'fill-opacity', 0.6);
+        }
+      } catch (e) {
+        // Bu katman beklenen paint ozelligini desteklemiyor olabilir; digerlerini etkilemesin.
+      }
+    });
+`;
+
+interface BasemapConfig {
+  /** Katman butonunda ve erisilebilirlik etiketinde gecen ad. */
+  label: string;
+  /** WebView'in baseUrl'i; Android'de origin null kalmasin diye (bkz. StationMap). */
+  tileOrigin: string;
+  cssHref: string;
+  scriptSrc: string;
+  /** CDN betiginin tanimladigi global ad; ayni zamanda ctrl CSS siniflarinin oneki. */
+  globalName: string;
+  styleUrl: string;
+  /**
+   * Pin ici rakamlar icin kalin glif. Mapbox "Noto Sans Bold"u sunmuyor (404
+   * doner ve yazilar hic cizilmez); DIN Pro onun kendi standart fontu.
+   */
+  boldFont: string;
+  /** Harita olusturulmadan once calisan hazirlik (Mapbox icin token). */
+  setupScript: string;
+  /** `load` olayinda, kendi katmanlarimizi eklemeden once calisan kod. */
+  onLoadScript: string;
+  /** Logo kontrolu gizlenebilir mi - Mapbox'ta kullanim kosullari geregi hayir. */
+  hideLogo: boolean;
+}
+
+export const BASEMAPS: Record<BasemapId, BasemapConfig> = {
+  classic: {
+    label: 'Sade harita',
+    tileOrigin: 'https://tiles.openfreemap.org',
+    cssHref: `https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.css`,
+    scriptSrc: `https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.js`,
+    globalName: 'maplibregl',
+    styleUrl: 'https://tiles.openfreemap.org/styles/positron',
+    boldFont: 'Noto Sans Bold',
+    setupScript: '',
+    onLoadScript: RECOLOR_SCRIPT,
+    hideLogo: true,
+  },
+  studio: {
+    label: 'Detaylı harita',
+    tileOrigin: 'https://api.mapbox.com',
+    cssHref: `https://api.mapbox.com/mapbox-gl-js/v${MAPBOX_GL_VERSION}/mapbox-gl.css`,
+    scriptSrc: `https://api.mapbox.com/mapbox-gl-js/v${MAPBOX_GL_VERSION}/mapbox-gl.js`,
+    globalName: 'mapboxgl',
+    styleUrl: `mapbox://styles/${MAPBOX_USERNAME}/${MAPBOX_STYLE_ID}`,
+    boldFont: 'DIN Pro Bold',
+    setupScript: `  mapboxgl.accessToken = '${MAPBOX_ACCESS_TOKEN}';`,
+    onLoadScript: '',
+    hideLogo: false,
+  },
+};
 
 export interface MapHtmlOptions {
   centerLatitude: number;
   centerLongitude: number;
   zoom: number;
+  basemap: BasemapId;
 }
 
-export function buildMapHtml({ centerLatitude, centerLongitude, zoom }: MapHtmlOptions): string {
+export function buildMapHtml({
+  centerLatitude,
+  centerLongitude,
+  zoom,
+  basemap,
+}: MapHtmlOptions): string {
+  const config = BASEMAPS[basemap];
+  const { globalName, boldFont } = config;
+
   return `<!doctype html>
 <html lang="tr">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-<link href="https://api.mapbox.com/mapbox-gl-js/v${MAPBOX_GL_VERSION}/mapbox-gl.css" rel="stylesheet" />
-<script src="https://api.mapbox.com/mapbox-gl-js/v${MAPBOX_GL_VERSION}/mapbox-gl.js"></script>
+<link href="${config.cssHref}" rel="stylesheet" />
+<script src="${config.scriptSrc}"></script>
 <style>
   html, body { margin: 0; padding: 0; height: 100%; width: 100%; }
   #map { height: 100%; width: 100%; }
   body { background: ${colors.background}; overflow: hidden; }
-  /* Mapbox atifi/logosu kullanim kosullari geregi gizlenemez; sadece kucultup uyumlu hale getiriyoruz. */
-  .mapboxgl-ctrl-attrib { font-size: 9px; background: rgba(255,255,255,0.75); }
-  .mapboxgl-ctrl-attrib a { color: ${colors.textSecondary}; }
+  /* Atif (OSM icin ODbL, Mapbox icin kullanim kosullari) gorunur kalmali; yalnizca tipografiye uyduruyoruz. */
+  .${globalName}-ctrl-attrib { font-size: 9px; background: rgba(255,255,255,0.75); }
+  .${globalName}-ctrl-attrib a { color: ${colors.textSecondary}; }
+  ${config.hideLogo ? `.${globalName}-ctrl-bottom-left { display: none; }` : ''}
 </style>
 </head>
 <body>
@@ -65,21 +178,21 @@ export function buildMapHtml({ centerLatitude, centerLongitude, zoom }: MapHtmlO
     return false;
   };
 
-  if (typeof mapboxgl === 'undefined') {
-    post({ type: 'error', message: 'Mapbox GL betigi yuklenemedi (CDN)' });
+  if (typeof ${globalName} === 'undefined') {
+    post({ type: 'error', message: 'Harita betigi yuklenemedi (CDN)' });
     return;
   }
 
-  mapboxgl.accessToken = '${MAPBOX_ACCESS_TOKEN}';
+${config.setupScript}
 
   var EMPTY = { type: 'FeatureCollection', features: [] };
 
-  var map = new mapboxgl.Map({
+  var map = new ${globalName}.Map({
     container: 'map',
-    style: '${MAPBOX_STYLE_URL}',
+    style: '${config.styleUrl}',
     center: [${centerLongitude}, ${centerLatitude}],
     zoom: ${zoom},
-    // Stilin Mapbox Studio'daki varsayilani egimli/dondurulmus (3D onizleme
+    // Mapbox stilinin Studio'daki varsayilani egimli/dondurulmus (3D onizleme
     // icin) - uygulamamiz duz, tepeden gorunumlu 2D bir harita bekliyor.
     pitch: 0,
     bearing: 0,
@@ -97,7 +210,15 @@ export function buildMapHtml({ centerLatitude, centerLongitude, zoom }: MapHtmlO
     post({ type: 'error', message: msg });
   });
 
+  // Taban harita degistiginde WebView bastan yukleniyor; RN tarafi son kamerayi
+  // saklayip yeni haritayi ayni yerden acsin diye her hareketin sonunda bildiriyoruz.
+  map.on('moveend', function () {
+    var c = map.getCenter();
+    post({ type: 'camera', lng: c.lng, lat: c.lat, zoom: map.getZoom() });
+  });
+
   map.on('load', function () {
+${config.onLoadScript}
     map.addSource('stations', {
       type: 'geojson',
       data: EMPTY,
@@ -139,7 +260,7 @@ export function buildMapHtml({ centerLatitude, centerLongitude, zoom }: MapHtmlO
       filter: ['has', 'point_count'],
       layout: {
         'text-field': ['get', 'point_count_abbreviated'],
-        'text-font': ['Noto Sans Bold'],
+        'text-font': ['${boldFont}'],
         'text-size': 13,
       },
       paint: { 'text-color': '#FFFFFF' },
@@ -174,7 +295,7 @@ export function buildMapHtml({ centerLatitude, centerLongitude, zoom }: MapHtmlO
       filter: ['!', ['has', 'point_count']],
       layout: {
         'text-field': ['to-string', ['get', 'available']],
-        'text-font': ['Noto Sans Bold'],
+        'text-font': ['${boldFont}'],
         'text-size': ['case', ['==', ['get', 'selected'], true], 14, 12],
         'text-allow-overlap': true,
         'text-ignore-placement': true,
