@@ -136,7 +136,15 @@ export const BASEMAPS: Record<BasemapId, BasemapConfig> = {
     globalName: 'mapboxgl',
     styleUrl: `mapbox://styles/${MAPBOX_USERNAME}/${MAPBOX_STYLE_ID}`,
     boldFont: 'DIN Pro Bold',
-    setupScript: `  mapboxgl.accessToken = '${MAPBOX_ACCESS_TOKEN}';`,
+    // Token bos kalirsa Mapbox'in kendi hatasi ("An API access token is
+    // required...") neyin eksik oldugunu soylemiyor. Bu bir kez gercekten
+    // basimiza geldi: token .env'de vardi ama EAS ortam degiskenlerine
+    // eklenmedigi icin yayinlanan pakette bos cikti ve harita hic acilmadi.
+    setupScript: `  mapboxgl.accessToken = '${MAPBOX_ACCESS_TOKEN}';
+  if (!mapboxgl.accessToken) {
+    post({ type: 'error', message: 'Mapbox token yok (EXPO_PUBLIC_MAPBOX_TOKEN). Yayinlanan surumde EAS ortam degiskenlerine de eklenmis olmali.' });
+    return;
+  }`,
     // "Standard" stilleri GL JS v3'te varsayilan olarak kure projeksiyonuyla
     // cizilir. Uygulama zaten duz 2D bir harita istiyor (pitch/bearing sifir,
     // dondurme kapali), ustelik kure bambaska ve cok daha agir bir WebGL yolu.

@@ -166,11 +166,20 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
       } else if (message.type === 'mapPress') {
         onMapPress?.();
       } else if (message.type === 'camera') {
-        cameraRef.current = {
-          centerLatitude: message.lat,
-          centerLongitude: message.lng,
-          zoom: message.zoom,
-        };
+        // Acilamamis bir harita kamerasini NaN olarak bildirebiliyor; onu
+        // saklarsak bir sonraki taban harita "Invalid LngLat object: (NaN, NaN)"
+        // ile aciliyor, yani bozuk harita saglam olani da zehirliyor.
+        const valid =
+          Number.isFinite(message.lat) &&
+          Number.isFinite(message.lng) &&
+          Number.isFinite(message.zoom);
+        if (valid) {
+          cameraRef.current = {
+            centerLatitude: message.lat,
+            centerLongitude: message.lng,
+            zoom: message.zoom,
+          };
+        }
       } else if (message.type === 'error') {
         setError(message.message);
       }
