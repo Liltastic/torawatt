@@ -74,6 +74,15 @@ interface MapFilter {
  */
 const SHEET_SNAP_POINTS = ['15%', '46%', '82%'];
 
+/**
+ * expo-router'in native sekme cubugu (NativeTabs), sadece duz bir ScrollView'i
+ * otomatik guvenli-alan payiyla genisletiyor - @gorhom/bottom-sheet'in kendi
+ * BottomSheetScrollView'i bu otomatik ayarlamayi almiyor. Onsuz, en alt (82%)
+ * snap noktasinda listenin son ogesi sekme cubugunun arkasinda kalip
+ * gorunmuyordu; bu sabit pay onu telafi ediyor.
+ */
+const LIST_TAB_BAR_CLEARANCE = 90;
+
 const DETAIL_TABS = [
   { value: 'station' as const, label: 'İstasyon' },
   { value: 'location' as const, label: 'Konum' },
@@ -756,7 +765,10 @@ const styles = StyleSheet.create({
   },
   chips: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
   chip: { marginRight: spacing.sm },
-  list: { paddingBottom: spacing.xl, paddingHorizontal: spacing.xs },
+  list: {
+    paddingBottom: spacing.xl + LIST_TAB_BAR_CLEARANCE,
+    paddingHorizontal: spacing.xs,
+  },
   loadingWrap: { paddingVertical: spacing.xxxl, alignItems: 'center' },
   retryButton: {
     marginTop: spacing.xl,
