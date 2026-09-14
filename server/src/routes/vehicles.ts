@@ -3,10 +3,10 @@ import { z } from 'zod';
 
 import { prisma } from '../db.js';
 import { serializeVehicle } from '../lib/serialize.js';
-import { requireDeviceId } from '../middleware/deviceAuth.js';
+import { requireAuth } from '../middleware/auth.js';
 
 export const vehiclesRouter = Router();
-vehiclesRouter.use(requireDeviceId);
+vehiclesRouter.use(requireAuth);
 
 const CONNECTOR_TYPES = ['TYPE_2', 'CCS2', 'CHADEMO', 'NACS'] as const;
 

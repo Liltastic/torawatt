@@ -3,10 +3,10 @@ import { z } from 'zod';
 
 import { prisma } from '../db.js';
 import { serializeHistoryEntry } from '../lib/serialize.js';
-import { requireDeviceId } from '../middleware/deviceAuth.js';
+import { requireAuth } from '../middleware/auth.js';
 
 export const historyRouter = Router();
-historyRouter.use(requireDeviceId);
+historyRouter.use(requireAuth);
 
 const createSchema = z.object({
   stationId: z.string().optional(),

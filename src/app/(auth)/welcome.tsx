@@ -28,13 +28,12 @@ export default function WelcomeScreen() {
         </View>
 
         <Animated.View entering={FadeInUp.delay(360).duration(450)} style={styles.actions}>
-          <Button label="Hadi başlayalım" onPress={() => router.replace('/map')} />
+          <Button label="Hadi başlayalım" onPress={() => router.push('/register')} />
           <Button
             label="Zaten hesabım var"
             variant="secondary"
             style={styles.secondaryAction}
-            // Giris ekrani Faz 1'in auth adiminda eklenecek.
-            disabled
+            onPress={() => router.push('/login')}
           />
           <Text style={styles.footer}>TORA WATT · {getRunningUpdateLabel()}</Text>
         </Animated.View>

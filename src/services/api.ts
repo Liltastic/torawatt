@@ -22,15 +22,39 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Su anki oturum token'i. Store (src/store/auth.ts) her login/logout/hydrate'te
+ * bunu gunceller. Modul seviyesinde tutuluyor ki bu dosya store'u import
+ * etmesin (store zaten authApi'yi cagirmak icin bu dosyayi import ediyor -
+ * cift yonlu import yerine store'un bu setter'i cagirmasi yeterli).
+ */
+let authToken: string | undefined;
+
+export function setAuthToken(token: string | undefined) {
+  authToken = token;
+}
+
+/** Store bunu kaydeder; token gecerliligini yitirince (90 gunluk sure dolar/sunucu reddeder) oturumu kapatir. */
+let onUnauthorized: (() => void) | undefined;
+
+export function setUnauthorizedHandler(handler: (() => void) | undefined) {
+  onUnauthorized = handler;
+}
+
 async function request<T>(
   path: string,
-  options: { method?: string; body?: unknown; auth?: boolean } = {},
+  options: { method?: string; body?: unknown; auth?: boolean; includeDeviceId?: boolean } = {},
 ): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
 
   let response: Response;
   try {
-    if (options.auth !== false) {
+    if (options.auth !== false && authToken) {
+      headers.Authorization = `Bearer ${authToken}`;
+    }
+    // Sadece register/login: bu cihaz daha once auth'suz kullanildiysa,
+    // sunucu eski verileri yeni hesaba tasiyabilsin diye (bkz. server/src/routes/auth.ts).
+    if (options.includeDeviceId) {
       headers['x-device-id'] = await getDeviceId();
     }
 
@@ -53,12 +77,51 @@ async function request<T>(
   const json = text ? JSON.parse(text) : undefined;
 
   if (!response.ok) {
+    // auth !== false: gecerli bir token'la yapilmis, oturum gerektiren bir istek.
+    // register/login/me kendi 401'ini kendisi ele aliyor (auth:false ya da hydrate'teki try/catch).
+    if (response.status === 401 && options.auth !== false) {
+      authToken = undefined;
+      onUnauthorized?.();
+    }
+
     const message = json?.message ?? json?.error ?? `İstek başarısız (${response.status})`;
     throw new ApiError(message, response.status);
   }
 
   return json as T;
 }
+
+// --- Kimlik dogrulama ---
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string | null;
+}
+
+interface AuthResponse {
+  token: string;
+  user: AuthUser;
+}
+
+export const authApi = {
+  register: (email: string, password: string, name?: string) =>
+    request<AuthResponse>('/auth/register', {
+      method: 'POST',
+      body: { email, password, name },
+      auth: false,
+      includeDeviceId: true,
+    }),
+  login: (email: string, password: string) =>
+    request<AuthResponse>('/auth/login', {
+      method: 'POST',
+      body: { email, password },
+      auth: false,
+      includeDeviceId: true,
+    }),
+  /** Su anki (module-level) token gecerliyse kullaniciyi dondurur. */
+  me: () => request<AuthUser>('/auth/me'),
+};
 
 // --- Istasyonlar (kimlik dogrulama gerekmez) ---
 

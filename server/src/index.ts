@@ -9,6 +9,7 @@ import 'express-async-errors';
 import cors from 'cors';
 import express from 'express';
 
+import { authRouter } from './routes/auth.js';
 import { favoritesRouter } from './routes/favorites.js';
 import { historyRouter } from './routes/history.js';
 import { paymentMethodsRouter } from './routes/paymentMethods.js';
@@ -25,6 +26,7 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'tora-watt-server' });
 });
 
+app.use('/auth', authRouter);
 app.use('/stations', stationsRouter);
 app.use('/vehicles', vehiclesRouter);
 app.use('/reservations', reservationsRouter);

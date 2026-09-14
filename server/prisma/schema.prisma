@@ -7,10 +7,11 @@
 // diye, ayrica ileride tekrar SQLite'a donulmesi gerekirse de calismaya
 // devam eder.
 //
-// Sahiplik: gercek auth (spec bolum 22: /auth/register, /auth/login) henuz
-// yok. Bu yuzden her kayit bir "ownerId" tasir - mobil uygulamanin
-// SecureStore'da tuttugu kalici, rastgele bir cihaz kimligi. Login eklendiginde
-// ownerId = gercek kullanici id'sine gecilecek; sema degismeyecek.
+// Sahiplik: her kayit bir "ownerId" tasir. Gercek auth (asagidaki User modeli)
+// eklenmeden once bu, mobil uygulamanin SecureStore'da tuttugu kalici rastgele
+// bir cihaz kimligiydi; artik gercek User.id. Deger duz bir String kaldi (FK
+// degil) cunku gecis sirasinda hala cihaz kimligi tasiyan eski kayitlar olabilir -
+// bunlar login/register aninda User.id'ye tasinir (bkz. routes/auth.ts).
 
 generator client {
   provider = "prisma-client-js"
@@ -19,6 +20,14 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
 }
 
 model Station {

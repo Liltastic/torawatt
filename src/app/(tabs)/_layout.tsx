@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { useEffect } from 'react';
 import {
   Platform,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
+import { useAuthStore } from '@/store/auth';
 import { colors, spacing, typography } from '@/theme';
 import { haptics } from '@/utils/haptics';
 
@@ -78,6 +79,14 @@ function HapticTabButton({
 }
 
 export default function TabsLayout() {
+  const status = useAuthStore((s) => s.status);
+
+  // Token suresi dolup useAuthStore.logout() cagrildiginda (bkz. src/services/api.ts
+  // 401 yakalayan yerler) sekmelerde kalinmasin diye guvenlik agi.
+  if (status === 'unauthenticated') {
+    return <Redirect href="/welcome" />;
+  }
+
   return (
     <Tabs
       screenOptions={{

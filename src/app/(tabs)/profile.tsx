@@ -9,6 +9,7 @@ import { useMemo } from 'react';
 import { AnimatedPressable, Card } from '@/components';
 import { useChargingHistory } from '@/queries/history';
 import { useActiveVehicle } from '@/queries/vehicles';
+import { useAuthStore } from '@/store/auth';
 import { colors, radius, spacing, typography } from '@/theme';
 import { connectorLabels } from '@/types/domain';
 import { getRunningUpdateLabel } from '@/utils/buildInfo';
@@ -31,6 +32,13 @@ export default function ProfileScreen() {
   const router = useRouter();
   const activeVehicle = useActiveVehicle();
   const { data: history } = useChargingHistory();
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
+
+  const onLogout = async () => {
+    await logout();
+    router.replace('/welcome');
+  };
 
   const stats = useMemo(() => {
     if (!history || history.length === 0) return null;
@@ -48,6 +56,12 @@ export default function ProfileScreen() {
     <SafeAreaView edges={['top']} style={styles.root}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Profil</Text>
+        {!!user && (
+          <Text style={styles.accountEmail} numberOfLines={1}>
+            {user.name ? `${user.name} · ` : ''}
+            {user.email}
+          </Text>
+        )}
 
         <Animated.View entering={FadeInDown.duration(320)}>
           <Card style={styles.vehicleCard}>
@@ -140,6 +154,16 @@ export default function ProfileScreen() {
           })}
         </View>
 
+        <AnimatedPressable
+          accessibilityRole="button"
+          haptic="heavy"
+          scaleTo={0.98}
+          onPress={onLogout}
+          style={({ pressed }) => [styles.logout, pressed && styles.logoutPressed]}>
+          <Ionicons name="log-out-outline" size={20} color={colors.danger} />
+          <Text style={styles.logoutLabel}>Çıkış yap</Text>
+        </AnimatedPressable>
+
         <Text style={styles.version}>TORA WATT · {getRunningUpdateLabel()}</Text>
       </ScrollView>
     </SafeAreaView>
@@ -166,6 +190,7 @@ const styles = StyleSheet.create({
   statLabel: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
   content: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl },
   title: { ...typography.h2, color: colors.text, paddingTop: spacing.sm },
+  accountEmail: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
 
   vehicleCard: { marginTop: spacing.xl },
   vehicleCardLabel: { ...typography.captionStrong, color: colors.primary, letterSpacing: 1 },
@@ -215,6 +240,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginRight: spacing.sm,
   },
+
+  logout: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: radius.card,
+  },
+  logoutPressed: { backgroundColor: colors.surfaceMuted },
+  logoutLabel: { ...typography.body, fontWeight: '600', color: colors.danger, marginLeft: spacing.sm },
 
   version: {
     ...typography.caption,

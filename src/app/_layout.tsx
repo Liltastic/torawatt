@@ -3,10 +3,11 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { useAuthStore } from '@/store/auth';
 import { colors } from '@/theme';
 import { checkForImmediateUpdate } from '@/utils/autoUpdate';
 
@@ -38,6 +39,27 @@ export default function RootLayout() {
       }),
   );
 
+  const authStatus = useAuthStore((s) => s.status);
+  const hydrateAuth = useAuthStore((s) => s.hydrate);
+  useEffect(() => {
+    hydrateAuth();
+  }, [hydrateAuth]);
+
+  // Stack, oturum durumu belli olmadan mount olmasin: src/app/index.tsx ilk
+  // render'inda dogru hedefe (welcome/map) senkron karar verebilsin diye -
+  // aksi halde Stack once mount olup bir an sonra Redirect tetiklenince
+  // (SecureStore okumasi async oldugu icin), Expo Router'in lazy route
+  // chunk'lari henuz kayitli olmadan gelen bu gecikmis navigasyon
+  // "onUnhandledAction" ile sessizce basarisiz olup (auth) grubunun rastgele
+  // bulunan bir cocugunda (login/register) kalinmasina yol aciyordu.
+  if (authStatus === 'hydrating') {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <GestureHandlerRootView style={styles.flex}>
       <QueryClientProvider client={queryClient}>
@@ -57,4 +79,7 @@ export default function RootLayout() {
   );
 }
 
-const styles = StyleSheet.create({ flex: { flex: 1 } });
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
+});

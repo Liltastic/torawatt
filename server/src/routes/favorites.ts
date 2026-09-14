@@ -1,14 +1,14 @@
 import { Router } from 'express';
 
 import { prisma } from '../db.js';
-import { requireDeviceId } from '../middleware/deviceAuth.js';
+import { requireAuth } from '../middleware/auth.js';
 
 /**
  * Favori istasyonlar. Yanit yalnizca istasyon id listesi: istemci zaten
  * istasyonlarin tamamini tutuyor, ayni veriyi ikinci kez tasimak gereksiz.
  */
 export const favoritesRouter = Router();
-favoritesRouter.use(requireDeviceId);
+favoritesRouter.use(requireAuth);
 
 favoritesRouter.get('/', async (req, res) => {
   const favorites = await prisma.favorite.findMany({

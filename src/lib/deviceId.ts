@@ -4,15 +4,12 @@ import * as SecureStore from 'expo-secure-store';
 /**
  * Kalici, rastgele cihaz kimligi.
  *
- * Gercek bir login akisi (spec bolum 22) gelene kadar, backend kayitlari
- * bu kimlige gore sahiplendiriyor (bkz. server/src/middleware/deviceAuth.ts).
- * SecureStore'da tutuluyor cunku spec bolum 26 kimlik/oturum bilgisinin
- * Keychain/Keystore uzerinden saklanmasini istiyor - bu deger tam bir oturum
- * token'i degil ama ayni sekilde ele alinmasi dogru: uygulama silininceye
- * kadar kalici olmali ve düz metin storage'a (AsyncStorage) yazilmamali.
- *
- * Gercek auth eklendiginde bu deger yerini gercek kullanici id'sine birakacak;
- * o ana kadar bir cihazdaki veriler baska cihaza tasinmiyor.
+ * Gercek auth eklenmeden once tum kayitlar bu kimlige gore sahiplenirdi.
+ * Artik sadece register/login isteklerinde `x-device-id` olarak gonderiliyor
+ * ki kullanici hesap acmadan once bu cihazda olusturdugu veriler (araclar,
+ * favoriler, gecmis) yeni hesabina tasinabilsin (bkz. server/src/routes/auth.ts
+ * claimDeviceData). SecureStore'da tutuluyor: uygulama silininceye kadar
+ * kalici olmali ve duz metin storage'a (AsyncStorage) yazilmamali.
  */
 
 let cached: string | undefined;

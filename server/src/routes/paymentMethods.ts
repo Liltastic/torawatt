@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { prisma } from '../db.js';
 import { serializePaymentMethod } from '../lib/serialize.js';
-import { requireDeviceId } from '../middleware/deviceAuth.js';
+import { requireAuth } from '../middleware/auth.js';
 
 /**
  * DEMO odeme yontemleri (spec bolum 12).
@@ -14,7 +14,7 @@ import { requireDeviceId } from '../middleware/deviceAuth.js';
  * alanlarini tutacak sekilde genisleyecek, kart verisi yine buraya girmeyecek.
  */
 export const paymentMethodsRouter = Router();
-paymentMethodsRouter.use(requireDeviceId);
+paymentMethodsRouter.use(requireAuth);
 
 const createSchema = z.object({
   brand: z.string().trim().min(1),
