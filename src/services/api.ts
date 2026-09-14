@@ -121,6 +121,10 @@ export const authApi = {
     }),
   /** Su anki (module-level) token gecerliyse kullaniciyi dondurur. */
   me: () => request<AuthUser>('/auth/me'),
+  updateProfile: (name: string) => request<AuthUser>('/auth/me', { method: 'PATCH', body: { name } }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<void>('/auth/change-password', { method: 'POST', body: { currentPassword, newPassword } }),
+  deleteAccount: () => request<void>('/auth/me', { method: 'DELETE' }),
 };
 
 // --- Istasyonlar (kimlik dogrulama gerekmez) ---

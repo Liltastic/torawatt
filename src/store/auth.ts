@@ -15,6 +15,10 @@ interface AuthState {
   register: (email: string, password: string, name?: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateProfile: (name: string) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  /** Hesabi ve tum verilerini kalici olarak siler, ardindan oturumu kapatir. */
+  deleteAccount: () => Promise<void>;
 }
 
 const TOKEN_KEY = 'tora-watt-auth-token';
@@ -72,6 +76,22 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: async () => {
+    setAuthToken(undefined);
+    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    set({ token: undefined, user: undefined, status: 'unauthenticated' });
+  },
+
+  updateProfile: async (name) => {
+    const user = await authApi.updateProfile(name);
+    set({ user });
+  },
+
+  changePassword: async (currentPassword, newPassword) => {
+    await authApi.changePassword(currentPassword, newPassword);
+  },
+
+  deleteAccount: async () => {
+    await authApi.deleteAccount();
     setAuthToken(undefined);
     await SecureStore.deleteItemAsync(TOKEN_KEY);
     set({ token: undefined, user: undefined, status: 'unauthenticated' });

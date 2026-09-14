@@ -25,7 +25,7 @@ const MENU: { icon: IoniconName; label: string; href?: string; tag?: string }[] 
   { icon: 'notifications-outline', label: 'Bildirimler' },
   { icon: 'pricetag-outline', label: 'Kampanyalar' },
   { icon: 'help-buoy-outline', label: 'Yardım ve destek' },
-  { icon: 'settings-outline', label: 'Ayarlar' },
+  { icon: 'settings-outline', label: 'Ayarlar', href: '/settings' },
 ];
 
 export default function ProfileScreen() {

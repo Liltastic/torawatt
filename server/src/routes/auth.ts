@@ -91,3 +91,63 @@ authRouter.get('/me', requireAuth, async (req, res) => {
   }
   res.json(serializeUser(user));
 });
+
+const updateProfileSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+});
+
+authRouter.patch('/me', requireAuth, async (req, res) => {
+  const parsed = updateProfileSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'invalid_body', issues: parsed.error.issues });
+    return;
+  }
+
+  const user = await prisma.user.update({ where: { id: req.ownerId }, data: parsed.data });
+  res.json(serializeUser(user));
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8, 'Şifre en az 8 karakter olmalı.'),
+});
+
+authRouter.post('/change-password', requireAuth, async (req, res) => {
+  const parsed = changePasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'invalid_body', issues: parsed.error.issues });
+    return;
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: req.ownerId } });
+  const valid = user ? await bcrypt.compare(parsed.data.currentPassword, user.passwordHash) : false;
+  if (!user || !valid) {
+    // 401 degil: bu istek zaten gecerli bir oturumla yapildi (requireAuth gecti).
+    // 401 kullanirsak client'taki global "oturum gecersiz -> cikis yap" mantigi
+    // yanlislikla tetiklenir (bkz. src/services/api.ts setUnauthorizedHandler).
+    res.status(403).json({ error: 'invalid_credentials', message: 'Mevcut şifre hatalı.' });
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(parsed.data.newPassword, 12);
+  await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+  res.status(204).send();
+});
+
+/**
+ * Hesabi ve sahip oldugu her seyi (arac, rezervasyon, gecmis, favori, odeme
+ * yontemi) kalici olarak siler. Geri alinamaz - client tarafinda ayri bir
+ * onay adimi (Alert.alert) var.
+ */
+authRouter.delete('/me', requireAuth, async (req, res) => {
+  const ownerId = req.ownerId;
+  await prisma.$transaction([
+    prisma.vehicle.deleteMany({ where: { ownerId } }),
+    prisma.reservation.deleteMany({ where: { ownerId } }),
+    prisma.chargingHistoryEntry.deleteMany({ where: { ownerId } }),
+    prisma.favorite.deleteMany({ where: { ownerId } }),
+    prisma.paymentMethod.deleteMany({ where: { ownerId } }),
+    prisma.user.delete({ where: { id: ownerId } }),
+  ]);
+  res.status(204).send();
+});
