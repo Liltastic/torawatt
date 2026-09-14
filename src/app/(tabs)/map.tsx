@@ -389,6 +389,7 @@ export default function MapScreen() {
             accessibilityLabel="Bildirimler"
             hitSlop={10}
             haptic="tap"
+            onPress={() => router.push('/notifications')}
             style={styles.iconButton}>
             <Ionicons name="notifications-outline" size={20} color={colors.text} />
           </AnimatedPressable>
