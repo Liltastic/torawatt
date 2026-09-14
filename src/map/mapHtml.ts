@@ -1,24 +1,32 @@
 import { colors, statusColors } from '@/theme';
 
-/** MapLibre GL JS surumu CDN'de sabitlenir; UMD build yalnizca 5.x'te var. */
-const MAPLIBRE_VERSION = '5.24.0';
+/** Mapbox GL JS surumu CDN'de sabitlenir. */
+const MAPBOX_GL_VERSION = '3.9.0';
 
 /**
- * Acik kaynak tile saglayicisi: OpenFreeMap (API anahtari yok, kota yok).
- * Taban stil "positron"; zemin ve su renkleri TORA WATT paletine cekiliyor.
+ * Mapbox Studio'da elle tasarlanmis ozel stil (raxyizm/cmu1946s600gj01s75bta4r79).
+ * Bu bir "Standard" stili: `imports: ['basemap']` ile mapbox://styles/mapbox/standard'i
+ * temel alip aydinlatma/renk konfigurasyonu (lightPreset: dawn vb.) uzerine
+ * kuruluyor - Mapbox GL JS v3'e ozel bir mekanizma. MapLibre bu "imports"
+ * sistemini hic desteklemiyor, klasik "Raster Tiles" ucu da bu stil turunu
+ * islenmis goruntuye ceviremeyip her zaman bos/beyaz karo donduruyor (denendi,
+ * dogrulandi). Bu yuzden burada MapLibre yerine gercek Mapbox GL JS kullanip
+ * stili doğrudan `mapbox://styles/...` ile yukluyoruz.
  */
-export const TILE_ORIGIN = 'https://tiles.openfreemap.org';
-const STYLE_URL = `${TILE_ORIGIN}/styles/positron`;
+export const TILE_ORIGIN = 'https://api.mapbox.com';
+const MAPBOX_USERNAME = 'raxyizm';
+const MAPBOX_STYLE_ID = 'cmu1946s600gj01s75bta4r79';
+// Public token (pk.) - Mapbox'ta client tarafinda kullanilmasi normal, ama
+// koda gomulu bir token GitHub'in secret-scanning korumasini tetikliyor; env
+// degiskeninde tutup derleme zamaninda gomduruyoruz (bkz. .env.example).
+const MAPBOX_ACCESS_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '';
+const MAPBOX_STYLE_URL = `mapbox://styles/${MAPBOX_USERNAME}/${MAPBOX_STYLE_ID}`;
 
-/**
- * Positron'un notr grilerini "Solar Fresh" paletine cekiyoruz: canli nane
- * yesili zemin, doygun gok mavisi su, yesil alanlar (park/orman/cim) daha
- * belirgin bir yesile, binalar hafif sicak bir kreme boyaniyor.
- */
-const LAND_COLOR = '#E4F7EC';
-const WATER_COLOR = '#BFE7F5';
-const PARK_COLOR = '#BFEBD2';
-const BUILDING_COLOR = '#FFF1DE';
+if (__DEV__ && !MAPBOX_ACCESS_TOKEN) {
+  console.warn(
+    'EXPO_PUBLIC_MAPBOX_TOKEN tanımlı değil, harita yüklenemeyecek. .env dosyasına ekle (bkz. .env.example).',
+  );
+}
 
 export interface MapHtmlOptions {
   centerLatitude: number;
@@ -32,16 +40,15 @@ export function buildMapHtml({ centerLatitude, centerLongitude, zoom }: MapHtmlO
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-<link href="https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.css" rel="stylesheet" />
-<script src="https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v${MAPBOX_GL_VERSION}/mapbox-gl.css" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v${MAPBOX_GL_VERSION}/mapbox-gl.js"></script>
 <style>
   html, body { margin: 0; padding: 0; height: 100%; width: 100%; }
   #map { height: 100%; width: 100%; }
   body { background: ${colors.background}; overflow: hidden; }
-  /* OSM atifi ODbL geregi gorunur kalmali; yalnizca uygulamanin tipografisine uyduruyoruz. */
-  .maplibregl-ctrl-attrib { font-size: 9px; background: rgba(255,255,255,0.75); }
-  .maplibregl-ctrl-attrib a { color: ${colors.textSecondary}; }
-  .maplibregl-ctrl-bottom-left { display: none; }
+  /* Mapbox atifi/logosu kullanim kosullari geregi gizlenemez; sadece kucultup uyumlu hale getiriyoruz. */
+  .mapboxgl-ctrl-attrib { font-size: 9px; background: rgba(255,255,255,0.75); }
+  .mapboxgl-ctrl-attrib a { color: ${colors.textSecondary}; }
 </style>
 </head>
 <body>
@@ -58,19 +65,24 @@ export function buildMapHtml({ centerLatitude, centerLongitude, zoom }: MapHtmlO
     return false;
   };
 
-  if (typeof maplibregl === 'undefined') {
-    post({ type: 'error', message: 'MapLibre betigi yuklenemedi (CDN)' });
+  if (typeof mapboxgl === 'undefined') {
+    post({ type: 'error', message: 'Mapbox GL betigi yuklenemedi (CDN)' });
     return;
   }
 
+  mapboxgl.accessToken = '${MAPBOX_ACCESS_TOKEN}';
 
   var EMPTY = { type: 'FeatureCollection', features: [] };
 
-  var map = new maplibregl.Map({
+  var map = new mapboxgl.Map({
     container: 'map',
-    style: '${STYLE_URL}',
+    style: '${MAPBOX_STYLE_URL}',
     center: [${centerLongitude}, ${centerLatitude}],
     zoom: ${zoom},
+    // Stilin Mapbox Studio'daki varsayilani egimli/dondurulmus (3D onizleme
+    // icin) - uygulamamiz duz, tepeden gorunumlu 2D bir harita bekliyor.
+    pitch: 0,
+    bearing: 0,
     attributionControl: { compact: true },
     // Pinleri parmak altinda tutmak icin egimi kapatiyoruz.
     pitchWithRotate: false,
@@ -86,35 +98,6 @@ export function buildMapHtml({ centerLatitude, centerLongitude, zoom }: MapHtmlO
   });
 
   map.on('load', function () {
-    if (map.getLayer('background')) map.setPaintProperty('background', 'background-color', '${LAND_COLOR}');
-
-    // Positron'un tam katman kimliklerini varsayamayiz (surum/CDN degisebilir);
-    // isimlerine gore eslesen dolgu katmanlarini tarayip Solar Fresh paletine
-    // ceviriyoruz. Beklenmeyen bir katman turu patlatirsa tek bir katman
-    // yuzunden haritanin tamami calismaz olmasin diye try/catch var.
-    map.getStyle().layers.forEach(function (layer) {
-      if (layer.type !== 'fill') return;
-      var id = layer.id.toLowerCase();
-      try {
-        if (id.indexOf('water') !== -1) {
-          map.setPaintProperty(layer.id, 'fill-color', '${WATER_COLOR}');
-        } else if (
-          id.indexOf('park') !== -1 ||
-          id.indexOf('wood') !== -1 ||
-          id.indexOf('forest') !== -1 ||
-          id.indexOf('grass') !== -1 ||
-          id.indexOf('landcover') !== -1
-        ) {
-          map.setPaintProperty(layer.id, 'fill-color', '${PARK_COLOR}');
-        } else if (id.indexOf('building') !== -1) {
-          map.setPaintProperty(layer.id, 'fill-color', '${BUILDING_COLOR}');
-          map.setPaintProperty(layer.id, 'fill-opacity', 0.6);
-        }
-      } catch (e) {
-        // Bu katman beklenen paint ozelligini desteklemiyor olabilir; digerlerini etkilemesin.
-      }
-    });
-
     map.addSource('stations', {
       type: 'geojson',
       data: EMPTY,
