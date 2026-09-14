@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
+import { GlassTabBar } from '@/components/GlassTabBar';
 import { useAuthStore } from '@/store/auth';
 import { colors, spacing, typography } from '@/theme';
 import { haptics } from '@/utils/haptics';
@@ -56,9 +57,8 @@ function AnimatedTabIcon({
 
 /**
  * Varsayilan sekme butonunu titresimle sarmalar; gorseli/dokunma alanini
- * degistirmez. React Navigation'in tabBarButton tipi (ozel ref varyanti)
- * disariya sizdirilmiyor - Pressable'in kendi prop tipini kullanip ref'i
- * kasitli olarak yut, cunku bu buton icin programatik ref'e ihtiyac yok.
+ * degistirmez. Yalnizca Android'de kullanilir (bkz. asagidaki iOS/Android
+ * ayrimi) - GlassTabBar kendi Pressable/titresim mantigini iceriyor.
  */
 function HapticTabButton({
   children,
@@ -78,6 +78,8 @@ function HapticTabButton({
   );
 }
 
+const isIOS = Platform.OS === 'ios';
+
 export default function TabsLayout() {
   const status = useAuthStore((s) => s.status);
 
@@ -89,14 +91,17 @@ export default function TabsLayout() {
 
   return (
     <Tabs
+      // "Liquid Glass" yuzen sekme cubugu sadece iPhone'a ozel (iOS 26'nin
+      // kendi tasarim dili) - Android standart, dokme cubugunu koruyor.
+      tabBar={isIOS ? (props) => <GlassTabBar {...props} /> : undefined}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textTertiary,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: isIOS ? undefined : styles.tabBar,
         tabBarLabelStyle: styles.tabLabel,
         tabBarItemStyle: styles.tabItem,
-        tabBarButton: (props) => <HapticTabButton {...props} />,
+        tabBarButton: isIOS ? undefined : (props) => <HapticTabButton {...props} />,
         sceneStyle: { backgroundColor: colors.background },
       }}>
       {TABS.map(({ name, title, icon, iconActive }) => (
@@ -120,7 +125,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopColor: colors.border,
     borderTopWidth: 1,
-    height: Platform.select({ ios: 88, default: 64 }),
+    height: 64,
     paddingTop: spacing.sm,
   },
   tabItem: { paddingVertical: spacing.xs },
