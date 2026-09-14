@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { Redirect } from 'expo-router';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 
@@ -6,13 +5,31 @@ import { useAuthStore } from '@/store/auth';
 import { colors } from '@/theme';
 import { haptics } from '@/utils/haptics';
 
-/** Spec bolum 4: Harita / Rota / Sarj / Gecmis / Profil */
+/**
+ * Spec bolum 4: Harita / Rota / Sarj / Gecmis / Profil.
+ *
+ * Ikonlar SF Symbols (iOS) ve Material Symbols (Android) - NativeTabs'in
+ * kendi native ikon yollari. `VectorIcon` ile Ionicons'u sarmalayip `src`
+ * uzerinden {default, selected} nesnesi vermeyi denedigimizde gercek
+ * cihazda "[RNScreens] To use selectedIcon prop, the icon prop must also
+ * be provided" hatasiyla acilista cokuyordu (VectorIcon'un async
+ * getImageSource'u ile native tarafin senkron icon/selectedIcon
+ * beklentisi arasinda bir yaris durumu). sf/md string degerleri senkron
+ * oldugu icin bu sorunu tamamen ortadan kaldiriyor - ayrica zaten "native"
+ * bir sekme cubugu icin platform ikonlarini kullanmak daha dogru.
+ */
 const TABS = [
-  { name: 'map', title: 'Harita', icon: 'map-outline', iconActive: 'map' },
-  { name: 'route', title: 'Rota', icon: 'navigate-outline', iconActive: 'navigate' },
-  { name: 'charging', title: 'Şarj', icon: 'flash-outline', iconActive: 'flash' },
-  { name: 'history', title: 'Geçmiş', icon: 'time-outline', iconActive: 'time' },
-  { name: 'profile', title: 'Profil', icon: 'person-outline', iconActive: 'person' },
+  { name: 'map', title: 'Harita', sf: 'map', sfSelected: 'map.fill', md: 'map' },
+  {
+    name: 'route',
+    title: 'Rota',
+    sf: 'paperplane',
+    sfSelected: 'paperplane.fill',
+    md: 'navigation',
+  },
+  { name: 'charging', title: 'Şarj', sf: 'bolt', sfSelected: 'bolt.fill', md: 'bolt' },
+  { name: 'history', title: 'Geçmiş', sf: 'clock', sfSelected: 'clock.fill', md: 'history' },
+  { name: 'profile', title: 'Profil', sf: 'person', sfSelected: 'person.fill', md: 'person' },
 ] as const;
 
 export default function TabsLayout() {
@@ -33,15 +50,10 @@ export default function TabsLayout() {
     <NativeTabs
       tintColor={colors.primary}
       screenListeners={{ tabPress: () => haptics.selection() }}>
-      {TABS.map(({ name, title, icon, iconActive }) => (
+      {TABS.map(({ name, title, sf, sfSelected, md }) => (
         <NativeTabs.Trigger key={name} name={name}>
           <NativeTabs.Trigger.Label>{title}</NativeTabs.Trigger.Label>
-          <NativeTabs.Trigger.Icon
-            src={{
-              default: <NativeTabs.Trigger.VectorIcon family={Ionicons} name={icon} />,
-              selected: <NativeTabs.Trigger.VectorIcon family={Ionicons} name={iconActive} />,
-            }}
-          />
+          <NativeTabs.Trigger.Icon sf={{ default: sf, selected: sfSelected }} md={md} />
         </NativeTabs.Trigger>
       ))}
     </NativeTabs>
