@@ -196,6 +196,11 @@ export default function MapScreen() {
   const basemap = useMapStyleStore((s) => s.basemap);
   const toggleBasemap = useMapStyleStore((s) => s.toggle);
 
+  // Baslik (logo + arama + varsa rezervasyon bandi) haritanin uzerine biniyor;
+  // haritanin hata afisi onun arkasinda kalip okunamiyordu. Yuksekligi olcup
+  // afisi altina gonderiyoruz - rezervasyon bandi acilip kapandikca da guncellenir.
+  const [headerHeight, setHeaderHeight] = useState(0);
+
   const userLocation = useLocationStore((s) => s.coords);
   const locationStatus = useLocationStore((s) => s.status);
   const ensureLocation = useLocationStore((s) => s.ensure);
@@ -375,6 +380,7 @@ export default function MapScreen() {
           if (station) openStation(station);
         }}
         onMapPress={handleMapPress}
+        errorTopOffset={headerHeight ? headerHeight + spacing.md : undefined}
         style={styles.map}
       />
 
@@ -409,7 +415,11 @@ export default function MapScreen() {
         </AnimatedPressable>
       </Animated.View>
 
-      <SafeAreaView edges={['top']} style={styles.header} pointerEvents="box-none">
+      <SafeAreaView
+        edges={['top']}
+        style={styles.header}
+        pointerEvents="box-none"
+        onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}>
         <View style={styles.headerRow}>
           <Logo width={104} />
           <AnimatedPressable

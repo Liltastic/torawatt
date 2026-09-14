@@ -8,7 +8,13 @@ import { stationAvailability, type Coordinate, type Station } from '@/types/doma
 
 import { BASEMAPS, buildMapHtml } from './mapHtml';
 
-/** Arama kutusunun altina denk gelir; harita basligin arkasina kadar uzaniyor. */
+/**
+ * Harita, uzerine binen basligin arkasina kadar uzaniyor; hata afisi de bu
+ * kadar asagida basliyor. Cagiran ekran kendi basliginin gercek yuksekligini
+ * biliyorsa `errorTopOffset` ile bildirir - sabit bir deger, guvenli alani
+ * buyuk olan telefonlarda (veya rezervasyon bandi acikken) afisi arama
+ * kutusunun altinda birakip okunmaz hale getiriyordu.
+ */
 const ERROR_BANNER_TOP = 130;
 
 /** Istanbul merkezi; konum alinana kadar varsayilan kamera. */
@@ -46,6 +52,8 @@ interface StationMapProps {
   onSelectStation?: (id: string) => void;
   /** Istasyon/cluster disindaki bos harita alanina dokunulunca tetiklenir. */
   onMapPress?: () => void;
+  /** Hata afisinin ustten mesafesi; ekranin haritaya binen basliginin yuksekligi. */
+  errorTopOffset?: number;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -57,7 +65,17 @@ type BridgeMessage =
   | { type: 'error'; message: string };
 
 export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function StationMap(
-  { stations, selectedId, userLocation, route, interactive = true, onSelectStation, onMapPress, style },
+  {
+    stations,
+    selectedId,
+    userLocation,
+    route,
+    interactive = true,
+    onSelectStation,
+    onMapPress,
+    errorTopOffset,
+    style,
+  },
   ref,
 ) {
   const webViewRef = useRef<WebView>(null);
@@ -228,7 +246,9 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
 
       {/* Harita acildiktan sonra da hata cikabilir (tile, glyph, sprite). */}
       {ready && !!error && (
-        <View style={styles.errorBanner} pointerEvents="none">
+        <View
+          style={[styles.errorBanner, { top: errorTopOffset ?? ERROR_BANNER_TOP }]}
+          pointerEvents="none">
           <Text style={styles.errorText} numberOfLines={3}>
             {error}
           </Text>
@@ -263,7 +283,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: spacing.lg,
     right: spacing.lg,
-    top: ERROR_BANNER_TOP,
     padding: spacing.md,
     borderRadius: radius.badge,
     backgroundColor: colors.dangerSoft,

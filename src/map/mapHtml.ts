@@ -420,12 +420,22 @@ ${config.onLoadScript}
       if (f) post({ type: 'stationPress', id: f.properties.id });
     });
 
+    // Kume acma zoom'u, iki kutuphanenin imzasi ayrilan tek yeri: MapLibre 5
+    // Promise donduruyor, Mapbox GL JS ise callback bekliyor. Yanlisini
+    // cagirinca kumeye her dokunusta "then is not a function" patliyor.
     map.on('click', 'clusters', function (e) {
       var f = e.features && e.features[0];
       if (!f) return;
-      map.getSource('stations').getClusterExpansionZoom(f.properties.cluster_id).then(function (z) {
+      var expand = function (z) {
         map.easeTo({ center: f.geometry.coordinates, zoom: z });
-      }).catch(function () {});
+      };
+      var pending = map.getSource('stations').getClusterExpansionZoom(
+        f.properties.cluster_id,
+        function (err, z) { if (!err && z != null) expand(z); }
+      );
+      if (pending && typeof pending.then === 'function') {
+        pending.then(expand).catch(function () {});
+      }
     });
 
     // Bos harita alanina (istasyon/cluster disi) dokunuldugunda RN tarafina
