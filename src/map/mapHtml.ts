@@ -23,7 +23,15 @@ export type BasemapId = 'classic' | 'studio';
 
 /** MapLibre GL JS surumu CDN'de sabitlenir; UMD build yalnizca 5.x'te var. */
 const MAPLIBRE_VERSION = '5.24.0';
-const MAPBOX_GL_VERSION = '3.9.0';
+const MAPBOX_GL_VERSION = '3.30.0';
+
+/**
+ * Harita bu surede acilmazsa pes edip kullaniciya soyluyoruz. Onsuz basarisiz
+ * bir yukleme sonsuza kadar "Harita yukleniyor" donduruyor ve elimizde neyin
+ * takildigina dair hicbir bilgi kalmiyor - ozellikle iOS'ta, WebView'in icine
+ * bakamadigimiz icin.
+ */
+const LOAD_TIMEOUT_MS = 20000;
 
 const MAPBOX_USERNAME = 'raxyizm';
 const MAPBOX_STYLE_ID = 'cmu1946s600gj01s75bta4r79';
@@ -98,6 +106,8 @@ interface BasemapConfig {
   boldFont: string;
   /** Harita olusturulmadan once calisan hazirlik (Mapbox icin token). */
   setupScript: string;
+  /** Map yapicisindaki `projection` degeri; anlamsizsa 'undefined' (yani yok sayilir). */
+  projection: string;
   /** `load` olayinda, kendi katmanlarimizi eklemeden once calisan kod. */
   onLoadScript: string;
   /** Logo kontrolu gizlenebilir mi - Mapbox'ta kullanim kosullari geregi hayir. */
@@ -114,6 +124,7 @@ export const BASEMAPS: Record<BasemapId, BasemapConfig> = {
     styleUrl: 'https://tiles.openfreemap.org/styles/positron',
     boldFont: 'Noto Sans Bold',
     setupScript: '',
+    projection: 'undefined',
     onLoadScript: RECOLOR_SCRIPT,
     hideLogo: true,
   },
@@ -126,6 +137,10 @@ export const BASEMAPS: Record<BasemapId, BasemapConfig> = {
     styleUrl: `mapbox://styles/${MAPBOX_USERNAME}/${MAPBOX_STYLE_ID}`,
     boldFont: 'DIN Pro Bold',
     setupScript: `  mapboxgl.accessToken = '${MAPBOX_ACCESS_TOKEN}';`,
+    // "Standard" stilleri GL JS v3'te varsayilan olarak kure projeksiyonuyla
+    // cizilir. Uygulama zaten duz 2D bir harita istiyor (pitch/bearing sifir,
+    // dondurme kapali), ustelik kure bambaska ve cok daha agir bir WebGL yolu.
+    projection: `'mercator'`,
     onLoadScript: '',
     hideLogo: false,
   },
@@ -187,6 +202,14 @@ ${config.setupScript}
 
   var EMPTY = { type: 'FeatureCollection', features: [] };
 
+  // Yukleme sessizce takilirsa (WebView'in icine bakamadigimiz iOS'ta oldugu
+  // gibi) en azindan nereye kadar gelindigini bilelim.
+  var stage = 'betik yuklendi';
+  var opened = false;
+  setTimeout(function () {
+    if (!opened) post({ type: 'error', message: 'Harita acilamadi - son asama: ' + stage });
+  }, ${LOAD_TIMEOUT_MS});
+
   var map = new ${globalName}.Map({
     container: 'map',
     style: '${config.styleUrl}',
@@ -196,11 +219,15 @@ ${config.setupScript}
     // icin) - uygulamamiz duz, tepeden gorunumlu 2D bir harita bekliyor.
     pitch: 0,
     bearing: 0,
+    projection: ${config.projection},
     attributionControl: { compact: true },
     // Pinleri parmak altinda tutmak icin egimi kapatiyoruz.
     pitchWithRotate: false,
     dragRotate: false,
   });
+  stage = 'harita kuruldu';
+
+  map.on('styledata', function () { stage = 'stil geldi'; });
 
   map.on('error', function (e) {
     var err = e && e.error;
@@ -401,6 +428,7 @@ ${config.onLoadScript}
       if (hits.length === 0) post({ type: 'mapPress' });
     });
 
+    opened = true;
     post({ type: 'ready' });
   });
 

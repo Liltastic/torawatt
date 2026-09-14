@@ -201,13 +201,24 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
 
       {!ready && (
         <View style={styles.overlay} pointerEvents="none">
-          <ActivityIndicator color={colors.primary} />
-          <Text style={styles.overlayText}>Harita yükleniyor</Text>
+          {error ? (
+            // Acilmadan gelen hata buraya yaziliyor: asagidaki afis harita
+            // ekraninin arama kutusunun altinda kalabiliyor, bu katman ise
+            // tum alani kapladigi icin her zaman gorunur.
+            <Text style={styles.overlayError} numberOfLines={4}>
+              {error}
+            </Text>
+          ) : (
+            <>
+              <ActivityIndicator color={colors.primary} />
+              <Text style={styles.overlayText}>Harita yükleniyor</Text>
+            </>
+          )}
         </View>
       )}
 
-      {/* Harita yuklendikten sonra da hata cikabilir (tile, glyph, sprite). */}
-      {!!error && (
+      {/* Harita acildiktan sonra da hata cikabilir (tile, glyph, sprite). */}
+      {ready && !!error && (
         <View style={styles.errorBanner} pointerEvents="none">
           <Text style={styles.errorText} numberOfLines={3}>
             {error}
@@ -233,6 +244,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   overlayText: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.md },
+  overlayError: {
+    ...typography.caption,
+    color: colors.danger,
+    textAlign: 'center',
+    paddingHorizontal: spacing.xl,
+  },
   errorBanner: {
     position: 'absolute',
     left: spacing.lg,
