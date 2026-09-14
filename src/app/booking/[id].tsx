@@ -16,6 +16,7 @@ import {
 } from '@/types/domain';
 import { formatDate, formatMinutes, formatTime } from '@/utils/format';
 import { haptics } from '@/utils/haptics';
+import { cancelReservationReminders } from '@/utils/notifications';
 
 /** Durum -> rozet tonu. Rozet paleti soket durumlariyla ortak. */
 const STATUS_TONE: Record<ReservationStatus, 'AVAILABLE' | 'OCCUPIED' | 'FAULTED' | 'UNKNOWN'> = {
@@ -79,7 +80,10 @@ export default function ReservationDetailScreen() {
       {
         text: 'İptal et',
         style: 'destructive',
-        onPress: () => setStatus.mutate({ id: reservation.id, status: 'CANCELLED' }),
+        onPress: () => {
+          setStatus.mutate({ id: reservation.id, status: 'CANCELLED' });
+          void cancelReservationReminders(reservation.id);
+        },
       },
     ]);
 
@@ -156,7 +160,12 @@ export default function ReservationDetailScreen() {
             onPress={() =>
               setStatus.mutate(
                 { id: reservation.id, status: 'ARRIVED' },
-                { onSuccess: () => haptics.success() },
+                {
+                  onSuccess: () => {
+                    haptics.success();
+                    void cancelReservationReminders(reservation.id);
+                  },
+                },
               )
             }
           />

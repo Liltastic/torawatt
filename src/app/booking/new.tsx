@@ -12,6 +12,7 @@ import { colors, radius, shadows, spacing, typography } from '@/theme';
 import { RESERVATION_GRACE_MINUTES, currentTypeOf } from '@/types/domain';
 import { formatTime } from '@/utils/format';
 import { haptics } from '@/utils/haptics';
+import { scheduleReservationReminders } from '@/utils/notifications';
 
 /** Hizli rezervasyon secenekleri (spec bolum 10). */
 const START_OPTIONS = [
@@ -83,7 +84,10 @@ export default function NewReservationScreen() {
           setStatus.mutate(
             { id: reservation.id, status: 'CONFIRMED' },
             {
-              onSuccess: () => haptics.success(),
+              onSuccess: () => {
+                haptics.success();
+                void scheduleReservationReminders(reservation);
+              },
               onSettled: () => {
                 router.replace({ pathname: '/booking/[id]', params: { id: reservation.id } });
               },
