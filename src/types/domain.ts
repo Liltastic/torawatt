@@ -183,3 +183,11 @@ export const reservationStatusLabels: Record<ReservationStatus, string> = {
   EXPIRED: 'Süresi doldu',
   CANCELLED: 'İptal edildi',
 };
+
+export interface Campaign {
+  id: string;
+  title: string;
+  description: string;
+  discountLabel: string;
+  validUntil: string | null;
+}

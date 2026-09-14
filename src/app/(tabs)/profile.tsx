@@ -23,7 +23,7 @@ const MENU: { icon: IoniconName; label: string; href?: string; tag?: string }[] 
   { icon: 'card-outline', label: 'Ödeme yöntemleri', href: '/payment/methods', tag: 'demo' },
   { icon: 'heart-outline', label: 'Favoriler', href: '/favorites' },
   { icon: 'notifications-outline', label: 'Bildirimler', href: '/notifications' },
-  { icon: 'pricetag-outline', label: 'Kampanyalar' },
+  { icon: 'pricetag-outline', label: 'Kampanyalar', href: '/campaigns' },
   { icon: 'help-buoy-outline', label: 'Yardım ve destek', href: '/support' },
   { icon: 'settings-outline', label: 'Ayarlar', href: '/settings' },
 ];

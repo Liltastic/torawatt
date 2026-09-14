@@ -120,6 +120,22 @@ model Favorite {
   @@index([ownerId])
 }
 
+/**
+ * Kampanya/promosyon kartlari. Henuz bir admin paneli yok - su an icin
+ * prisma/seed.ts uzerinden elle eklenip guncelleniyor (istasyon verisiyle
+ * ayni upsert deseni). isActive ve validUntil, gecmis/kapatilmis kampanyalari
+ * veriyi silmeden gizlemeyi saglar.
+ */
+model Campaign {
+  id            String    @id
+  title         String
+  description   String
+  discountLabel String
+  validUntil    DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+}
+
 model SupportRequest {
   id        String   @id @default(cuid())
   ownerId   String

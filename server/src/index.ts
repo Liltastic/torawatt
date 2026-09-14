@@ -10,6 +10,7 @@ import cors from 'cors';
 import express from 'express';
 
 import { authRouter } from './routes/auth.js';
+import { campaignsRouter } from './routes/campaigns.js';
 import { favoritesRouter } from './routes/favorites.js';
 import { historyRouter } from './routes/history.js';
 import { paymentMethodsRouter } from './routes/paymentMethods.js';
@@ -29,6 +30,7 @@ app.get('/health', (_req, res) => {
 
 app.use('/auth', authRouter);
 app.use('/stations', stationsRouter);
+app.use('/campaigns', campaignsRouter);
 app.use('/vehicles', vehiclesRouter);
 app.use('/reservations', reservationsRouter);
 app.use('/charging-history', historyRouter);

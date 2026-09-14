@@ -191,7 +191,55 @@ const stations: SeedStation[] = [
   },
 ];
 
+interface SeedCampaign {
+  id: string;
+  title: string;
+  description: string;
+  discountLabel: string;
+  validUntil?: string;
+}
+
+const campaigns: SeedCampaign[] = [
+  {
+    id: 'camp_hosgeldin',
+    title: 'Hoş geldin indirimi',
+    description: 'TORA WATT\'a yeni katıldın, ilk şarj işleminde kWh başına indirim seni bekliyor.',
+    discountLabel: '%20 indirim',
+  },
+  {
+    id: 'camp_haftasonu',
+    title: 'Hafta sonu fırsatı',
+    description: 'Cumartesi ve pazar günleri tüm TORA WATT istasyonlarında geçerli.',
+    discountLabel: '%10 indirim',
+  },
+  {
+    id: 'camp_gece',
+    title: 'Otoyolda gece şarjı',
+    description: 'Gebze ve Bolu Dağı dinlenme tesislerinde 23:00-06:00 arası şarj işlemlerinde.',
+    discountLabel: '%15 indirim',
+  },
+];
+
 async function main() {
+  for (const campaign of campaigns) {
+    await prisma.campaign.upsert({
+      where: { id: campaign.id },
+      update: {
+        title: campaign.title,
+        description: campaign.description,
+        discountLabel: campaign.discountLabel,
+        validUntil: campaign.validUntil ? new Date(campaign.validUntil) : null,
+      },
+      create: {
+        id: campaign.id,
+        title: campaign.title,
+        description: campaign.description,
+        discountLabel: campaign.discountLabel,
+        validUntil: campaign.validUntil ? new Date(campaign.validUntil) : null,
+      },
+    });
+  }
+
   for (const station of stations) {
     await prisma.station.upsert({
       where: { id: station.id },
@@ -240,6 +288,7 @@ async function main() {
     }
   }
 
+  console.log(`${campaigns.length} kampanya yüklendi.`);
   console.log(`${stations.length} istasyon ve bağlı soketleri yüklendi.`);
 }
 

@@ -1,5 +1,6 @@
 import { getDeviceId } from '@/lib/deviceId';
 import type {
+  Campaign,
   ChargingHistoryDetail,
   Connector,
   ConnectorType,
@@ -132,6 +133,12 @@ export const authApi = {
 export const stationsApi = {
   list: () => request<Station[]>('/stations', { auth: false }),
   get: (id: string) => request<Station>(`/stations/${id}`, { auth: false }),
+};
+
+// --- Kampanyalar (kimlik dogrulama gerekmez) ---
+
+export const campaignsApi = {
+  list: () => request<Campaign[]>('/campaigns', { auth: false }),
 };
 
 // --- Araclar ---
