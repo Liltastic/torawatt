@@ -322,6 +322,12 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
 
       if (message.type === 'ready') {
         setReady(true);
+        // Harita acildiysa bekleyen hata artik gecerli degil. Ozellikle 20 sn'lik
+        // gozcu yavas bir agda haksiz yere tetiklenip afisi birakiyordu:
+        // hata ready'den ONCE geldigi icin otomatik kapanma zamanlayicisi da
+        // kurulmuyor ve afis sonsuza kadar ekranda kaliyordu.
+        clearErrorTimer();
+        setError(null);
         // Sayaci HEMEN sifirlamiyoruz. Bellek baskisindan olen bir WebView'in
         // tipik oruntusu "yeniden yukle -> sayfa acilir -> tekrar oldurulur";
         // ready aninda sifirlansaydi sayac hic dolmaz ve korumak istedigimiz
@@ -357,7 +363,7 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
         showError(message.message);
       }
     },
-    [onSelectStation, onMapPress, pushStations, pushUserLocation, pushRoute, showError],
+    [onSelectStation, onMapPress, pushStations, pushUserLocation, pushRoute, showError, clearErrorTimer],
   );
 
   return (

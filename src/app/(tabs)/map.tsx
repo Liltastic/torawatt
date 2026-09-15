@@ -327,10 +327,10 @@ export default function MapScreen() {
       if (!selectedStation) return null;
       const connector = selectedStation.connectors.find((c) => c.id === selectedConnectorId);
 
-      // iOS'ta sekme cubugu yer kaplamiyor, icerigin uzerine biniyor: bu pay
-      // olmadan "Rezerve Et" ve "Sarj Baslat" butonlari cam cubugun altinda kaliyor.
+      // Sheet zaten bottomInset ile cubugun ustune kaldirildi; footer'a ayrica
+      // pay vermek onu icerigin ortasinda birakirdi.
       return (
-        <DetailFooter {...footerProps} bottomInset={tabBarInset}>
+        <DetailFooter {...footerProps} bottomInset={0}>
           <Button
             label="Rezerve Et"
             variant="secondary"
@@ -466,6 +466,13 @@ export default function MapScreen() {
         ref={sheetRef}
         snapPoints={SHEET_SNAP_POINTS}
         index={1}
+        // Sheet'in TAMAMI sekme cubugunun ustunde dursun. Footer'a veya icerik
+        // paylarina tek tek pay eklemek ise yaramiyor: kutuphane footer'i
+        // icerigin uzerine bindiriyor ve bottomInset'i o hesaba katmiyordu,
+        // yani Ucretlendirme karti butonlarin altinda kaliyordu. bottomInset
+        // burada verilince sheet yuksekligi, snap noktalari ve footer konumu
+        // hepsi birlikte dogru hesaplaniyor.
+        bottomInset={tabBarInset}
         animatedIndex={sheetIndex}
         animatedPosition={sheetPosition}
         enableDynamicSizing={false}
@@ -556,7 +563,7 @@ export default function MapScreen() {
             ) : (
               <BottomSheetScrollView
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={[styles.list, { paddingBottom: spacing.xl + tabBarInset }]}>
+                contentContainerStyle={styles.list}>
                 {stations.map((station, index) => (
                   <Animated.View
                     key={station.id}
@@ -592,6 +599,11 @@ function StationDetail({
   onBack: () => void;
   onDirections: () => void;
 }) {
+  // enableFooterMarginAdjustment yalnizca footer'in OLCULEN yuksekligini pay
+  // olarak ekliyor; DetailFooter'a verdigimiz bottomInset footer'i yukari
+  // kaydiriyor ama o olcuye girmiyor. Payi eklemezsek iOS'ta icerigin son ~83pt'si
+  // (Ucretlendirme karti) butonlarin altinda kaliyor.
+  const tabBarInset = useTabBarInset();
   const availability = stationAvailability(station);
   const availableCount = station.connectors.filter((c) => c.status === 'AVAILABLE').length;
   const selectedConnector = station.connectors.find((c) => c.id === selectedConnectorId);
