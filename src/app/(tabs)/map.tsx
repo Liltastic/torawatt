@@ -73,8 +73,10 @@ interface MapFilter {
 /**
  * Kapali (peek): haritanin cogu gorunur ve etkilesim orada olur.
  * Yari: liste + haritayi paylasir. Acik: liste veya istasyon detayi tum dikkati alir.
+ * Oranlar, sekme cubugunun USTUNDE gorunen yuksekligin payidir (bkz. sheetSnapPoints).
  */
-const SHEET_SNAP_POINTS = ['15%', '46%', '82%'];
+const SHEET_SNAP_FRACTIONS = [0.15, 0.46, 0.82] as const;
+const SHEET_SNAP_POINTS = SHEET_SNAP_FRACTIONS.map((f) => `${Math.round(f * 100)}%`);
 
 const DETAIL_TABS = [
   { value: 'station' as const, label: 'İstasyon' },
@@ -185,9 +187,23 @@ export default function MapScreen() {
   const activeReservation = useActiveReservation();
   const { data: allStations, isLoading, isError, error, refetch } = useStations();
 
-  // iOS sekme cubugu yari saydam ve icerigin USTUNE biniyor; hem liste hem
-  // detay bari bu kadar yukaridan baslamali (bkz. utils/tabBar).
+  // iOS sekme cubugu yari saydam ve icerigin USTUNE biniyor; sheet'in govdesi
+  // cubugun altindan kayar, listenin son ogesi ise bu kadar yukarida bitmeli
+  // (bkz. utils/tabBar). Android'de 0.
   const tabBarInset = useTabBarInset();
+  const listContentStyle = { ...styles.list, paddingBottom: spacing.xl + tabBarInset };
+
+  // Yuzdelik snap noktalari cubugun arkasinda kalan ~83pt'yi de sayiyordu;
+  // peek konumunda cubugun ustunde neredeyse bir sey kalmiyordu. Oranlari
+  // cubugun ustundeki kullanilabilir yukseklige uygulayip payi geri ekliyoruz:
+  // gorunen kisim tasarimdaki oran, govde yine cubugun altina uzaniyor.
+  // Kapsayici olculene kadar (ve Android'de her zaman) yuzdeler aynen kalir.
+  const [sheetContainerHeight, setSheetContainerHeight] = useState(0);
+  const sheetSnapPoints = useMemo<(string | number)[]>(() => {
+    if (tabBarInset <= 0 || sheetContainerHeight <= 0) return SHEET_SNAP_POINTS;
+    const usable = sheetContainerHeight - tabBarInset;
+    return SHEET_SNAP_FRACTIONS.map((f) => Math.round(usable * f + tabBarInset));
+  }, [tabBarInset, sheetContainerHeight]);
 
   const basemap = useMapStyleStore((s) => s.basemap);
   const toggleBasemap = useMapStyleStore((s) => s.toggle);
@@ -327,10 +343,10 @@ export default function MapScreen() {
       if (!selectedStation) return null;
       const connector = selectedStation.connectors.find((c) => c.id === selectedConnectorId);
 
-      // Sheet zaten bottomInset ile cubugun ustune kaldirildi; footer'a ayrica
-      // pay vermek onu icerigin ortasinda birakirdi.
+      // Sheet ekranin dibine kadar iniyor; iOS'ta cam cubuk yer kaplamayip
+      // icerigin ustune bindigi icin butonlari o kadar yukari aliyoruz.
       return (
-        <DetailFooter {...footerProps} bottomInset={0}>
+        <DetailFooter {...footerProps} bottomInset={tabBarInset}>
           <Button
             label="Rezerve Et"
             variant="secondary"
@@ -363,7 +379,9 @@ export default function MapScreen() {
   );
 
   return (
-    <View style={styles.root}>
+    <View
+      style={styles.root}
+      onLayout={(e) => setSheetContainerHeight(e.nativeEvent.layout.height)}>
       {/* Harita en altta; arama ve alt sheet uzerine biniyor. */}
       <StationMap
         ref={mapRef}
@@ -464,15 +482,14 @@ export default function MapScreen() {
 
       <BottomSheet
         ref={sheetRef}
-        snapPoints={SHEET_SNAP_POINTS}
+        snapPoints={sheetSnapPoints}
         index={1}
-        // Sheet'in TAMAMI sekme cubugunun ustunde dursun. Footer'a veya icerik
-        // paylarina tek tek pay eklemek ise yaramiyor: kutuphane footer'i
-        // icerigin uzerine bindiriyor ve bottomInset'i o hesaba katmiyordu,
-        // yani Ucretlendirme karti butonlarin altinda kaliyordu. bottomInset
-        // burada verilince sheet yuksekligi, snap noktalari ve footer konumu
-        // hepsi birlikte dogru hesaplaniyor.
-        bottomInset={tabBarInset}
+        // bottomInset BILEREK verilmiyor: kutuphane onu kapsayici View'a
+        // `bottom` + overflow:hidden olarak uyguluyor; sheet cubugun ustunde
+        // keskin bir cizgiyle bitip arkasinda harita gorunuyordu. Sheet dibe
+        // kadar iner, cam cubugun altindan gecer; icerigin ve footer'in cubugun
+        // ustunde kalmasini paylar (listContentStyle, detailContentStyle,
+        // DetailFooter bottomInset) saglar.
         animatedIndex={sheetIndex}
         animatedPosition={sheetPosition}
         enableDynamicSizing={false}
@@ -563,7 +580,7 @@ export default function MapScreen() {
             ) : (
               <BottomSheetScrollView
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.list}>
+                contentContainerStyle={listContentStyle}>
                 {stations.map((station, index) => (
                   <Animated.View
                     key={station.id}
@@ -601,9 +618,16 @@ function StationDetail({
 }) {
   // enableFooterMarginAdjustment yalnizca footer'in OLCULEN yuksekligini pay
   // olarak ekliyor; DetailFooter'a verdigimiz bottomInset footer'i yukari
-  // kaydiriyor ama o olcuye girmiyor. Payi eklemezsek iOS'ta icerigin son ~83pt'si
-  // (Ucretlendirme karti) butonlarin altinda kaliyor.
+  // kaydiriyor ama o olcuye girmiyor. Payi biz ekliyoruz; yoksa iOS'ta icerigin
+  // son ~83pt'si (Ucretlendirme karti) butonlarin altinda kaliyor.
+  //
+  // DIKKAT: contentContainerStyle DUZ bir nesne olmali. Dizi verilirse
+  // kutuphane (useBottomSheetContentContainerStyle) StyleSheet.compose ile yine
+  // dizi uretiyor, icinden paddingBottom okuyamiyor ve kendi
+  // `paddingBottom: 0 + footerHeight` degerini bizimkinin uzerine yaziyor.
+  // "Pay ise yaramiyor" diye gorunen onceki denemelerin sebebi buydu.
   const tabBarInset = useTabBarInset();
+  const detailContentStyle = { ...styles.detailContent, paddingBottom: spacing.xl + tabBarInset };
   const availability = stationAvailability(station);
   const availableCount = station.connectors.filter((c) => c.status === 'AVAILABLE').length;
   const selectedConnector = station.connectors.find((c) => c.id === selectedConnectorId);
@@ -667,7 +691,7 @@ function StationDetail({
       <BottomSheetScrollView
         showsVerticalScrollIndicator={false}
         enableFooterMarginAdjustment
-        contentContainerStyle={styles.detailContent}>
+        contentContainerStyle={detailContentStyle}>
         {tab === 'station' ? (
           <>
             <Text style={styles.detailSectionHint}>Şarj başlatmak için bir soket seç.</Text>
