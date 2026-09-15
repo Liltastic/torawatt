@@ -15,6 +15,7 @@ import Animated, {
 
 import { Button, Card, EmptyState, ProgressRing } from '@/components';
 import { useCreateHistoryEntry } from '@/queries/history';
+import { useTabBarInset } from '@/utils/tabBar';
 import { useSessionStore } from '@/store/session';
 import { colors, radius, spacing, typography } from '@/theme';
 import { formatDuration, formatEnergy, formatPower, formatPrice } from '@/utils/format';
@@ -27,6 +28,8 @@ const ASSUMED_BATTERY_KWH = 60;
 
 export default function ChargingScreen() {
   const router = useRouter();
+  // iOS sekme cubugu icerigin uzerine biniyor (bkz. utils/tabBar).
+  const tabBarInset = useTabBarInset();
   const session = useSessionStore((state) => state.session);
   const meta = useSessionStore((state) => state.meta);
   const elapsedSeconds = useSessionStore((state) => state.elapsedSeconds);
@@ -34,7 +37,7 @@ export default function ChargingScreen() {
   const clearSession = useSessionStore((state) => state.clear);
 
   const [powerHistory, setPowerHistory] = useState<number[]>([]);
-  const lastSampleRef = useRef<number | undefined>(undefined);
+  const lastSampleRef = useRef<{ sessionId: string; energyKwh: number } | undefined>(undefined);
   const createHistoryEntry = useCreateHistoryEntry();
   const archivedSessionIdRef = useRef<string | undefined>(undefined);
   const wasFinishedRef = useRef(false);
@@ -72,12 +75,20 @@ export default function ChargingScreen() {
 
   const pulseStyle = useAnimatedStyle(() => ({ opacity: pulse.value }));
 
+  // Ornekler oturum kimligiyle birlikte saklaniyor. Sarj sekmesi oturumlar
+  // arasinda mount kaliyor ve clearSession() yalnizca store'u temizliyor;
+  // kimlik tutulmazsa ikinci oturum birincisinin cubuklariyla acilip yeni
+  // soketin tepe gucune gore yanlis olceklenmis bir egri gosteriyor.
   useEffect(() => {
     if (!session || session.status !== 'CHARGING') return;
-    if (lastSampleRef.current === session.energyKwh) return;
+    const last = lastSampleRef.current;
+    if (last?.sessionId === session.id && last.energyKwh === session.energyKwh) return;
 
-    lastSampleRef.current = session.energyKwh;
-    setPowerHistory((prev) => [...prev, session.powerKw].slice(-HISTORY_LIMIT));
+    const startedNewSession = last?.sessionId !== session.id;
+    lastSampleRef.current = { sessionId: session.id, energyKwh: session.energyKwh };
+    setPowerHistory((prev) =>
+      startedNewSession ? [session.powerKw] : [...prev, session.powerKw].slice(-HISTORY_LIMIT),
+    );
   }, [session]);
 
   // Oturum COMPLETED olunca gecmise TEK SEFERLIK yaz. Enerji aktarilmadiysa
@@ -128,7 +139,9 @@ export default function ChargingScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: spacing.xxl + tabBarInset }]}
+        showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={styles.headerTitleRow}>
             <Text style={styles.headerTitle}>{isFinished ? 'Şarj tamamlandı' : 'Aktif şarj'}</Text>
@@ -185,7 +198,7 @@ export default function ChargingScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.actions}>
+      <View style={[styles.actions, { paddingBottom: spacing.md + tabBarInset }]}>
         {isFinished ? (
           <Button label="Yolculuğa dön" onPress={() => { clearSession(); router.replace('/map'); }} />
         ) : (

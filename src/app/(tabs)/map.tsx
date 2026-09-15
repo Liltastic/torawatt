@@ -62,6 +62,7 @@ import {
 } from '@/types/domain';
 import { formatPrice, formatTime } from '@/utils/format';
 import { haptics } from '@/utils/haptics';
+import { useTabBarInset } from '@/utils/tabBar';
 
 interface MapFilter {
   id: string;
@@ -74,15 +75,6 @@ interface MapFilter {
  * Yari: liste + haritayi paylasir. Acik: liste veya istasyon detayi tum dikkati alir.
  */
 const SHEET_SNAP_POINTS = ['15%', '46%', '82%'];
-
-/**
- * Yalnizca iOS: orada sekme cubugu NativeTabs ile native cizilyor ve sadece duz
- * bir ScrollView'i otomatik guvenli-alan payiyla genisletiyor - @gorhom/bottom-sheet'in
- * kendi BottomSheetScrollView'i bu ayarlamayi almiyor. Onsuz, en alt (82%) snap
- * noktasinda listenin son ogesi cubugun arkasinda kalip gorunmuyordu. Android'de
- * cubuk React Navigation'in kendi cubugu ve bu paya ihtiyac yok (bkz. (tabs)/_layout.tsx).
- */
-const LIST_TAB_BAR_CLEARANCE = Platform.select({ ios: 90, default: 0 });
 
 const DETAIL_TABS = [
   { value: 'station' as const, label: 'İstasyon' },
@@ -192,6 +184,10 @@ export default function MapScreen() {
   const activeVehicle = useActiveVehicle();
   const activeReservation = useActiveReservation();
   const { data: allStations, isLoading, isError, error, refetch } = useStations();
+
+  // iOS sekme cubugu yari saydam ve icerigin USTUNE biniyor; hem liste hem
+  // detay bari bu kadar yukaridan baslamali (bkz. utils/tabBar).
+  const tabBarInset = useTabBarInset();
 
   const basemap = useMapStyleStore((s) => s.basemap);
   const toggleBasemap = useMapStyleStore((s) => s.toggle);
@@ -331,11 +327,10 @@ export default function MapScreen() {
       if (!selectedStation) return null;
       const connector = selectedStation.connectors.find((c) => c.id === selectedConnectorId);
 
-      // insets.bottom uygulanmiyor: bu ekran zaten sekme cubugunun ustunde
-      // duruyor, cubuk kendi safe-area payini kendisi ayirtiyor - ikisini
-      // toplarsak footer ile cubuk arasinda gereksiz bir bosluk olusuyordu.
+      // iOS'ta sekme cubugu yer kaplamiyor, icerigin uzerine biniyor: bu pay
+      // olmadan "Rezerve Et" ve "Sarj Baslat" butonlari cam cubugun altinda kaliyor.
       return (
-        <DetailFooter {...footerProps} bottomInset={0}>
+        <DetailFooter {...footerProps} bottomInset={tabBarInset}>
           <Button
             label="Rezerve Et"
             variant="secondary"
@@ -364,7 +359,7 @@ export default function MapScreen() {
         </DetailFooter>
       );
     },
-    [selectedStation, selectedConnectorId, router],
+    [selectedStation, selectedConnectorId, router, tabBarInset],
   );
 
   return (
@@ -561,7 +556,7 @@ export default function MapScreen() {
             ) : (
               <BottomSheetScrollView
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.list}>
+                contentContainerStyle={[styles.list, { paddingBottom: spacing.xl + tabBarInset }]}>
                 {stations.map((station, index) => (
                   <Animated.View
                     key={station.id}
@@ -796,7 +791,6 @@ const styles = StyleSheet.create({
   chips: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md },
   chip: { marginRight: spacing.sm },
   list: {
-    paddingBottom: spacing.xl + LIST_TAB_BAR_CLEARANCE,
     paddingHorizontal: spacing.xs,
   },
   loadingWrap: { paddingVertical: spacing.xxxl, alignItems: 'center' },

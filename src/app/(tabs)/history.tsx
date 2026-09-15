@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInRight, LinearTransition } from 'react-native-reanimated';
 
 import { AnimatedPressable, Card, EmptyState, FilterChip, StationCardSkeleton } from '@/components';
+import { useTabBarInset } from '@/utils/tabBar';
 import { useChargingHistory } from '@/queries/history';
 import { colors, radius, spacing, typography } from '@/theme';
 import type { ChargingHistoryDetail } from '@/types/domain';
@@ -36,6 +37,7 @@ const RANGES = [
 
 export default function HistoryScreen() {
   const router = useRouter();
+  const tabBarInset = useTabBarInset();
   const { data: items, isLoading } = useChargingHistory();
   const [range, setRange] = useState<string>('all');
 
@@ -92,7 +94,9 @@ export default function HistoryScreen() {
           />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={[styles.list, { paddingBottom: spacing.xxl + tabBarInset }]}
+          showsVerticalScrollIndicator={false}>
           <Animated.View entering={FadeInDown.duration(320)}>
             <Card style={styles.summary}>
               <View style={styles.summaryItem}>

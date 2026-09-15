@@ -22,12 +22,15 @@ import { planTrip, type TripPlan } from '@/services/tripPlanner';
 import { colors, radius, spacing, typography } from '@/theme';
 import { formatEnergy, formatMinutes, formatPrice } from '@/utils/format';
 import { haptics } from '@/utils/haptics';
+import { useTabBarInset } from '@/utils/tabBar';
 
 /** Varista bataryada birakilmasi istenen pay. */
 const RESERVE_PERCENT = 10;
 
 export default function RouteScreen() {
   const router = useRouter();
+  // iOS sekme cubugu icerigin uzerine biniyor (bkz. utils/tabBar).
+  const tabBarInset = useTabBarInset();
   const { isLoading: vehiclesLoading } = useVehicles();
   const vehicle = useActiveVehicle();
   const { data: stations } = useStations();
@@ -116,7 +119,7 @@ export default function RouteScreen() {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, { paddingBottom: spacing.huge + tabBarInset }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           <Text style={styles.title}>Rota</Text>

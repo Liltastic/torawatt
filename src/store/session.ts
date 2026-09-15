@@ -57,6 +57,17 @@ function powerAtBattery(ratedKw: number, batteryPercent: number): number {
   return ratedKw;
 }
 
+/**
+ * Simulasyon saati gercek saatin TIME_SCALE katinda akiyor. Bitis damgasini
+ * gercek duvar saatinden alirsak kayit kendi kendisiyle celisiyordu: 40 saniye
+ * suren bir oturum makbuza "Baslangic 14:03 / Bitis 14:04 / Sure 40 dk" olarak
+ * basiliyordu (bkz. services/invoice.ts). Bitisi simule sureden tureterek
+ * endedAt - startedAt == sure esitligini koruyoruz.
+ */
+function simulatedEnd(startedAt: string, elapsedSeconds: number): string {
+  return new Date(new Date(startedAt).getTime() + elapsedSeconds * 1000).toISOString();
+}
+
 export const useSessionStore = create<SessionState>((set, get) => ({
   session: null,
   meta: null,
@@ -123,7 +134,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           batteryPercent: nextBattery,
           cost: energyKwh * meta.pricePerKwh,
           status: finished ? 'COMPLETED' : 'CHARGING',
-          endedAt: finished ? new Date().toISOString() : undefined,
+          endedAt: finished ? simulatedEnd(session.startedAt, elapsedSeconds + TIME_SCALE) : undefined,
         },
       });
 
@@ -140,7 +151,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       session: {
         ...session,
         status: 'COMPLETED',
-        endedAt: new Date().toISOString(),
+        endedAt: simulatedEnd(session.startedAt, get().elapsedSeconds),
       },
     });
   },
