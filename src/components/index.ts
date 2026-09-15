@@ -13,3 +13,4 @@ export { SegmentedControl } from './SegmentedControl';
 export { Skeleton, StationCardSkeleton } from './Skeleton';
 export { ConnectorCard } from './ConnectorCard';
 export { TextField } from './TextField';
+export { AUTH_HERO_SMALL, AuthHero, useAuthKeyboard } from './AuthHero';

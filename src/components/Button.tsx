@@ -21,6 +21,8 @@ interface ButtonProps extends Omit<PressableProps, 'style' | 'children'> {
   loading?: boolean;
   /** Metnin solunda gosterilecek ikon. */
   icon?: React.ReactNode;
+  /** Metnin sagenda gosterilecek ikon (ornegin ileri oku). */
+  trailingIcon?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -31,6 +33,7 @@ export function Button({
   loading = false,
   disabled,
   icon,
+  trailingIcon,
   style,
   ...rest
 }: ButtonProps) {
@@ -60,6 +63,7 @@ export function Button({
           <Text style={[styles.label, styles[`label_${variant}`], !!icon && styles.labelWithIcon]}>
             {label}
           </Text>
+          {!!trailingIcon && <View style={styles.trailingIcon}>{trailingIcon}</View>}
         </View>
       )}
     </AnimatedPressable>
@@ -91,6 +95,7 @@ const styles = StyleSheet.create({
 
   label: { ...typography.body, fontWeight: '600' },
   labelWithIcon: { marginLeft: spacing.sm },
+  trailingIcon: { marginLeft: spacing.sm },
   label_primary: { color: colors.white },
   label_secondary: { color: colors.primaryDark },
   label_ghost: { color: colors.primaryDark },

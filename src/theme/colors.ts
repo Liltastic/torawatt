@@ -20,6 +20,10 @@ export const colors = {
   primary: '#0FB5A3',
   primaryDark: '#0C8F82',
   primarySoft: '#DCF6EF',
+  /** Beyaz metnin uzerine oturdugu koyu turkuaz zemin (giris/kayit hero'su). */
+  heroDark: '#0B3B35',
+  /** Acik zeminde LINK/vurgu metni: primaryDark 3.8:1'de kaliyordu, bu 5.4:1 (AA). */
+  primaryText: '#0A7468',
 
   success: '#16C784',
   successSoft: '#E1FAEE',
