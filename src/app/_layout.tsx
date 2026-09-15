@@ -7,7 +7,8 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { useAuthStore } from '@/store/auth';
+import { setQueryClientForAuth, useAuthStore } from '@/store/auth';
+import { useSessionStore } from '@/store/session';
 import { colors } from '@/theme';
 import { checkForImmediateUpdate } from '@/utils/autoUpdate';
 
@@ -39,11 +40,33 @@ export default function RootLayout() {
       }),
   );
 
+  // Store, provider'in altinda olmadigi icin useQueryClient kullanamiyor;
+  // giris/kayit sirasinda cache'i bosaltabilsin diye client'i ona veriyoruz.
+  useEffect(() => {
+    setQueryClientForAuth(queryClient);
+  }, [queryClient]);
+
   const authStatus = useAuthStore((s) => s.status);
   const hydrateAuth = useAuthStore((s) => s.hydrate);
   useEffect(() => {
     hydrateAuth();
   }, [hydrateAuth]);
+
+  // Cikista onceki hesabin hicbir izi bellekte kalmasin. Burada yapiliyor cunku
+  // bu effect, (tabs)/_layout'un Redirect'e dusup sekmeleri unmount ettigi
+  // render'dan sonra calisir; logout() icinde cagrilsaydi hala mount olan
+  // sorgular token'siz refetch edip 401 -> logout zincirini tetiklerdi.
+  //
+  // Sarj oturumu da temizleniyor: o zustand store'u modul seviyesinde yasiyor ve
+  // kendi setInterval'ini tutuyor. Temizlenmezse B kullanicisi giris yaptiginda
+  // Sarj sekmesi A'nin canli oturumunu gostermeye devam ediyor, dahasi oturum
+  // COMPLETED olunca A'nin sarj kaydi B'nin token'iyla B'nin gecmisine yaziliyor.
+  const userId = useAuthStore((s) => s.user?.id);
+  useEffect(() => {
+    if (userId) return;
+    queryClient.clear();
+    useSessionStore.getState().clear();
+  }, [userId, queryClient]);
 
   // Stack, oturum durumu belli olmadan mount olmasin: src/app/index.tsx ilk
   // render'inda dogru hedefe (welcome/map) senkron karar verebilsin diye -

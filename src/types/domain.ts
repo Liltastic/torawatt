@@ -123,12 +123,14 @@ export const connectorLabels: Record<ConnectorType, string> = {
 export type StationAvailability = 'AVAILABLE' | 'PARTIAL' | 'FULL' | 'UNKNOWN';
 
 /**
- * Cevrimdisi ve durumu bilinmeyen soketler hesaba katilmaz: kullanicinin
- * sarj olabilecegi soket var mi, sorusunu yanitliyoruz.
+ * Yalnizca sarj edilebilir ya da bosalmasi beklenebilir soketler sayilir;
+ * cevrimdisi, durumu bilinmeyen ve ARIZALI olanlar hesap disi. Arizali soket
+ * asla bosalmayacagi icin FULL ('Dolu') sayilmasi, kullaniciya beklemeye deger
+ * bir istasyon vaadi veriyordu; hepsi arizali istasyon artik UNKNOWN doner.
  */
 export function stationAvailability(station: Pick<Station, 'connectors'>): StationAvailability {
   const usable = station.connectors.filter(
-    (c) => c.status !== 'OFFLINE' && c.status !== 'UNKNOWN',
+    (c) => c.status === 'AVAILABLE' || c.status === 'OCCUPIED',
   );
   if (usable.length === 0) return 'UNKNOWN';
 

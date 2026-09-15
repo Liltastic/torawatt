@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 
-import { connectorLabels, type ChargingSession, type Connector, type Station } from '@/types/domain';
+import {
+  connectorLabels,
+  type ChargingSession,
+  type Connector,
+  type Station,
+  type Vehicle,
+} from '@/types/domain';
 
 /**
  * GECICI: aktif sarj oturumu simule ediliyor.
@@ -19,20 +25,31 @@ import { connectorLabels, type ChargingSession, type Connector, type Station } f
 const TIME_SCALE = 60;
 const TICK_MS = 1000;
 
+/** Kullanicinin secili araci yoksa dusulen ortalama batarya kapasitesi. */
+const DEFAULT_BATTERY_KWH = 60;
+
 interface SessionMeta {
   stationName: string;
   connectorLabel: string;
   pricePerKwh: number;
+  /** Oturumun tepe gucu: soket gucu ile aracin kabul ettigi gucun kucugu. */
   ratedPowerKw: number;
+  /** Batarya yuzdesi ve kalan sure bu kapasiteye gore hesaplanir. */
+  batteryCapacityKwh: number;
+  /** Arac profili oturum basladiktan sonra gelirse tavani yeniden hesaplamak icin. */
+  connector: Connector;
 }
 
 interface SessionState {
   session: ChargingSession | null;
   meta: SessionMeta | null;
+  /** Simulasyonu besleyen aktif arac; yoksa ortalama varsayimlara duseriz. */
+  vehicle: Vehicle | null;
   /** Oturum baslangicindan bu yana gecen simule saniye. */
   elapsedSeconds: number;
 
   start: (station: Station, connector: Connector) => void;
+  setVehicle: (vehicle: Vehicle | null) => void;
   stop: () => void;
   clear: () => void;
 }
@@ -50,6 +67,22 @@ const stopTimer = () => {
  * Batarya doldukca sarj gucu duser; gercek EV egrisine kaba bir yaklasim.
  * %80 sonrasi belirgin sekilde yavaslar.
  */
+/**
+ * Soket etiketinde 180 kW yazsa da arac 50 kW ile siniriysa oturum 50 kW ile
+ * ilerler; ayni kural rota planlayicida da uygulaniyor (services/tripPlanner).
+ */
+function ratedPowerFor(connector: Connector, vehicle: Vehicle | null): number {
+  const vehicleMaxKw = connector.type === 'TYPE_2' ? vehicle?.maxAcKw : vehicle?.maxDcKw;
+  if (!vehicleMaxKw || vehicleMaxKw <= 0) return connector.powerKw;
+  return Math.min(connector.powerKw, vehicleMaxKw);
+}
+
+/** Kapasite 0 gelirse yuzde tek tikta %100 olurdu; ortalamaya duseriz. */
+function capacityFor(vehicle: Vehicle | null): number {
+  const capacity = vehicle?.batteryCapacityKwh ?? 0;
+  return capacity > 0 ? capacity : DEFAULT_BATTERY_KWH;
+}
+
 function powerAtBattery(ratedKw: number, batteryPercent: number): number {
   if (batteryPercent >= 95) return ratedKw * 0.08;
   if (batteryPercent >= 80) return ratedKw * 0.35;
@@ -71,11 +104,13 @@ function simulatedEnd(startedAt: string, elapsedSeconds: number): string {
 export const useSessionStore = create<SessionState>((set, get) => ({
   session: null,
   meta: null,
+  vehicle: null,
   elapsedSeconds: 0,
 
   start: (station, connector) => {
     stopTimer();
 
+    const { vehicle } = get();
     const startedAt = new Date().toISOString();
     set({
       elapsedSeconds: 0,
@@ -83,7 +118,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         stationName: station.name,
         connectorLabel: `${connectorLabels[connector.type]} · ${connector.powerKw} kW`,
         pricePerKwh: connector.pricePerKwh ?? 0,
-        ratedPowerKw: connector.powerKw,
+        ratedPowerKw: ratedPowerFor(connector, vehicle),
+        batteryCapacityKwh: capacityFor(vehicle),
+        connector,
       },
       session: {
         id: `sess_${Date.now()}`,
@@ -121,8 +158,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       const hours = (TICK_MS / 1000 / 3600) * TIME_SCALE;
       const energyKwh = session.energyKwh + powerKw * hours;
 
-      // 60 kWh'lik ortalama bir batarya varsayimi.
-      const nextBattery = Math.min(100, battery + (powerKw * hours * 100) / 60);
+      const nextBattery = Math.min(
+        100,
+        battery + (powerKw * hours * 100) / meta.batteryCapacityKwh,
+      );
       const finished = nextBattery >= 100;
 
       set({
@@ -140,6 +179,31 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
       if (finished) stopTimer();
     }, TICK_MS);
+  },
+
+  /**
+   * Store React Query'ye erisemedigi icin aktif araci disaridan aliyor
+   * (bkz. src/app/(tabs)/charging.tsx). Sarj sekmesi ilk oturumla birlikte
+   * mount oldugundan arac bilgisi oturum basladiktan hemen sonra gelebilir;
+   * o yuzden devam eden oturumun kapasitesini ve guc tavanini da guncelliyoruz.
+   */
+  setVehicle: (vehicle) => {
+    const { vehicle: current, session, meta } = get();
+    if (current === vehicle) return;
+
+    if (!session || !meta || session.status === 'COMPLETED') {
+      set({ vehicle });
+      return;
+    }
+
+    set({
+      vehicle,
+      meta: {
+        ...meta,
+        ratedPowerKw: ratedPowerFor(meta.connector, vehicle),
+        batteryCapacityKwh: capacityFor(vehicle),
+      },
+    });
   },
 
   stop: () => {

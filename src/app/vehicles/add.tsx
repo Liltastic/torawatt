@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Controller, useForm, type Control } from 'react-hook-form';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { z } from 'zod';
 
 import { Button, FilterChip, TextField } from '@/components';
@@ -12,6 +13,7 @@ import { vehicleCatalog, type VehiclePreset } from '@/mocks/vehicleCatalog';
 import { useCreateVehicle } from '@/queries/vehicles';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
 import { connectorLabels, type ConnectorType } from '@/types/domain';
+import { haptics } from '@/utils/haptics';
 
 const CONNECTOR_OPTIONS: ConnectorType[] = ['TYPE_2', 'CCS2', 'CHADEMO', 'NACS'];
 
@@ -90,20 +92,26 @@ export default function AddVehicleScreen() {
   };
 
   const onSubmit = handleSubmit((values) => {
+    // Erken return'un ustunde temizleniyor: aksi halde soket hatasiyla donen
+    // denemede onceki gonderim hatasi ekranda asili kaliyordu.
+    setSubmitError(undefined);
+
     // Soket secimi zod semasinin disinda tutuluyor; kendi kontrolu var.
     if (connectors.length === 0) {
       setConnectorError('En az bir soket tipi seç');
+      haptics.error();
       return;
     }
 
-    setSubmitError(undefined);
     // values zaten semadan gecmis halde: sayisal alanlar number.
     createVehicle.mutate(
       { ...values, connectors },
       {
         onSuccess: () => router.back(),
-        onError: (err) =>
-          setSubmitError(err instanceof Error ? err.message : 'Araç kaydedilemedi'),
+        onError: (err) => {
+          setSubmitError(err instanceof Error ? err.message : 'Araç kaydedilemedi');
+          haptics.error();
+        },
       },
     );
   });
@@ -212,11 +220,21 @@ export default function AddVehicleScreen() {
               />
             ))}
           </View>
-          {!!connectorError && <Text style={styles.connectorError}>{connectorError}</Text>}
-          {!!submitError && <Text style={styles.connectorError}>{submitError}</Text>}
         </ScrollView>
 
         <SafeAreaView edges={['bottom']} style={[styles.actions, shadows.sheet]}>
+          {/* Kayit hatasi butonun yaninda duruyor: kaydirilabilir alanin dibinde
+              kalsa kullanici butona basarken onu hic gormuyordu. */}
+          {/* Soket hatasi da buraya: ScrollView'in dibinde kalinca kullanici
+              klavye acikken butona basiyor ve ekranda hicbir sey degismiyordu. */}
+          {!!(submitError || connectorError) && (
+            <Animated.View entering={FadeInDown.duration(220)} style={styles.errorBox}>
+              <Ionicons name="alert-circle-outline" size={16} color={colors.danger} />
+              <Text style={styles.errorText} numberOfLines={3}>
+                {submitError ?? connectorError}
+              </Text>
+            </Animated.View>
+          )}
           <Button
             label="Aracı kaydet"
             onPress={onSubmit}
@@ -308,7 +326,16 @@ const styles = StyleSheet.create({
 
   connectors: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.lg },
   connectorChip: { marginRight: spacing.sm, marginBottom: spacing.sm },
-  connectorError: { ...typography.caption, color: colors.danger },
+
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.badge,
+    backgroundColor: colors.dangerSoft,
+  },
+  errorText: { ...typography.caption, color: colors.danger, flex: 1, marginLeft: spacing.sm },
 
   actions: {
     backgroundColor: colors.surface,

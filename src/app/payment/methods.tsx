@@ -19,6 +19,7 @@ import {
   useSetDefaultPaymentMethod,
 } from '@/queries/paymentMethods';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
+import { haptics } from '@/utils/haptics';
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
@@ -31,11 +32,31 @@ export default function PaymentMethodsScreen() {
   const setDefault = useSetDefaultPaymentMethod();
 
   const [picking, setPicking] = useState(false);
+  const [error, setError] = useState<string>();
+
+  // Backend ucretsiz katmanda uyudugu icin bu istekler gercekten basarisiz
+  // olabiliyor; sessiz kalinca kullaniciya hicbir sey olmamis gibi gorunuyordu.
+  const failWith = (fallback: string) => (err: unknown) => {
+    setError(err instanceof Error ? err.message : fallback);
+    haptics.error();
+  };
+
+  // Ayni demo kart iki kez eklenmesin: katalogda kalanlar gosteriliyor.
+  const availableCards = demoCardCatalog.filter(
+    (card) => !(methods ?? []).some((m) => m.brand === card.brand && m.last4 === card.last4),
+  );
 
   const confirmRemove = (id: string, label: string) =>
     Alert.alert('Kartı sil', `${label} kaldırılsın mı?`, [
       { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Sil', style: 'destructive', onPress: () => remove.mutate(id) },
+      {
+        text: 'Sil',
+        style: 'destructive',
+        onPress: () => {
+          setError(undefined);
+          remove.mutate(id, { onError: failWith('Kart silinemedi') });
+        },
+      },
     ]);
 
   return (
@@ -117,7 +138,10 @@ export default function PaymentMethodsScreen() {
                   <AnimatedPressable
                     accessibilityRole="button"
                     haptic="selection"
-                    onPress={() => setDefault.mutate(method.id)}
+                    onPress={() => {
+                      setError(undefined);
+                      setDefault.mutate(method.id, { onError: failWith('Varsayılan kart değiştirilemedi') });
+                    }}
                     style={({ pressed }) => [styles.makeDefault, pressed && styles.makeDefaultPressed]}>
                     <Text style={styles.makeDefaultText}>Varsayılan yap</Text>
                   </AnimatedPressable>
@@ -133,27 +157,47 @@ export default function PaymentMethodsScreen() {
             exiting={FadeOutDown.duration(180)}
             style={styles.picker}>
             <Text style={styles.pickerTitle}>Hangi demo kart?</Text>
-            <View style={styles.pickerChips}>
-              {demoCardCatalog.map((card) => (
-                <FilterChip
-                  key={card.last4}
-                  label={`${card.brand} ···· ${card.last4}`}
-                  onPress={() => {
-                    addPaymentMethod.mutate(card);
-                    setPicking(false);
-                  }}
-                  style={styles.pickerChip}
-                />
-              ))}
-            </View>
+            {availableCards.length === 0 ? (
+              <Text style={styles.pickerEmpty}>Katalogdaki tüm demo kartlar zaten ekli.</Text>
+            ) : (
+              <View style={styles.pickerChips}>
+                {availableCards.map((card) => (
+                  <FilterChip
+                    key={card.last4}
+                    label={`${card.brand} ···· ${card.last4}`}
+                    onPress={() => {
+                      // Istek surerken ikinci dokunus ayni karti tekrar eklemesin.
+                      if (addPaymentMethod.isPending) return;
+                      setError(undefined);
+                      addPaymentMethod.mutate(card, {
+                        // Secici yalnizca kart gercekten eklenince kapaniyor;
+                        // hata durumunda acik kalip tekrar denemeye izin veriyor.
+                        onSuccess: () => setPicking(false),
+                        onError: failWith('Kart eklenemedi'),
+                      });
+                    }}
+                    style={styles.pickerChip}
+                  />
+                ))}
+              </View>
+            )}
           </Animated.View>
         )}
       </ScrollView>
 
       <SafeAreaView edges={['bottom']} style={[styles.actions, shadows.sheet]}>
+        {!!error && (
+          <Animated.View entering={FadeInDown.duration(220)} style={styles.errorBox}>
+            <Ionicons name="alert-circle-outline" size={16} color={colors.danger} />
+            <Text style={styles.errorText} numberOfLines={3}>
+              {error}
+            </Text>
+          </Animated.View>
+        )}
         <Button
           label={picking ? 'Vazgeç' : 'Demo kart ekle'}
           variant={picking ? 'ghost' : 'primary'}
+          loading={addPaymentMethod.isPending}
           onPress={() => setPicking((p) => !p)}
         />
       </SafeAreaView>
@@ -246,6 +290,17 @@ const styles = StyleSheet.create({
   pickerTitle: { ...typography.captionStrong, color: colors.textSecondary },
   pickerChips: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.md },
   pickerChip: { marginRight: spacing.sm, marginBottom: spacing.sm },
+  pickerEmpty: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm },
+
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.badge,
+    backgroundColor: colors.dangerSoft,
+  },
+  errorText: { ...typography.caption, color: colors.danger, flex: 1, marginLeft: spacing.sm },
 
   actions: {
     backgroundColor: colors.surface,

@@ -1,4 +1,4 @@
-import type { Station, Vehicle } from '@/types/domain';
+import type { Connector, Station, Vehicle } from '@/types/domain';
 
 import { haversineKm, type RouteResult } from './routing';
 
@@ -9,7 +9,8 @@ import { haversineKm, type RouteResult } from './routing';
  * - Tuketim sabit kabul ediliyor; hiz, rakim, hava ve yuk yok sayiliyor
  * - Sarj suresi tepe gucun ortalama bir oraniyla hesaplanir; gercek
  *   egrinin sekli modellenmiyor
- * - Istasyon secimi rotaya yakinlik + guc; fiyat ve doluluk tahmini yok
+ * - Istasyon secimi rotaya yakinlik + guc; doluluk tahmini yok, anlik doluluk
+ *   varista gecerli olmayacagi icin aday elemede kullanilmiyor
  */
 
 /** Aracin ulasabilecegi mesafeye uygulanan guvenlik payi. */
@@ -24,6 +25,11 @@ const MAX_DETOUR_KM = 12;
  * ciddi sekilde iyimser gosteriyordu.
  */
 const AVERAGE_POWER_RATIO = 0.65;
+/**
+ * Bir mola en az bu kadar doluluk eklemeli. Aksi halde batarya varista zaten
+ * CHARGE_TO_PERCENT ustundeyse "0 kWh, 0 dk" gibi anlamsiz bir durak cikiyor.
+ */
+const MIN_CHARGE_GAIN_PERCENT = 10;
 
 export interface ChargingStop {
   station: Station;
@@ -39,6 +45,11 @@ export interface ChargingStop {
 
 export interface TripPlan {
   stops: ChargingStop[];
+  /**
+   * Hedefe varista tahmini batarya yuzdesi. unreachable true iken bu deger
+   * "hic durmadan gidilseydi" projeksiyonudur ve eksiye dusebilir; olcum
+   * degil, ne kadar acik kaldigini gosteren bir isaret.
+   */
   arrivalPercent: number;
   totalChargeMinutes: number;
   totalChargeCost: number;
@@ -59,6 +70,30 @@ export interface TripInput {
 function rangeKm(vehicle: Vehicle, percent: number): number {
   const usableKwh = (vehicle.batteryCapacityKwh * percent) / 100;
   return (usableKwh / vehicle.averageConsumptionKwhPer100Km) * 100 * SAFETY_MARGIN;
+}
+
+/**
+ * Verilen mesafe icin harcanacagi varsayilan batarya yuzdesi; rangeKm ile ayni
+ * tuketim varsayimini paylasir.
+ *
+ * Guvenlik payi BILEREK uygulanmiyor. Pay yalnizca "bu bacagi bu sarjla gecebilir
+ * miyim" testine ait (bkz. rangeKm). Buraya da katsaydik varista batarya oldugundan
+ * dusuk gorunur, addedKwh = (hedef - varis) oldugu icin her molaya gercekte
+ * harcanmayan enerji eklenir ve kullaniciya gosterilen sarj suresi ile maliyet
+ * sisirdi - 250 km'lik bir bacakta durak basina ~5 kWh hayalet enerji.
+ */
+function consumedPercent(vehicle: Vehicle, km: number): number {
+  const kwh = (km * vehicle.averageConsumptionKwhPer100Km) / 100;
+  return (kwh / vehicle.batteryCapacityKwh) * 100;
+}
+
+/**
+ * Plan kurarken soket durumu eleme olcutu degil bilgi: kullanici istasyona
+ * saatler sonra varacak, o ana kadar DOLU bir soket bosalmis olabilir. Bu
+ * yuzden yalnizca kalici olarak kullanilamayacak soketleri disarida birakiyoruz.
+ */
+function plannableConnectors(station: Station): Connector[] {
+  return station.connectors.filter((c) => c.status !== 'FAULTED' && c.status !== 'OFFLINE');
 }
 
 /** Rota cizgisi boyunca her noktanin baslangictan uzakligini hesaplar. */
@@ -89,7 +124,7 @@ function stationsAlongRoute(route: RouteResult, stations: Station[]): StationOnR
   const found: StationOnRoute[] = [];
 
   for (const station of stations) {
-    const usable = station.connectors.filter((c) => c.status === 'AVAILABLE');
+    const usable = plannableConnectors(station);
     if (usable.length === 0) continue;
 
     let bestDetour = Infinity;
@@ -124,9 +159,7 @@ function stationsAlongRoute(route: RouteResult, stations: Station[]): StationOnR
 
 /** Aracin bir istasyonda kullanabilecegi gercek guc. */
 function effectivePowerKw(vehicle: Vehicle, station: Station): number {
-  const usable = station.connectors.filter(
-    (c) => c.status === 'AVAILABLE' && vehicle.connectors.includes(c.type),
-  );
+  const usable = plannableConnectors(station).filter((c) => vehicle.connectors.includes(c.type));
   if (usable.length === 0) return 0;
 
   const stationMax = Math.max(...usable.map((c) => c.powerKw));
@@ -135,8 +168,8 @@ function effectivePowerKw(vehicle: Vehicle, station: Station): number {
 }
 
 function cheapestPrice(station: Station): number {
-  const prices = station.connectors
-    .filter((c) => c.status === 'AVAILABLE' && c.pricePerKwh != null)
+  const prices = plannableConnectors(station)
+    .filter((c) => c.pricePerKwh != null)
     .map((c) => c.pricePerKwh!);
   return prices.length ? Math.min(...prices) : 0;
 }
@@ -172,7 +205,9 @@ export function planTrip({
     if (reachable.length === 0) {
       return {
         stops,
-        arrivalPercent: 0,
+        // Dolgu bir 0 yerine gercek projeksiyon: hic durmadan gidilseydi
+        // batarya nereye duserdi. Eksi cikmasi menzil aciginin olcusu.
+        arrivalPercent: batteryPercent - consumedPercent(vehicle, remainingKm),
         totalChargeMinutes: stops.reduce((s, x) => s + x.chargeMinutes, 0),
         totalChargeCost: stops.reduce((s, x) => s + x.cost, 0),
         unreachable: true,
@@ -182,11 +217,14 @@ export function planTrip({
     // En uzaktaki durak, mola sayisini en aza indirir.
     const next = reachable[reachable.length - 1];
     const legKm = next.distanceFromStartKm - positionKm;
-    const usedPercent =
-      (legKm * vehicle.averageConsumptionKwhPer100Km) / vehicle.batteryCapacityKwh;
-    const arrivalPercent = batteryPercent - usedPercent;
+    const arrivalPercent = batteryPercent - consumedPercent(vehicle, legKm);
 
-    const targetPercent = Math.max(CHARGE_TO_PERCENT, arrivalPercent);
+    // Varista batarya zaten hedefin ustundeyse hic enerji eklemeyen bir durak
+    // cikmasin; mola her zaman anlamli bir kazanc saglasin.
+    const targetPercent = Math.min(
+      100,
+      Math.max(CHARGE_TO_PERCENT, arrivalPercent + MIN_CHARGE_GAIN_PERCENT),
+    );
     const addedKwh = ((targetPercent - arrivalPercent) / 100) * vehicle.batteryCapacityKwh;
     const powerKw = effectivePowerKw(vehicle, next.station);
 
@@ -205,12 +243,10 @@ export function planTrip({
   }
 
   const finalLegKm = route.distanceKm - positionKm;
-  const finalUsed =
-    (finalLegKm * vehicle.averageConsumptionKwhPer100Km) / vehicle.batteryCapacityKwh;
 
   return {
     stops,
-    arrivalPercent: batteryPercent - finalUsed,
+    arrivalPercent: batteryPercent - consumedPercent(vehicle, finalLegKm),
     totalChargeMinutes: stops.reduce((s, x) => s + x.chargeMinutes, 0),
     totalChargeCost: stops.reduce((s, x) => s + x.cost, 0),
     unreachable: false,

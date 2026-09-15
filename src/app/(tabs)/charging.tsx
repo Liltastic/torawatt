@@ -15,6 +15,7 @@ import Animated, {
 
 import { Button, Card, EmptyState, ProgressRing } from '@/components';
 import { useCreateHistoryEntry } from '@/queries/history';
+import { useActiveVehicle } from '@/queries/vehicles';
 import { useTabBarInset } from '@/utils/tabBar';
 import { useSessionStore } from '@/store/session';
 import { colors, radius, spacing, typography } from '@/theme';
@@ -23,8 +24,6 @@ import { haptics } from '@/utils/haptics';
 
 /** Grafikte tutulan en fazla ornek sayisi. */
 const HISTORY_LIMIT = 40;
-/** Simulasyondaki ortalama batarya kapasitesi; kalan sure tahmininde kullanilir. */
-const ASSUMED_BATTERY_KWH = 60;
 
 export default function ChargingScreen() {
   const router = useRouter();
@@ -35,6 +34,8 @@ export default function ChargingScreen() {
   const elapsedSeconds = useSessionStore((state) => state.elapsedSeconds);
   const stopSession = useSessionStore((state) => state.stop);
   const clearSession = useSessionStore((state) => state.clear);
+  const setSessionVehicle = useSessionStore((state) => state.setVehicle);
+  const activeVehicle = useActiveVehicle();
 
   const [powerHistory, setPowerHistory] = useState<number[]>([]);
   const lastSampleRef = useRef<{ sessionId: string; energyKwh: number } | undefined>(undefined);
@@ -45,6 +46,13 @@ export default function ChargingScreen() {
   const battery = Math.round(session?.batteryPercent ?? 0);
   const isFinished = session?.status === 'COMPLETED';
   const isCharging = session?.status === 'CHARGING';
+
+  // Simulasyon store'u React Query'ye erisemiyor: kapasite ve aracin guc
+  // tavani buradan besleniyor, yoksa her arac 60 kWh'lik varsayimla dolardi.
+  useEffect(() => {
+    if (!activeVehicle) return;
+    setSessionVehicle(activeVehicle);
+  }, [activeVehicle, setSessionVehicle]);
 
   const pulse = useSharedValue(1);
 
@@ -133,7 +141,7 @@ export default function ChargingScreen() {
 
   const isStarting = session.status === 'STARTING';
 
-  const remainingKwh = ((100 - battery) / 100) * ASSUMED_BATTERY_KWH;
+  const remainingKwh = ((100 - battery) / 100) * meta.batteryCapacityKwh;
   const remainingMinutes =
     session.powerKw > 0 ? Math.round((remainingKwh / session.powerKw) * 60) : null;
 

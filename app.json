@@ -34,7 +34,19 @@
         }
       ],
       "expo-sharing",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "TORA WATT, sana en yakın şarj istasyonlarını gösterebilmek ve rota planlayabilmek için konumunu kullanır."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#0FB5A3"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

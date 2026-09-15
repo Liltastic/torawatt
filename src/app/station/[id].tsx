@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { AnimatedPressable, AvailabilityBadge, Button, Card, ConnectorCard, EmptyState } from '@/components';
+import { useIsFavorite, useToggleFavorite } from '@/queries/favorites';
 import { useStation } from '@/queries/stations';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
 import { stationAvailability } from '@/types/domain';
@@ -75,7 +76,7 @@ export default function StationDetailScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']}>
-        <ScreenHeader onBack={() => router.back()} />
+        <ScreenHeader stationId={station.id} onBack={() => router.back()} />
       </SafeAreaView>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -191,7 +192,10 @@ export default function StationDetailScreen() {
   );
 }
 
-function ScreenHeader({ onBack }: { onBack: () => void }) {
+function ScreenHeader({ stationId, onBack }: { stationId?: string; onBack: () => void }) {
+  const isFavorite = useIsFavorite(stationId);
+  const toggleFavorite = useToggleFavorite();
+
   return (
     <View style={styles.header}>
       <AnimatedPressable
@@ -204,14 +208,25 @@ function ScreenHeader({ onBack }: { onBack: () => void }) {
         <Ionicons name="chevron-back" size={22} color={colors.text} />
       </AnimatedPressable>
 
-      <AnimatedPressable
-        accessibilityRole="button"
-        accessibilityLabel="Favorilere ekle"
-        hitSlop={10}
-        haptic="tap"
-        style={styles.headerButton}>
-        <Ionicons name="heart-outline" size={20} color={colors.text} />
-      </AnimatedPressable>
+      {/* Istasyon henuz yuklenmediyse kalp hic cizilmiyor: dokunulabilir ama
+          hicbir sey yapmayan bir buton birakmak yanlis onay hissi veriyor. */}
+      {stationId ? (
+        <AnimatedPressable
+          accessibilityRole="button"
+          accessibilityLabel={isFavorite ? 'Favorilerden çıkar' : 'Favorilere ekle'}
+          accessibilityState={{ selected: isFavorite }}
+          hitSlop={10}
+          haptic={isFavorite ? 'tap' : 'success'}
+          scaleTo={0.85}
+          onPress={() => toggleFavorite.mutate({ stationId, favorite: !isFavorite })}
+          style={styles.headerButton}>
+          <Ionicons
+            name={isFavorite ? 'heart' : 'heart-outline'}
+            size={20}
+            color={isFavorite ? colors.danger : colors.text}
+          />
+        </AnimatedPressable>
+      ) : null}
     </View>
   );
 }

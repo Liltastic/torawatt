@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
+import { useIsFocused, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -176,16 +176,26 @@ function PlanResult({
 }) {
   const stopStations = useMemo(() => trip.stops.map((stop) => stop.station), [trip]);
 
+  // Expo Router ziyaret edilen sekmeyi mount edilmis birakiyor; onizleme de tam
+  // bir WebView + GL baglami oldugu icin baska sekmedeyken ikinci bir harita
+  // bellekte asili kaliyordu. Ekran odaktan cikinca sokuyoruz: onizleme
+  // tamamen `plan` state'inden yeniden uretilebiliyor.
+  const isFocused = useIsFocused();
+
   return (
     <View style={styles.result}>
       {/* Salt onizleme: kaydirma ScrollView'a kalsin, harita rotayi kendisi cerceveler. */}
       <Card padded={false} style={styles.mapCard}>
-        <StationMap
-          stations={stopStations}
-          route={route}
-          interactive={false}
-          style={styles.mapPreview}
-        />
+        {isFocused ? (
+          <StationMap
+            stations={stopStations}
+            route={route}
+            interactive={false}
+            style={styles.mapPreview}
+          />
+        ) : (
+          <View style={styles.mapPreview} />
+        )}
       </Card>
 
       <Card style={styles.summaryCard}>

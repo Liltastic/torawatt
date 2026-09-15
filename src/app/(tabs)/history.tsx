@@ -1,9 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeInRight, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 
 import { AnimatedPressable, Card, EmptyState, FilterChip, StationCardSkeleton } from '@/components';
 import { useTabBarInset } from '@/utils/tabBar';
@@ -94,58 +94,76 @@ export default function HistoryScreen() {
           />
         </View>
       ) : (
-        <ScrollView
+        // Kayit sayisi kullanildikca tek yonlu buyuyor ve ne istemcide ne
+        // sunucuda ust sinir var; ScrollView tum satirlari ekran acilirken
+        // birden kuruyordu.
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => item.id}
+          // Eleman olarak veriliyor: satir ici bir bilesen tipi her render'da
+          // basligi unmount/remount eder ve giris animasyonunu tekrar oynatirdi.
+          ListHeaderComponent={<HistorySummary energy={totals.energy} cost={totals.cost} />}
+          renderItem={({ item }) => (
+            <HistoryRow
+              item={item}
+              onPress={() => router.push({ pathname: '/history/[id]', params: { id: item.id } })}
+            />
+          )}
           contentContainerStyle={[styles.list, { paddingBottom: spacing.xxl + tabBarInset }]}
-          showsVerticalScrollIndicator={false}>
-          <Animated.View entering={FadeInDown.duration(320)}>
-            <Card style={styles.summary}>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Toplam enerji</Text>
-                <Text style={styles.summaryValue}>{formatEnergy(totals.energy)}</Text>
-              </View>
-              <View style={styles.summaryDivider} />
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Toplam tutar</Text>
-                <Text style={styles.summaryValue}>{formatPrice(totals.cost)}</Text>
-              </View>
-            </Card>
-          </Animated.View>
-
-          {filtered.map((item, index) => (
-            <Animated.View
-              key={item.id}
-              entering={FadeInRight.delay(Math.min(index, 8) * 40)
-                .duration(300)}
-              layout={LinearTransition.duration(220)}>
-              <AnimatedPressable
-                accessibilityRole="button"
-                accessibilityLabel={`${item.stationName}, ${formatDate(item.startedAt)}`}
-                haptic="tap"
-                scaleTo={0.98}
-                onPress={() =>
-                  router.push({ pathname: '/history/[id]', params: { id: item.id } })
-                }
-                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-                <View style={styles.rowMain}>
-                  <Text style={styles.station} numberOfLines={1}>
-                    {item.stationName}
-                  </Text>
-                  <Text style={styles.meta}>
-                    {formatDate(item.startedAt)} · {formatMinutes(item.durationMinutes)}
-                  </Text>
-                  <Text style={styles.energy}>{formatEnergy(item.energyKwh)}</Text>
-                </View>
-
-                <View style={styles.rowTrailing}>
-                  <Text style={styles.cost}>{formatPrice(item.cost)}</Text>
-                  <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-                </View>
-              </AnimatedPressable>
-            </Animated.View>
-          ))}
-        </ScrollView>
+          showsVerticalScrollIndicator={false}
+        />
       )}
     </SafeAreaView>
+  );
+}
+
+function HistorySummary({ energy, cost }: { energy: number; cost: number }) {
+  return (
+    <Animated.View entering={FadeInDown.duration(320)}>
+      <Card style={styles.summary}>
+        <View style={styles.summaryItem}>
+          <Text style={styles.summaryLabel}>Toplam enerji</Text>
+          <Text style={styles.summaryValue}>{formatEnergy(energy)}</Text>
+        </View>
+        <View style={styles.summaryDivider} />
+        <View style={styles.summaryItem}>
+          <Text style={styles.summaryLabel}>Toplam tutar</Text>
+          <Text style={styles.summaryValue}>{formatPrice(cost)}</Text>
+        </View>
+      </Card>
+    </Animated.View>
+  );
+}
+
+function HistoryRow({ item, onPress }: { item: ChargingHistoryDetail; onPress: () => void }) {
+  return (
+    // layout kaliyor: filtre cipleri satirlari gercekten yer degistiriyor.
+    // entering ise kaldirildi - geri donusturulen satirlarda kaydirirken her
+    // geri girisde yeniden oynayip yanip sonme uretiyordu.
+    <Animated.View layout={LinearTransition.duration(220)}>
+      <AnimatedPressable
+        accessibilityRole="button"
+        accessibilityLabel={`${item.stationName}, ${formatDate(item.startedAt)}`}
+        haptic="tap"
+        scaleTo={0.98}
+        onPress={onPress}
+        style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+        <View style={styles.rowMain}>
+          <Text style={styles.station} numberOfLines={1}>
+            {item.stationName}
+          </Text>
+          <Text style={styles.meta}>
+            {formatDate(item.startedAt)} · {formatMinutes(item.durationMinutes)}
+          </Text>
+          <Text style={styles.energy}>{formatEnergy(item.energyKwh)}</Text>
+        </View>
+
+        <View style={styles.rowTrailing}>
+          <Text style={styles.cost}>{formatPrice(item.cost)}</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+        </View>
+      </AnimatedPressable>
+    </Animated.View>
   );
 }
 

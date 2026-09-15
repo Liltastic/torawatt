@@ -42,13 +42,28 @@ export function setUnauthorizedHandler(handler: (() => void) | undefined) {
   onUnauthorized = handler;
 }
 
+/**
+ * Android'de (OkHttp) okuma zaman asimi pratikte sinirsiz, yani kopmus bir
+ * baglantida istek sonsuza kadar asili kalip ekranda donen bir spinner birakir.
+ * Sure, Render'in ucretsiz katmaninda uykudan kalkan servise de yetecek kadar
+ * genis tutuldu; _layout.tsx'teki retry: 1 bunu en kotu ihtimalle ikiye katlar.
+ */
+const REQUEST_TIMEOUT_MS = 30_000;
+
 async function request<T>(
   path: string,
   options: { method?: string; body?: unknown; auth?: boolean; includeDeviceId?: boolean } = {},
 ): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
 
+  // Iptali AbortSignal.timeout yerine kendi controller'imizla kuruyoruz: Expo'nun
+  // fetch'i hatayi kendi FetchError'ina sardigi icin error.name 'AbortError'
+  // olarak gelmiyor, zaman asimini ancak signal.aborted'dan ayirt edebiliyoruz.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
   let response: Response;
+  let text: string;
   try {
     if (options.auth !== false && authToken) {
       headers.Authorization = `Bearer ${authToken}`;
@@ -63,30 +78,72 @@ async function request<T>(
       method: options.method ?? 'GET',
       headers,
       body: options.body != null ? JSON.stringify(options.body) : undefined,
+      signal: controller.signal,
     });
+
+    if (response.status === 204) return undefined as T;
+
+    // Govde okumasi da zaman asiminin ve bu catch'in icinde: Expo'nun fetch'i
+    // basliklar gelir gelmez cozuluyor, govde yarida kesilirse hata buradan
+    // gelir ve disarida kalsaydi ApiError'a sarilmadan yukari kacardi.
+    text = await response.text();
   } catch (error) {
+    if (controller.signal.aborted) {
+      console.error(`API isteği zaman aşımına uğradı: ${API_BASE_URL}${path}`);
+      throw new ApiError('Sunucu yanıt vermedi. Tekrar dene.', 0);
+    }
     // Gercek sebep (network hatasi, SecureStore hatasi, CORS vb.) loglanmazsa
     // kullaniciya ve bize hep ayni jenerik mesaj gorunur, kok neden kaybolur.
     console.error(`API isteği başarısız: ${API_BASE_URL}${path}`, error);
     const detail = error instanceof Error ? ` (${error.message})` : '';
     throw new ApiError(`Sunucuya ulaşılamadı${detail}. Bağlantını kontrol et.`, 0);
+  } finally {
+    clearTimeout(timer);
   }
 
-  if (response.status === 204) return undefined as T;
+  let json: unknown;
+  try {
+    json = text ? JSON.parse(text) : undefined;
+  } catch {
+    // Express her zaman JSON donduruyor; JSON olmayan govde ancak onundeki bir
+    // katmandan (Render soguk baslangicta HTML 502) gelir. Govdeyi gormeden bunu
+    // sunucunun kendi hatasindan ayirt etmek imkansiz oldugu icin bir parcasini logla.
+    console.error(`API yanıtı JSON değil (${response.status}) ${path}:`, text.slice(0, 200));
+    json = undefined;
+  }
 
-  const text = await response.text();
-  const json = text ? JSON.parse(text) : undefined;
+  const body = (json ?? {}) as { message?: unknown; error?: unknown };
+  const serverMessage =
+    typeof body.message === 'string'
+      ? body.message
+      : typeof body.error === 'string'
+        ? body.error
+        : undefined;
 
   if (!response.ok) {
     // auth !== false: gecerli bir token'la yapilmis, oturum gerektiren bir istek.
     // register/login/me kendi 401'ini kendisi ele aliyor (auth:false ya da hydrate'teki try/catch).
     if (response.status === 401 && options.auth !== false) {
+      // Zaten token'siz gitmisse bu 401 yeni bir bilgi degil: cikistan sonra
+      // mount kalmis bir kok rota (station/[id], favorites...) refetch ettiginde
+      // olan tam olarak bu. onUnauthorized'i tekrar tetiklemek
+      // logout -> cache temizligi -> refetch -> 401 dongusunu besliyor.
+      const hadToken = authToken !== undefined;
       authToken = undefined;
-      onUnauthorized?.();
+      if (hadToken) onUnauthorized?.();
     }
 
-    const message = json?.message ?? json?.error ?? `İstek başarısız (${response.status})`;
-    throw new ApiError(message, response.status);
+    // Sunucudan mesaj gelmediyse: 5xx genelde gecici (soguk baslangic, yeniden
+    // dagitim), kullaniciyi tekrar denemeye yonlendir.
+    const fallback =
+      response.status >= 500
+        ? 'Sunucu şu anda yanıt vermiyor, birkaç saniye sonra tekrar dene.'
+        : `İstek başarısız (${response.status})`;
+    throw new ApiError(serverMessage ?? fallback, response.status);
+  }
+
+  if (text && json === undefined) {
+    throw new ApiError('Sunucudan beklenmeyen bir yanıt geldi.', response.status);
   }
 
   return json as T;
@@ -124,7 +181,10 @@ export const authApi = {
   me: () => request<AuthUser>('/auth/me'),
   updateProfile: (name: string) => request<AuthUser>('/auth/me', { method: 'PATCH', body: { name } }),
   changePassword: (currentPassword: string, newPassword: string) =>
-    request<void>('/auth/change-password', { method: 'POST', body: { currentPassword, newPassword } }),
+    request<{ token?: string } | undefined>('/auth/change-password', {
+      method: 'POST',
+      body: { currentPassword, newPassword },
+    }),
   deleteAccount: () => request<void>('/auth/me', { method: 'DELETE' }),
 };
 

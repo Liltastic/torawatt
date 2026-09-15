@@ -10,11 +10,21 @@ export const reservationKeys = {
 export function useReservations() {
   return useQuery({
     queryKey: reservationKeys.all,
-    // Bekleme suresi dolan rezervasyon EXPIRED'a donsun diye periyodik tazeleme;
-    // effectiveReservationStatus zaten anlik hesapliyor ama liste ekrandaki
-    // "aktif rezervasyon" bandinin kaybolmasi icin yeniden render tetiklemek gerek.
-    refetchInterval: 30_000,
     queryFn: reservationsApi.list,
+    // Bekleme suresi dolan rezervasyon EXPIRED'a donsun diye periyodik tazeleme:
+    // sunucu da EXPIRED'i saatten turetiyor (server/src/lib/serialize.ts), yani
+    // sure dolunca yanit gercekten degisir ve haritadaki "aktif rezervasyon"
+    // bandi yeniden render ile kaybolur. Poll yalnizca beklemede bir rezervasyon
+    // varken calisir; rezervasyonu olmayan kullanici - cogunluk - Harita sekmesi
+    // oturum boyunca mount kaldigi halde tek bir gereksiz istek atmaz.
+    // ARRIVED disarida: o durum hic EXPIRED'a donmuyor, poll sonsuza kadar surerdi.
+    refetchInterval: (query) =>
+      (query.state.data ?? []).some((r) => {
+        const status = effectiveReservationStatus(r);
+        return status === 'PENDING' || status === 'CONFIRMED';
+      })
+        ? 30_000
+        : false,
   });
 }
 

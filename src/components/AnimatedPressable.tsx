@@ -40,24 +40,30 @@ export const AnimatedPressable = forwardRef<View, AnimatedPressableProps>(functi
   const scale = useSharedValue(1);
   const [pressed, setPressed] = useState(false);
 
+  // Olcek animasyonu shared value uzerinden dondugu icin `pressed` state'i
+  // yalnizca fonksiyon-stil cozumlemesinde okunuyor. Duz stil nesnesi verilen
+  // kullanimlarda (cogunluk) state'i guncellemek her dokunusta gorsel karsiligi
+  // olmayan iki React render'i uretiyordu.
+  const usesPressedStyle = typeof style === 'function';
+
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   const handlePressIn = useCallback(
     (event: GestureResponderEvent) => {
       scale.value = withTiming(scaleTo, PRESS_IN);
-      setPressed(true);
+      if (usesPressedStyle) setPressed(true);
       onPressIn?.(event);
     },
-    [onPressIn, scale, scaleTo],
+    [onPressIn, scale, scaleTo, usesPressedStyle],
   );
 
   const handlePressOut = useCallback(
     (event: GestureResponderEvent) => {
       scale.value = withTiming(1, PRESS_OUT);
-      setPressed(false);
+      if (usesPressedStyle) setPressed(false);
       onPressOut?.(event);
     },
-    [onPressOut, scale],
+    [onPressOut, scale, usesPressedStyle],
   );
 
   const handlePress = useCallback(
@@ -68,7 +74,7 @@ export const AnimatedPressable = forwardRef<View, AnimatedPressableProps>(functi
     [disabled, haptic, onPress],
   );
 
-  const resolvedStyle = typeof style === 'function' ? style({ pressed }) : style;
+  const resolvedStyle = usesPressedStyle ? style({ pressed }) : style;
 
   return (
     <ReanimatedPressable
