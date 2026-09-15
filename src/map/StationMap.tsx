@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useIsFocused } from 'expo-router';
+import { ActivityIndicator, AppState, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
 import { useMapStyleStore } from '@/store/mapStyle';
@@ -16,6 +17,9 @@ import { BASEMAPS, buildMapHtml } from './mapHtml';
  * kutusunun altinda birakip okunmaz hale getiriyordu.
  */
 const ERROR_BANNER_TOP = 130;
+
+/** Harita acildiktan sonra gelen gecici hatalarin afiste kalma suresi. */
+const ERROR_BANNER_TIMEOUT_MS = 6000;
 
 /** Istanbul merkezi; konum alinana kadar varsayilan kamera. */
 const DEFAULT_CENTER = { centerLatitude: 41.055, centerLongitude: 29.0, zoom: 10.5 };
@@ -80,6 +84,10 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
 ) {
   const webViewRef = useRef<WebView>(null);
   const [ready, setReady] = useState(false);
+  // showError icinde guncel deger lazim; state'i bagimlilik yapinca her
+  // hazir/degil gecisinde yeni fonksiyon uretilirdi.
+  const readyRef = useRef(false);
+  readyRef.current = ready;
   const [error, setError] = useState<string | null>(null);
 
   // Taban harita degisince WebView bastan kuruluyor (iki farkli GL kutuphanesi).
@@ -90,14 +98,57 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
 
   const html = useMemo(() => buildMapHtml({ ...cameraRef.current, basemap }), [basemap]);
 
+  // Karo/glif hatalari geciciydi ama afis bir daha hic temizlenmiyordu: tek bir
+  // 404 kirmizi kutuyu kalici olarak ekranda birakiyordu. Harita ZATEN acildiysa
+  // afisi birkac saniye sonra kendiliginden kapatiyoruz; hic acilamadiysa
+  // kapatmiyoruz, yoksa kullanici bos bir ekranla aciklamasiz kalir.
+  const errorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearErrorTimer = useCallback(() => {
+    if (errorTimer.current) {
+      clearTimeout(errorTimer.current);
+      errorTimer.current = null;
+    }
+  }, []);
+
+  const showError = useCallback(
+    (message: string) => {
+      setError(message);
+      clearErrorTimer();
+      if (readyRef.current) {
+        errorTimer.current = setTimeout(() => setError(null), ERROR_BANNER_TIMEOUT_MS);
+      }
+    },
+    [clearErrorTimer],
+  );
+
+  useEffect(() => clearErrorTimer, [clearErrorTimer]);
+
   useEffect(() => {
     setReady(false);
     setError(null);
-  }, [basemap]);
+    clearErrorTimer();
+  }, [basemap, clearErrorTimer]);
+
 
   const inject = useCallback((script: string) => {
     webViewRef.current?.injectJavaScript(`window.__tw && (${script}); true;`);
   }, []);
+
+  // Nabiz animasyonu her karede haritanin tamamini yeniden cizdiriyor. Ekran
+  // odakta degilken (baska sekme) veya uygulama arka plandayken donmesin.
+  const isFocused = useIsFocused();
+  useEffect(() => {
+    if (!ready) return;
+    const sync = (active: boolean) => inject(`window.__tw.setPulse(${active})`);
+    sync(isFocused && AppState.currentState === 'active');
+    const sub = AppState.addEventListener('change', (state) =>
+      sync(isFocused && state === 'active'),
+    );
+    return () => {
+      sub.remove();
+      sync(false);
+    };
+  }, [ready, isFocused, inject]);
 
   const geojson = useMemo(
     () => ({
@@ -199,10 +250,10 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
           };
         }
       } else if (message.type === 'error') {
-        setError(message.message);
+        showError(message.message);
       }
     },
-    [onSelectStation, onMapPress, pushStations, pushUserLocation, pushRoute],
+    [onSelectStation, onMapPress, pushStations, pushUserLocation, pushRoute, showError],
   );
 
   return (
@@ -218,8 +269,8 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
         javaScriptEnabled
         domStorageEnabled
         onMessage={handleMessage}
-        onError={(e) => setError(e.nativeEvent.description || 'WebView yüklenemedi')}
-        onHttpError={(e) => setError(`HTTP ${e.nativeEvent.statusCode}`)}
+        onError={(e) => showError(e.nativeEvent.description || 'WebView yüklenemedi')}
+        onHttpError={(e) => showError(`HTTP ${e.nativeEvent.statusCode}`)}
         style={styles.webView}
         containerStyle={styles.webViewContainer}
         scrollEnabled={false}

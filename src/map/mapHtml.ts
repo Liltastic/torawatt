@@ -252,6 +252,165 @@ ${config.setupScript}
     post({ type: 'camera', lng: c.lng, lat: c.lat, zoom: map.getZoom() });
   });
 
+  // ---------------------------------------------------------------- PIN IKONLARI
+  // Istasyon isaretcisi daire degil damla/pin. WebView'e servis edilen yerel
+  // dosya olmadigi icin ikonlar burada, calisma zamaninda canvas ile cizilip
+  // map.addImage ile stile veriliyor. Cizim SENKRON: addLayer'dan once bitiyor,
+  // yani "Image ... could not be loaded" penceresi hic acilmiyor.
+  //
+  // KULLANILMAYAN yollar ve nedenleri:
+  //  - map.loadImage: MapLibre 5'te Promise, Mapbox 3'te callback donduruyor -
+  //    getClusterExpansionZoom ile birebir ayni tuzak. Cagirmiyoruz.
+  //  - SVG data URI: WebKit SVG'yi once kendi intrinsic boyutunda rasterize
+  //    edip buyutuyor (iPhone'da bulanik pin) ve decode asenkron.
+  //  - SDF ikon + icon-color: mesafe alani damlanin sivri ucunu kortelir,
+  //    golge de mumkun olmaz.
+
+  // DPR TAM SAYI olsun: Android WebView 2.625 / 2.75 gibi kesirli yogunluklar
+  // bildiriyor, iOS 2 veya 3. Yukari yuvarlayip 3'te kirpiyoruz; 3'un ustu
+  // gozle ayirt edilmiyor ama doku atlasini buyutuyor.
+  var PIN_DPR = Math.max(1, Math.min(3, Math.ceil(window.devicePixelRatio || 1)));
+
+  // Tum olculer CSS (logical) px; cizim sirasinda elle PIN_DPR ile carpiliyor.
+  //
+  // DIKKAT - canvas'ta ctx.setTransform ile OLCEKLEME YAPMIYORUZ. Sebebi
+  // shadowBlur / shadowOffsetY: spesifikasyon bunlarin donusum matrisinden
+  // etkilenmedigini soyler ama motorlar bu noktada ayrisabiliyor. Birim matris
+  // + elle carpma iki davranista da ayni pikseli uretir; iOS'ta
+  // dogrulayamayacagimiz bir belirsizligi tamamen ortadan kaldirir.
+  var PIN_PAD_X = 6;
+  var PIN_PAD_TOP = 6;
+  // GORUNUR ucun bitmap'in ALT kenarina uzakligi (golge sigsin diye). TUM
+  // ikonlarda birebir ayni olmak ZORUNDA, cunku icon-offset tek bir sabit.
+  var PIN_TIP_GAP = 8;
+  var PIN_SHADOW = 'rgba(6,40,33,0.28)';
+  var PIN_SHADOW_BLUR = 5;
+  var PIN_SHADOW_DY = 1.5;
+
+  var PIN_COLORS = {
+    AVAILABLE: '${statusColors.AVAILABLE}',
+    PARTIAL: '${statusColors.PARTIAL}',
+    FULL: '${statusColors.FULL}',
+    UNKNOWN: '${statusColors.UNKNOWN}'
+  };
+
+  // r    : kafa cemberinin dolgu yaricapi
+  // ring : GORUNUR beyaz cerceve kalinligi (stroke lineWidth'inin yarisi)
+  // tail : kafa merkezi -> GORUNUR sivri uc mesafesi. Koordinata oturan nokta
+  //        iste bu uc; rakamin text-offset'i de buna gore.
+  // font : kafadaki rakamin text-size'i
+  // tail/font iki durumda da 2.5 secildi; boylece text-offset SABIT olabiliyor.
+  var PIN_SPECS = {
+    def: { r: 13, ring: 3, tail: 30, font: 12 },
+    sel: { r: 16, ring: 3.5, tail: 35, font: 14 }
+  };
+
+  function drawPinImage(spec, color) {
+    var s = PIN_DPR;
+    var outer = spec.r + spec.ring;
+
+    var gapDev = Math.round(PIN_TIP_GAP * s);
+    var w = Math.ceil((2 * outer + 2 * PIN_PAD_X) * s);
+    // Yuvarlama fazlasi USTE gitsin ki uc-alt kenar mesafesi her ikonda tam
+    // gapDev kalsin - sabit icon-offset'in tek sarti bu.
+    var tipY = Math.ceil((PIN_PAD_TOP + outer + spec.tail) * s);
+    var h = tipY + gapDev;
+
+    var cx = w / 2;
+    var cy = tipY - spec.tail * s;
+    var vertexY = tipY - spec.ring * s;
+    var r = spec.r * s;
+    var d = vertexY - cy;
+
+    var cv = document.createElement('canvas');
+    cv.width = w;
+    cv.height = h;
+    var ctx = cv.getContext('2d');
+    if (!ctx) throw new Error('canvas 2d baglami alinamadi');
+
+    // Damla = kafa cemberinin BUYUK yayi + kose noktasindan cembere iki teget.
+    // Teget degme noktalari asagi eksenden +-acos(r/d) acida durur.
+    var t = Math.acos(Math.min(0.999, r / d));
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, Math.PI / 2 - t, Math.PI / 2 + t, true);
+    ctx.lineTo(cx, vertexY);
+    ctx.closePath();
+
+    // Yuvarlak birlesim: uc tam olarak ring kadar tasar (miter olsaydi tasma
+    // uc acisina gore degisirdi) - gorunur uc kesin olarak tipY'de biter.
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    // Beyaz cerceveyi GOLGELI ciz; ic yarisini birazdan dolgu kapatacak.
+    // Golgeyi tek islemde birakiyoruz, ikincisi ust uste binip koyulasirdi.
+    ctx.save();
+    ctx.shadowColor = PIN_SHADOW;
+    ctx.shadowBlur = PIN_SHADOW_BLUR * s;
+    ctx.shadowOffsetY = PIN_SHADOW_DY * s;
+    ctx.lineWidth = spec.ring * 2 * s;
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    // ImageData iki kutuphanenin de bekledigi {width,height,data} imzasi.
+    return ctx.getImageData(0, 0, w, h);
+  }
+
+  var PIN_PREFIX = 'tw-pin-';
+
+  function ensurePinImage(id) {
+    if (!id || id.indexOf(PIN_PREFIX) !== 0) return false;
+    if (map.hasImage(id)) return true;
+    var rest = id.slice(PIN_PREFIX.length);
+    var dash = rest.lastIndexOf('-');
+    if (dash < 0) return false;
+    var spec = PIN_SPECS[rest.slice(dash + 1)];
+    var color = PIN_COLORS[rest.slice(0, dash)];
+    if (!spec || !color) return false;
+    map.addImage(id, drawPinImage(spec, color), { pixelRatio: PIN_DPR });
+    return true;
+  }
+
+  function buildAllPinImages() {
+    var statuses = ['AVAILABLE', 'PARTIAL', 'FULL', 'UNKNOWN'];
+    var states = ['def', 'sel'];
+    for (var i = 0; i < statuses.length; i++) {
+      for (var j = 0; j < states.length; j++) {
+        ensurePinImage(PIN_PREFIX + statuses[i] + '-' + states[j]);
+      }
+    }
+  }
+
+  // Emniyet kemeri: beklenmedik bir status degeri gelirse ya da bir ikon
+  // dusmusse o an uret. Aksi halde o pin SESSIZCE kaybolur.
+  map.on('styleimagemissing', function (e) {
+    try { ensurePinImage(e && e.id); } catch (err) {}
+  });
+
+  // icon-anchor 'bottom' bitmap'in ALT-ORTA noktasini koordinata oturtur;
+  // gorunur uc alt kenardan PIN_TIP_GAP yukarida oldugu icin bitmap'i ayni
+  // miktarda asagi itiyoruz, uc tam koordinata gelsin.
+  var PIN_ICON_OFFSET = Math.round(PIN_TIP_GAP * PIN_DPR) / PIN_DPR;
+
+  // text-offset EM cinsinden ve dogrudan feature koordinatindan olculur,
+  // icon-offset'ten bagimsizdir. Kafa merkezi koordinatin 'tail' px ustunde.
+  // Iki durumun tail/font orani esitse tek sabit yeter (bugun 2.5); geometri
+  // degisirse kod kendiliginden data-driven ifadeye geciyor.
+  var PIN_TEXT_OFFSET = (function () {
+    var a = -(PIN_SPECS.def.tail / PIN_SPECS.def.font);
+    var b = -(PIN_SPECS.sel.tail / PIN_SPECS.sel.font);
+    if (a === b) return [0, a];
+    return ['case', ['==', ['get', 'selected'], true],
+      ['literal', [0, b]], ['literal', [0, a]]];
+  })();
+
+  // Secili pin komsularinin ustunde cizilsin. allow-overlap acikken BUYUK
+  // sort-key sonra (yani ustte) cizilir - iki motorda da ayni.
+  var PIN_SORT_KEY = ['case', ['==', ['get', 'selected'], true], 2, 1];
+
   map.on('load', function () {
 ${config.onLoadScript}
     map.addSource('stations', {
@@ -262,16 +421,36 @@ ${config.onLoadScript}
       clusterMaxZoom: 13,
     });
 
-    // Secili istasyonun mavi halesi (spec bolum 5).
+    // Ikonlar KATMANLARDAN ONCE eklenmeli, ama stil yuklendikten sonra
+    // (Mapbox aksi halde "Style is not done loading" firlatir) - yani burasi.
+    // Taban harita degisiminde WebView bastan kuruldugu icin (StationMap
+    // key={basemap}) bu kod her seferinde yeniden calisir.
+    var pinsOk = true;
+    try {
+      buildAllPinImages();
+    } catch (err) {
+      pinsOk = false;
+      post({
+        type: 'error',
+        message: 'Pin ikonlari uretilemedi, daire pinlere donuldu: ' + ((err && err.message) || err),
+      });
+    }
+
+    // Secili istasyonun turkuaz halesi. Koordinat artik pinin UCU oldugu icin
+    // hale ucun degil KAFANIN etrafinda olmali: ekran uzayinda tail kadar
+    // yukari kaydiriliyor. 'viewport' capa sart - iki parmakla dondurme
+    // dragRotate:false'a ragmen acik, hale pinden ayrilmasin.
     map.addLayer({
       id: 'station-halo',
       type: 'circle',
       source: 'stations',
       filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'selected'], true]],
       paint: {
-        'circle-radius': 18,
+        'circle-radius': pinsOk ? PIN_SPECS.sel.r + PIN_SPECS.sel.ring + 8 : 18,
         'circle-color': '${colors.primary}',
         'circle-opacity': 0.22,
+        'circle-translate': pinsOk ? [0, -PIN_SPECS.sel.tail] : [0, 0],
+        'circle-translate-anchor': 'viewport',
       },
     });
 
@@ -301,28 +480,72 @@ ${config.onLoadScript}
       paint: { 'text-color': '#FFFFFF' },
     });
 
-    map.addLayer({
-      id: 'stations',
-      type: 'circle',
-      source: 'stations',
-      filter: ['!', ['has', 'point_count']],
-      paint: {
-        // Secili pin belirgin sekilde buyur; icindeki musait soket sayisi okunur kalsin.
-        'circle-radius': ['case', ['==', ['get', 'selected'], true], 17, 13],
-        'circle-color': [
-          'match',
-          ['get', 'status'],
-          'AVAILABLE', '${statusColors.AVAILABLE}',
-          'PARTIAL', '${statusColors.PARTIAL}',
-          'FULL', '${statusColors.FULL}',
-          '${statusColors.UNKNOWN}'
-        ],
-        'circle-stroke-width': 3,
-        'circle-stroke-color': '#FFFFFF',
-      },
-    });
+    // Istasyon pini: damla/pin ikonu. Katman KIMLIGI degismiyor ('stations'),
+    // cunku click ve queryRenderedFeatures ona gore yazilmis.
+    if (pinsOk) {
+      map.addLayer({
+        id: 'stations',
+        type: 'symbol',
+        source: 'stations',
+        filter: ['!', ['has', 'point_count']],
+        layout: {
+          'icon-image': [
+            'concat',
+            PIN_PREFIX,
+            ['match', ['get', 'status'],
+              'AVAILABLE', 'AVAILABLE',
+              'PARTIAL', 'PARTIAL',
+              'FULL', 'FULL',
+              'UNKNOWN'],
+            ['case', ['==', ['get', 'selected'], true], '-sel', '-def'],
+          ],
+          // 1 DISINDA deger verme: bitmap buyutuldugunde bulaniklasir. Secili
+          // varyant zaten ayri ve daha buyuk bir bitmap olarak uretiliyor.
+          'icon-size': 1,
+          'icon-anchor': 'bottom',
+          'icon-offset': [0, PIN_ICON_OFFSET],
+          // ZORUNLU: circle katmani carpisma testi yapmiyordu, symbol yapiyor.
+          // Bunlar olmadan yogun bolgelerde pinlerin bir kismi SESSIZCE kaybolur.
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          // Harita dondurulse/egilse de pin dik dursun.
+          'icon-rotation-alignment': 'viewport',
+          'icon-pitch-alignment': 'viewport',
+          'symbol-sort-key': PIN_SORT_KEY,
+        },
+      });
+    } else {
+      // Acil yedek: ikon uretilemediyse eski daire pinler. Gorsel kayip var,
+      // islevsel kayip yok - harita asla bos kalmiyor.
+      map.addLayer({
+        id: 'stations',
+        type: 'circle',
+        source: 'stations',
+        filter: ['!', ['has', 'point_count']],
+        paint: {
+          'circle-radius': ['case', ['==', ['get', 'selected'], true], 17, 13],
+          'circle-color': [
+            'match',
+            ['get', 'status'],
+            'AVAILABLE', '${statusColors.AVAILABLE}',
+            'PARTIAL', '${statusColors.PARTIAL}',
+            'FULL', '${statusColors.FULL}',
+            '${statusColors.UNKNOWN}'
+          ],
+          'circle-stroke-width': 3,
+          'circle-stroke-color': '#FFFFFF',
+        },
+      });
+    }
 
-    // Pinin icinde musait soket sayisi (referans tasarimdaki sayili rozetler).
+    // Musait soket sayisi pinin KAFASINDA.
+    //
+    // Bilerek AYRI katman: boylece pin ikonu glif (font) istegine hic baglanmaz.
+    // Tek symbol katmaninda birlestirilseydi symbol bucket'i glif bagimliliklari
+    // cozulmeden render edilmezdi ve Mapbox'ta font gecikirse/duserse PINLER DE
+    // gecikirdi - dosyanin basindaki not bu riskin gercek oldugunu belgeliyor.
+    // Birlestirmek "komsu pinin sayisi ustume bindi" sorununu zaten cozmez:
+    // GL JS tek katmanda bile once tum ikonlari, sonra tum metinleri cizer.
     map.addLayer({
       id: 'station-count',
       type: 'symbol',
@@ -331,9 +554,14 @@ ${config.onLoadScript}
       layout: {
         'text-field': ['to-string', ['get', 'available']],
         'text-font': ['${boldFont}'],
-        'text-size': ['case', ['==', ['get', 'selected'], true], 14, 12],
+        'text-size': ['case', ['==', ['get', 'selected'], true],
+          PIN_SPECS.sel.font, PIN_SPECS.def.font],
+        'text-anchor': 'center',
+        'text-offset': pinsOk ? PIN_TEXT_OFFSET : [0, 0],
         'text-allow-overlap': true,
         'text-ignore-placement': true,
+        'text-rotation-alignment': 'viewport',
+        'symbol-sort-key': PIN_SORT_KEY,
       },
       paint: { 'text-color': '#FFFFFF' },
     });
@@ -395,24 +623,46 @@ ${config.onLoadScript}
       },
     });
 
+    // Nabiz dongusu rAF'i BOSA dondurmemeli. Eskiden 'load' aninda baslayip
+    // kullanici konumu hic gelmese bile sonsuza kadar donuyordu (rota
+    // onizlemesinde konum hic verilmiyor); konum geldiginde ise her karede
+    // setPaintProperty cagirip haritanin TAMAMINI 60 Hz yeniden cizdiriyordu -
+    // kullanici alt sheet'te liste okurken veya baska sekmedeyken bile.
+    // Artik yalnizca konum varken VE RN "ekran odakta" derken doner.
     var pulseStart = null;
     var hasUser = false;
+    var pulseOn = true;
+    var pulseRaf = null;
+
     function pulse(ts) {
-      if (hasUser) {
-        if (pulseStart === null) pulseStart = ts;
-        var t = ((ts - pulseStart) % 2000) / 2000;
-        map.setPaintProperty('user-pulse', 'circle-radius', 10 + t * 18);
-        map.setPaintProperty('user-pulse', 'circle-opacity', 0.35 * (1 - t));
-      }
-      requestAnimationFrame(pulse);
+      if (pulseStart === null) pulseStart = ts;
+      var t = ((ts - pulseStart) % 2000) / 2000;
+      map.setPaintProperty('user-pulse', 'circle-radius', 10 + t * 18);
+      map.setPaintProperty('user-pulse', 'circle-opacity', 0.35 * (1 - t));
+      pulseRaf = requestAnimationFrame(pulse);
     }
-    requestAnimationFrame(pulse);
+    function startPulse() {
+      if (pulseRaf === null && hasUser && pulseOn) pulseRaf = requestAnimationFrame(pulse);
+    }
+    function stopPulse() {
+      if (pulseRaf !== null) {
+        cancelAnimationFrame(pulseRaf);
+        pulseRaf = null;
+        pulseStart = null;
+      }
+    }
+
+    window.__twSetPulse = function (on) {
+      pulseOn = !!on;
+      if (pulseOn) startPulse(); else stopPulse();
+    };
     window.__twSetUser = function (lng, lat) {
       hasUser = true;
       map.getSource('user').setData({
         type: 'FeatureCollection',
         features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [lng, lat] }, properties: {} }],
       });
+      startPulse();
     };
 
     map.on('click', 'stations', function (e) {
@@ -458,6 +708,11 @@ ${config.onLoadScript}
     },
     setUserLocation: function (lng, lat) {
       if (window.__twSetUser) window.__twSetUser(lng, lat);
+    },
+    // Ekran odagi kaybolunca nabzi durdur: aksi halde kullanici baska
+    // sekmedeyken de harita 60 Hz yeniden cizilir.
+    setPulse: function (on) {
+      if (window.__twSetPulse) window.__twSetPulse(on);
     },
     // coords: [[lng, lat], ...]; endpoints: [{lng, lat, kind: 'start'|'end'}]
     setRoute: function (coords, endpoints) {
