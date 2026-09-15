@@ -3,10 +3,11 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { warmUpServer } from '@/services/api';
 import { setQueryClientForAuth, useAuthStore } from '@/store/auth';
 import { useSessionStore } from '@/store/session';
 import { colors } from '@/theme';
@@ -21,6 +22,17 @@ export default function RootLayout() {
   // varsayilan davranista bir sonraki acilisa kadar beklerdi.
   useEffect(() => {
     checkForImmediateUpdate();
+  }, []);
+
+  // API uykudaysa (Render ucretsiz katmani) uyanmasi 30 sn'yi asiyor; kullanici
+  // giris formunu doldururken ya da uygulamayi one getirirken bunu simdiden
+  // baslatiyoruz ki ilk gercek istek uyanmis bir sunucuya gitsin (bkz. api.ts).
+  useEffect(() => {
+    warmUpServer();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') warmUpServer();
+    });
+    return () => sub.remove();
   }, []);
 
   // useState ile olusturuluyor: modul kapsaminda bir kez olusturulsa render'lar

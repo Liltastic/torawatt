@@ -44,11 +44,52 @@ export function setUnauthorizedHandler(handler: (() => void) | undefined) {
 
 /**
  * Android'de (OkHttp) okuma zaman asimi pratikte sinirsiz, yani kopmus bir
- * baglantida istek sonsuza kadar asili kalip ekranda donen bir spinner birakir.
- * Sure, Render'in ucretsiz katmaninda uykudan kalkan servise de yetecek kadar
- * genis tutuldu; _layout.tsx'teki retry: 1 bunu en kotu ihtimalle ikiye katlar.
+ * baglantida istek sonsuza kadar asili kalip ekranda donen bir spinner birakir;
+ * o yuzden her istegin bir ust siniri var.
+ *
+ * Ama tek bir sabit sure yetmiyor: API Render'in ucretsiz katmaninda ve 15 dk
+ * istek gelmeyince uyuyor; uyanmasi 30 sn'yi asabiliyor (emulatorde olculdu -
+ * ilk kayit istegi 30 sn'de iptal edildi, hemen ardindan yapilan deneme aninda
+ * gecti). 30 sn'lik sabit sinir bu uyanmayi "Sunucu yanit vermedi" hatasina
+ * ceviriyordu; giris yapmak imkansizlasiyordu.
+ *
+ * Bu yuzden iki kademe: sunucudan yakin zamanda yanit almadiysak uyuyor
+ * varsayip uzun sure taniyoruz, yanit geldikten sonra kisa sureye donuyoruz.
+ * _layout.tsx acilista ve uygulama one gelince warmUpServer ile /health'e
+ * dokunup uyanmayi kullanici daha formu doldururken baslatiyor.
  */
-const REQUEST_TIMEOUT_MS = 30_000;
+const WARM_TIMEOUT_MS = 30_000;
+const COLD_TIMEOUT_MS = 90_000;
+/** Render bu kadar sure istek almayinca servisi uyutuyor (15 dk); payli tutuyoruz. */
+const ASSUME_ASLEEP_AFTER_MS = 10 * 60_000;
+
+let lastResponseAt = 0;
+
+function likelyAsleep() {
+  return Date.now() - lastResponseAt > ASSUME_ASLEEP_AFTER_MS;
+}
+
+function noteServerResponded(status: number) {
+  // 502-504 Render'in kendi katmanindan gelir: servis daha ayakta degil demek,
+  // "uyandi" sayilmaz.
+  if (status >= 502 && status <= 504) return;
+  lastResponseAt = Date.now();
+}
+
+/**
+ * Sunucuyu uyandirmak icin ates-et-unut /health istegi. Yaniti ve hatasi
+ * onemsiz; tek amaci kullanici giris formunu doldururken uyanma suresini
+ * onceden baslatmak. Sunucu zaten ayaktaysa istek atilmaz.
+ */
+export function warmUpServer() {
+  if (!likelyAsleep()) return;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), COLD_TIMEOUT_MS);
+  fetch(`${API_BASE_URL}/health`, { signal: controller.signal })
+    .then((response) => noteServerResponded(response.status))
+    .catch(() => {})
+    .finally(() => clearTimeout(timer));
+}
 
 async function request<T>(
   path: string,
@@ -60,7 +101,8 @@ async function request<T>(
   // fetch'i hatayi kendi FetchError'ina sardigi icin error.name 'AbortError'
   // olarak gelmiyor, zaman asimini ancak signal.aborted'dan ayirt edebiliyoruz.
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeoutMs = likelyAsleep() ? COLD_TIMEOUT_MS : WARM_TIMEOUT_MS;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   let response: Response;
   let text: string;
@@ -80,6 +122,7 @@ async function request<T>(
       body: options.body != null ? JSON.stringify(options.body) : undefined,
       signal: controller.signal,
     });
+    noteServerResponded(response.status);
 
     if (response.status === 204) return undefined as T;
 
@@ -89,8 +132,8 @@ async function request<T>(
     text = await response.text();
   } catch (error) {
     if (controller.signal.aborted) {
-      console.error(`API isteği zaman aşımına uğradı: ${API_BASE_URL}${path}`);
-      throw new ApiError('Sunucu yanıt vermedi. Tekrar dene.', 0);
+      console.error(`API isteği zaman aşımına uğradı (${timeoutMs} ms): ${API_BASE_URL}${path}`);
+      throw new ApiError('Sunucu yanıt vermedi. Uyanıyor olabilir; birkaç saniye sonra tekrar dene.', 0);
     }
     // Gercek sebep (network hatasi, SecureStore hatasi, CORS vb.) loglanmazsa
     // kullaniciya ve bize hep ayni jenerik mesaj gorunur, kok neden kaybolur.

@@ -23,6 +23,43 @@ interface AuthState {
 }
 
 const TOKEN_KEY = 'tora-watt-auth-token';
+/**
+ * Son bilinen kullanici. Acilista sunucuya sormadan oturumu hemen kurmak icin:
+ * API uykudaysa (Render ucretsiz katmani) /auth/me 30-90 sn surebiliyor ve
+ * onceki davranista uygulama o sure boyunca spinner gosterip sonunda kullaniciyi
+ * karsilama ekranina atiyordu - "giris yapamiyorum" sikayetinin kaynagi buydu.
+ */
+const USER_KEY = 'tora-watt-auth-user';
+
+async function persistSession(token: string, user: AuthUser) {
+  await Promise.all([
+    SecureStore.setItemAsync(TOKEN_KEY, token),
+    SecureStore.setItemAsync(USER_KEY, JSON.stringify(user)),
+  ]);
+}
+
+async function clearPersistedSession() {
+  setAuthToken(undefined);
+  await Promise.all([SecureStore.deleteItemAsync(TOKEN_KEY), SecureStore.deleteItemAsync(USER_KEY)]);
+}
+
+function parseCachedUser(raw: string | null): AuthUser | undefined {
+  if (!raw) return undefined;
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      typeof (value as AuthUser).id === 'string' &&
+      typeof (value as AuthUser).email === 'string'
+    ) {
+      return value as AuthUser;
+    }
+  } catch {
+    // Bozuk kayit: sunucudan yeniden alinir.
+  }
+  return undefined;
+}
 
 /**
  * setAuthToken ile ayni desen: store, QueryClientProvider'in altinda olmadigi
@@ -44,26 +81,50 @@ export const useAuthStore = create<AuthState>((set) => ({
   status: 'hydrating',
 
   hydrate: async () => {
-    const token = await SecureStore.getItemAsync(TOKEN_KEY);
+    const [token, cachedUserRaw] = await Promise.all([
+      SecureStore.getItemAsync(TOKEN_KEY),
+      SecureStore.getItemAsync(USER_KEY),
+    ]);
     if (!token) {
       set({ status: 'unauthenticated' });
       return;
     }
 
     setAuthToken(token);
+
+    const cachedUser = parseCachedUser(cachedUserRaw);
+    if (cachedUser) {
+      // Oturumu hemen kur, sunucuyla dogrulamayi arka planda yap. Sunucu
+      // token'i reddederse (401) api.ts onUnauthorized -> logout ile oturumu
+      // kapatir; ag hatasi / zaman asimi / 5xx ise onbellekteki oturum kalir.
+      set({ token, user: cachedUser, status: 'authenticated' });
+      try {
+        const user = await authApi.me();
+        // Bu arada cikis yapildiysa (token degisti) eski kullaniciyi geri yazma.
+        if (useAuthStore.getState().token !== token) return;
+        await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
+        set({ user });
+      } catch {
+        // 401 zaten onUnauthorized ile ele alindi; gerisi gecici, oturum korunur.
+      }
+      return;
+    }
+
+    // Onbellekte kullanici yok (bu surumden onceki bir giris): dogrulamayi
+    // beklemek zorundayiz, sonrasinda kullanici onbellege girer ve bir daha
+    // beklenmez.
     try {
       const user = await authApi.me();
+      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
       set({ token, user, status: 'authenticated' });
     } catch (error) {
       // Token'i YALNIZCA sunucu reddettiyse sil. Ag hatasi veya zaman asimi
-      // (Render soguk baslangici 30 sn'yi asabiliyor, istekler artik o surede
-      // iptal ediliyor) gecerli bir oturumu silmemeli: kapali otoparkta ya da
-      // tunelde uygulamayi acan kullanici yoksa oturumunu kaybedip yeniden
-      // giris yapmak zorunda kaliyor. Token dururken sadece bu acilisi
+      // gecerli bir oturumu silmemeli: kapali otoparkta ya da tunelde
+      // uygulamayi acan kullanici yoksa oturumunu kaybedip yeniden giris
+      // yapmak zorunda kaliyor. Token dururken sadece bu acilisi
       // dogrulayamiyoruz; bir sonraki acilis onu geri yukleyecek.
       if (error instanceof ApiError && error.status === 401) {
-        setAuthToken(undefined);
-        await SecureStore.deleteItemAsync(TOKEN_KEY);
+        await clearPersistedSession();
       }
       set({ status: 'unauthenticated' });
     }
@@ -74,7 +135,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const { token, user } = await authApi.register(email, password, name);
       setAuthToken(token);
-      await SecureStore.setItemAsync(TOKEN_KEY, token);
+      await persistSession(token, user);
       // set()'ten ONCE: bu anda hicbir (tabs) ekrani mount degil, yani silinen
       // sorgular icin hayalet refetch olmaz. Sonrasina birakilirsa yeni oturumun
       // ilk karesinde onceki hesabin verisi gorunur.
@@ -91,7 +152,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const { token, user } = await authApi.login(email, password);
       setAuthToken(token);
-      await SecureStore.setItemAsync(TOKEN_KEY, token);
+      await persistSession(token, user);
       // Ayni cihazda hesap degisimi: onceki kullanicinin cache'i yeni oturuma
       // sizmasin (register'daki aciklamanin aynisi, sira onemli).
       queryClient?.clear();
@@ -103,13 +164,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: async () => {
-    setAuthToken(undefined);
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    await clearPersistedSession();
     set({ token: undefined, user: undefined, status: 'unauthenticated' });
   },
 
   updateProfile: async (name) => {
     const user = await authApi.updateProfile(name);
+    await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
     set({ user });
   },
 
@@ -132,8 +193,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   deleteAccount: async () => {
     await authApi.deleteAccount();
-    setAuthToken(undefined);
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    await clearPersistedSession();
     set({ token: undefined, user: undefined, status: 'unauthenticated' });
   },
 }));
