@@ -22,9 +22,23 @@ const registerSchema = credentialsSchema.extend({
  * kayitlari (araclar, rezervasyonlar, gecmis, favoriler, odeme yontemleri)
  * yeni User.id'ye tasir. Boylece kayit/giris kullanicinin var olan verisini
  * silmez. Eslesen kayit yoksa hicbir sey degismez.
+ *
+ * GUVENLIK: deviceId tamamen istemcinin soyledigi bir deger ve dogrulanamaz.
+ * Bir User.id'ye esitse tasima YAPILMAZ - aksi halde saldirgan kendi
+ * girisinde 'x-device-id: <kurban_user_id>' gondererek kurbanin butun
+ * araclarini, rezervasyonlarini, gecmisini, favorilerini ve odeme
+ * yontemlerini kendi hesabina tasiyabilirdi (updateMany oldugu icin kurban
+ * ayni anda verisini de kaybederdi). Kullanici id'si bir sir degil:
+ * /auth/register ve /auth/me yanitlarinda duz metin donuyor.
  */
 async function claimDeviceData(deviceId: string | undefined, userId: string) {
   if (!deviceId || deviceId === userId) return;
+
+  const impersonated = await prisma.user.findUnique({
+    where: { id: deviceId },
+    select: { id: true },
+  });
+  if (impersonated) return;
 
   await prisma.$transaction([
     prisma.vehicle.updateMany({ where: { ownerId: deviceId }, data: { ownerId: userId } }),
