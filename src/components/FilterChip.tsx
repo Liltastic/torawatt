@@ -42,8 +42,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   chipSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: colors.primaryStrong,
+    borderColor: colors.primaryStrong,
   },
   chipPressed: { opacity: 0.7 },
   label: { ...typography.caption, fontWeight: '600', color: colors.textSecondary },

@@ -27,7 +27,7 @@ export function CrashScreen({ message, onRetry }: CrashScreenProps) {
 
       <View style={styles.body}>
         <View style={styles.icon}>
-          <Ionicons name="alert-circle-outline" size={36} color={colors.danger} />
+          <Ionicons name="alert-circle-outline" size={36} color={colors.dangerText} />
         </View>
         <Text style={styles.title}>Bir şeyler ters gitti</Text>
         <Text style={styles.text}>
@@ -85,9 +85,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.button,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryStrong,
     marginBottom: spacing.lg,
   },
-  buttonPressed: { backgroundColor: colors.primaryDark },
+  buttonPressed: { backgroundColor: colors.primaryStrongPressed },
   buttonLabel: { ...typography.body, fontWeight: '600', color: colors.white, marginLeft: spacing.sm },
 });

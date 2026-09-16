@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
   overlayText: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.md },
   overlayError: {
     ...typography.caption,
-    color: colors.danger,
+    color: colors.dangerText,
     textAlign: 'center',
     paddingHorizontal: spacing.xl,
   },
@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
     borderRadius: radius.button,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryStrong,
   },
   retryButtonPressed: { opacity: 0.8 },
   retryText: { ...typography.captionStrong, color: colors.white },
@@ -494,5 +494,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.danger,
   },
-  errorText: { ...typography.caption, color: colors.danger },
+  errorText: { ...typography.caption, color: colors.dangerText },
 });

@@ -45,11 +45,13 @@ export function TextField({
   const [hidden, setHidden] = useState(true);
   const secure = secureToggle ? hidden : secureTextEntry;
 
-  const dangerColor = onDark ? colors.dangerOnDark : colors.danger;
+  const dangerColor = onDark ? colors.dangerOnDark : colors.dangerText;
   const iconColor = error
     ? dangerColor
     : focused
-      ? colors.primary
+      ? onDark
+        ? colors.primary
+        : colors.primaryStrong
       : onDark
         ? 'rgba(255, 255, 255, 0.62)'
         : colors.textTertiary;
@@ -72,7 +74,7 @@ export function TextField({
         style={[
           styles.inputWrap,
           onDark && styles.inputWrapOnDark,
-          focused && styles.inputWrapFocused,
+          focused && (onDark ? styles.inputWrapFocusedOnDark : styles.inputWrapFocused),
           !!error && (onDark ? styles.inputWrapErrorOnDark : styles.inputWrapError),
         ]}>
         {!!leadingIcon && (
@@ -143,7 +145,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(7, 30, 26, 0.58)',
     borderColor: 'rgba(255, 255, 255, 0.34)',
   },
-  inputWrapFocused: { borderColor: colors.primary },
+  // Odak cercevesi beyaz alanda en az 3:1 olmali: parlak turkuaz 2.6'da kaliyordu.
+  inputWrapFocused: { borderColor: colors.primaryStrong },
+  // Fotograf perdesinin uzerinde parlak turkuaz zaten yuksek kontrastli.
+  inputWrapFocusedOnDark: { borderColor: colors.primary },
   inputWrapError: { borderColor: colors.danger },
   inputWrapErrorOnDark: { borderColor: colors.dangerOnDark },
   leadingIcon: { marginRight: spacing.sm },

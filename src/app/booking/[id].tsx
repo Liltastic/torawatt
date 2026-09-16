@@ -124,7 +124,7 @@ export default function ReservationDetailScreen() {
 
         {status === 'EXPIRED' && (
           <Animated.View entering={FadeInDown.duration(250)} style={styles.warnBox}>
-            <Ionicons name="time-outline" size={16} color={colors.danger} />
+            <Ionicons name="time-outline" size={16} color={colors.dangerText} />
             <Text style={styles.warnText}>
               Bekleme süresi doldu ve soket serbest bırakıldı. Yeni bir rezervasyon
               oluşturabilirsin.
@@ -134,7 +134,7 @@ export default function ReservationDetailScreen() {
 
         {status === 'ARRIVED' && (
           <Animated.View entering={FadeInDown.duration(250)} style={styles.okBox}>
-            <Ionicons name="checkmark-circle-outline" size={16} color={colors.success} />
+            <Ionicons name="checkmark-circle-outline" size={16} color={colors.successText} />
             <Text style={styles.okText}>
               Geldiğini bildirdin. Soketi takıp şarjı başlatabilirsin.
             </Text>
@@ -142,7 +142,7 @@ export default function ReservationDetailScreen() {
         )}
 
         <View style={styles.notice}>
-          <Ionicons name="flask-outline" size={16} color={colors.warning} />
+          <Ionicons name="flask-outline" size={16} color={colors.warningText} />
           <Text style={styles.noticeText}>
             Rezervasyon onayı simüle ediliyor. Gerçekte soketi başkası kapmış olabilir ve sunucu
             reddedebilir.
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   statusBadge: { marginTop: spacing.lg },
   station: { ...typography.h1, color: colors.text, marginTop: spacing.md },
   connector: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
-  countdown: { ...typography.bodyStrong, color: colors.primaryDark, marginTop: spacing.md },
+  countdown: { ...typography.bodyStrong, color: colors.primaryText, marginTop: spacing.md },
 
   card: { marginTop: spacing.xl, paddingVertical: spacing.xs },
   row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.md },

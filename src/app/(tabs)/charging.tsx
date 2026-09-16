@@ -427,7 +427,7 @@ function Metric({
   return (
     <View style={styles.metric}>
       <View style={[styles.metricIcon, accent && styles.metricIconAccent]}>
-        <Ionicons name={icon} size={15} color={accent ? colors.white : colors.primaryDark} />
+        <Ionicons name={icon} size={15} color={accent ? colors.white : colors.primaryText} />
       </View>
       <Text style={styles.metricLabel}>{label}</Text>
       <View style={styles.metricValueRow}>
@@ -621,7 +621,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  metricIconAccent: { backgroundColor: colors.primary },
+  metricIconAccent: { backgroundColor: colors.primaryStrong },
   metricLabel: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm },
   metricValueRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 2 },
   metricValue: { ...typography.h3, fontSize: 19, lineHeight: 24, color: colors.text },
@@ -686,8 +686,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stopSquare: { width: 9, height: 9, borderRadius: 2, backgroundColor: colors.danger },
-  stopLabel: { ...typography.bodyStrong, color: colors.danger, marginLeft: spacing.sm },
+  stopSquare: { width: 9, height: 9, borderRadius: 2, backgroundColor: colors.dangerText },
+  stopLabel: { ...typography.bodyStrong, color: colors.dangerText, marginLeft: spacing.sm },
 
   // --- Bos durum
   idleTitle: { ...typography.h2, color: colors.text },
@@ -698,7 +698,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryStrong,
     alignItems: 'center',
     justifyContent: 'center',
   },

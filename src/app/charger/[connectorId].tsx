@@ -126,7 +126,7 @@ export default function ChargeSummaryScreen() {
         <Animated.View
           entering={FadeInDown.delay(120).duration(300)}
           style={styles.notice}>
-          <Ionicons name="flask-outline" size={16} color={colors.warning} />
+          <Ionicons name="flask-outline" size={16} color={colors.warningText} />
           <Text style={styles.noticeText}>
             Bu akış simülasyon çalışıyor. Gerçek şarj başlatma ve ödeme, backend bağlandığında
             devreye girecek.

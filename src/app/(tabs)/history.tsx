@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
   rowMain: { flex: 1 },
   station: { ...typography.h3, color: colors.text },
   meta: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-  energy: { ...typography.caption, color: colors.primaryDark, marginTop: spacing.sm, fontWeight: '600' },
+  energy: { ...typography.caption, color: colors.primaryText, marginTop: spacing.sm, fontWeight: '600' },
   rowTrailing: { flexDirection: 'row', alignItems: 'center', marginLeft: spacing.md },
   cost: { ...typography.bodyStrong, color: colors.text, marginRight: spacing.xs },
 });

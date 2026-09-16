@@ -56,7 +56,9 @@ export function Button({
       ]}
       {...rest}>
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? colors.white : colors.primary} />
+        <ActivityIndicator
+          color={variant === 'primary' || variant === 'danger' ? colors.white : colors.primaryText}
+        />
       ) : (
         <View style={styles.content}>
           {icon}
@@ -81,15 +83,17 @@ const styles = StyleSheet.create({
   size_md: { height: 44 },
   size_lg: { height: 54 },
 
-  variant_primary: { backgroundColor: colors.primary },
+  // Beyaz yazili dolgular *Strong tonunda: parlak turkuaz/kirmizi uzerinde
+  // beyaz 2.6:1 / 3.2:1'de kalip AA'yi gecmiyordu.
+  variant_primary: { backgroundColor: colors.primaryStrong },
   variant_secondary: { backgroundColor: colors.primarySoft },
   variant_ghost: { backgroundColor: 'transparent' },
-  variant_danger: { backgroundColor: colors.danger },
+  variant_danger: { backgroundColor: colors.dangerStrong },
 
-  pressed_primary: { backgroundColor: colors.primaryDark },
-  pressed_secondary: { backgroundColor: '#DCE6FF' },
+  pressed_primary: { backgroundColor: colors.primaryStrongPressed },
+  pressed_secondary: { backgroundColor: colors.primarySoftPressed },
   pressed_ghost: { backgroundColor: colors.surfaceMuted },
-  pressed_danger: { backgroundColor: '#C93B3F' },
+  pressed_danger: { backgroundColor: colors.dangerStrongPressed },
 
   disabled: { opacity: 0.45 },
 
@@ -97,7 +101,7 @@ const styles = StyleSheet.create({
   labelWithIcon: { marginLeft: spacing.sm },
   trailingIcon: { marginLeft: spacing.sm },
   label_primary: { color: colors.white },
-  label_secondary: { color: colors.primaryDark },
-  label_ghost: { color: colors.primaryDark },
+  label_secondary: { color: colors.primaryText },
+  label_ghost: { color: colors.primaryText },
   label_danger: { color: colors.white },
 });

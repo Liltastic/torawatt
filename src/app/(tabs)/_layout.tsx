@@ -137,8 +137,10 @@ function StyledTabs() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textTertiary,
+        // Beyaz cubukta etiket metni: parlak turkuaz 2.6:1, soluk gri 2.5:1'de
+        // kaliyordu; ikisi de AA'nin altindaydi.
+        tabBarActiveTintColor: colors.primaryText,
+        tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: styles.tabBar,
         tabBarLabelStyle: styles.tabLabel,
         tabBarItemStyle: styles.tabItem,
@@ -174,7 +176,7 @@ function StyledTabs() {
  */
 function LiquidGlassTabs() {
   return (
-    <NativeTabs tintColor={colors.primary} screenListeners={{ tabPress: () => haptics.selection() }}>
+    <NativeTabs tintColor={colors.primaryText} screenListeners={{ tabPress: () => haptics.selection() }}>
       {TABS.map(({ name, title, sf, sfSelected, md }) => (
         <NativeTabs.Trigger key={name} name={name}>
           <NativeTabs.Trigger.Label>{title}</NativeTabs.Trigger.Label>

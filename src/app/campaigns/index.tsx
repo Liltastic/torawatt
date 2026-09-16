@@ -54,7 +54,7 @@ export default function CampaignsScreen() {
             <Animated.View key={campaign.id} entering={FadeInDown.delay(index * 60).duration(280)}>
               <Card style={styles.card}>
                 <View style={styles.badge}>
-                  <Ionicons name="pricetag" size={14} color={colors.primaryDark} />
+                  <Ionicons name="pricetag" size={14} color={colors.primaryText} />
                   <Text style={styles.badgeText}>{campaign.discountLabel}</Text>
                 </View>
                 <Text style={styles.title}>{campaign.title}</Text>
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     ...typography.captionStrong,
-    color: colors.primaryDark,
+    color: colors.primaryText,
     marginLeft: spacing.xs,
   },
   title: { ...typography.h3, color: colors.text, marginTop: spacing.md },

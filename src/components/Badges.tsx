@@ -1,7 +1,13 @@
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { colors, radius, spacing, typography } from '@/theme';
-import { statusColors, statusLabels, statusSoftColors, type BadgeStatus } from '@/theme/colors';
+import {
+  statusColors,
+  statusLabels,
+  statusSoftColors,
+  statusTextColors,
+  type BadgeStatus,
+} from '@/theme/colors';
 import { connectorLabels, type ConnectorType, type CurrentType } from '@/types/domain';
 
 /** Soket / istasyon musaitlik rozeti (spec bolum 7). */
@@ -17,7 +23,8 @@ export function AvailabilityBadge({
   return (
     <View style={[styles.badge, { backgroundColor: statusSoftColors[status] }, style]}>
       <View style={[styles.dot, { backgroundColor: statusColors[status] }]} />
-      <Text style={[styles.badgeText, { color: statusColors[status] }]}>
+      {/* Nokta parlak durum renginde, yazi ayni ailenin okunur koyu tonunda. */}
+      <Text style={[styles.badgeText, { color: statusTextColors[status] }]}>
         {label ?? statusLabels[status]}
       </Text>
     </View>
@@ -26,8 +33,8 @@ export function AvailabilityBadge({
 
 const currentTypeColors: Record<CurrentType, { bg: string; fg: string }> = {
   AC: { bg: colors.neutralSoft, fg: colors.textSecondary },
-  DC: { bg: colors.primarySoft, fg: colors.primaryDark },
-  HPC: { bg: colors.primary, fg: colors.white },
+  DC: { bg: colors.primarySoft, fg: colors.primaryText },
+  HPC: { bg: colors.primaryStrong, fg: colors.white },
 };
 
 /** AC / DC / HPC + kW rozeti (spec bolum 5). */

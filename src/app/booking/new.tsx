@@ -176,7 +176,7 @@ export default function NewReservationScreen() {
 
         {!!error && (
           <Animated.View entering={FadeInDown.duration(220)} style={styles.errorBox}>
-            <Ionicons name="alert-circle-outline" size={16} color={colors.danger} />
+            <Ionicons name="alert-circle-outline" size={16} color={colors.dangerText} />
             <Text style={styles.errorText}>{error}</Text>
           </Animated.View>
         )}
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.badge,
     backgroundColor: colors.dangerSoft,
   },
-  errorText: { ...typography.caption, color: colors.danger, flex: 1, marginLeft: spacing.sm },
+  errorText: { ...typography.caption, color: colors.dangerText, flex: 1, marginLeft: spacing.sm },
 
   actions: {
     backgroundColor: colors.surface,

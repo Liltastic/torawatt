@@ -47,7 +47,7 @@ export function ConnectorCard({ connector, index, selected = false, onPress }: C
           </Text>
         </View>
 
-        {selected && <Ionicons name="checkmark-circle" size={22} color={colors.primary} />}
+        {selected && <Ionicons name="checkmark-circle" size={22} color={colors.primaryStrong} />}
       </View>
 
       <View style={styles.badges}>
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  numberBadgeSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+  numberBadgeSelected: { backgroundColor: colors.primaryStrong, borderColor: colors.primaryStrong },
   number: { ...typography.captionStrong, color: colors.textSecondary },
   numberSelected: { color: colors.white },
 

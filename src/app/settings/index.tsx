@@ -219,8 +219,8 @@ const styles = StyleSheet.create({
   cardAction: { marginTop: spacing.md, alignSelf: 'flex-start' },
 
   emailLabel: { ...typography.caption, color: colors.textSecondary, marginTop: -spacing.sm },
-  status: { ...typography.caption, color: colors.success, marginTop: spacing.sm },
-  error: { ...typography.caption, color: colors.danger, marginTop: spacing.sm },
+  status: { ...typography.caption, color: colors.successText, marginTop: spacing.sm },
+  error: { ...typography.caption, color: colors.dangerText, marginTop: spacing.sm },
 
   dangerText: { ...typography.body, color: colors.textSecondary },
 });

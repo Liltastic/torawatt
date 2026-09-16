@@ -229,7 +229,7 @@ export default function AddVehicleScreen() {
               klavye acikken butona basiyor ve ekranda hicbir sey degismiyordu. */}
           {!!(submitError || connectorError) && (
             <Animated.View entering={FadeInDown.duration(220)} style={styles.errorBox}>
-              <Ionicons name="alert-circle-outline" size={16} color={colors.danger} />
+              <Ionicons name="alert-circle-outline" size={16} color={colors.dangerText} />
               <Text style={styles.errorText} numberOfLines={3}>
                 {submitError ?? connectorError}
               </Text>
@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
   presetPressed: { backgroundColor: colors.primarySoft, borderColor: colors.primary },
   presetMake: { ...typography.caption, color: colors.textSecondary },
   presetModel: { ...typography.bodyStrong, color: colors.text, marginTop: 2 },
-  presetBattery: { ...typography.caption, color: colors.primaryDark, marginTop: spacing.sm },
+  presetBattery: { ...typography.caption, color: colors.primaryText, marginTop: spacing.sm },
 
   form: { marginTop: spacing.lg },
 
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.badge,
     backgroundColor: colors.dangerSoft,
   },
-  errorText: { ...typography.caption, color: colors.danger, flex: 1, marginLeft: spacing.sm },
+  errorText: { ...typography.caption, color: colors.dangerText, flex: 1, marginLeft: spacing.sm },
 
   actions: {
     backgroundColor: colors.surface,

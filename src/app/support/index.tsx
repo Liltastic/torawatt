@@ -124,7 +124,7 @@ export default function SupportScreen() {
           <Card style={styles.card}>
             {sent ? (
               <View style={styles.sentRow}>
-                <Ionicons name="checkmark-circle-outline" size={20} color={colors.success} />
+                <Ionicons name="checkmark-circle-outline" size={20} color={colors.successText} />
                 <Text style={styles.sentText}>Mesajın ulaştı, en kısa sürede döneriz.</Text>
               </View>
             ) : (
@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.border,
   },
-  error: { ...typography.caption, color: colors.danger, marginTop: spacing.sm },
+  error: { ...typography.caption, color: colors.dangerText, marginTop: spacing.sm },
   sendButton: { marginTop: spacing.lg },
 
   sentRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm },

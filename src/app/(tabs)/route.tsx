@@ -160,7 +160,7 @@ export default function RouteScreen() {
 
           {!!error && (
             <Animated.View entering={FadeInDown.duration(220)} style={styles.errorBox}>
-              <Ionicons name="alert-circle-outline" size={16} color={colors.danger} />
+              <Ionicons name="alert-circle-outline" size={16} color={colors.dangerText} />
               <Text style={styles.errorText}>{error}</Text>
             </Animated.View>
           )}
@@ -240,7 +240,7 @@ function PlanResult({
 
       {trip.unreachable ? (
         <View style={styles.warnBox}>
-          <Ionicons name="warning-outline" size={16} color={colors.warning} />
+          <Ionicons name="warning-outline" size={16} color={colors.warningText} />
           <Text style={styles.warnText}>
             Bu rotada menzilin yetmiyor ve ulaşabileceğin uygun istasyon bulunamadı. Daha yüksek
             batarya ile başlamayı dene.
@@ -248,7 +248,7 @@ function PlanResult({
         </View>
       ) : trip.stops.length === 0 ? (
         <View style={styles.okBox}>
-          <Ionicons name="checkmark-circle-outline" size={16} color={colors.success} />
+          <Ionicons name="checkmark-circle-outline" size={16} color={colors.successText} />
           <Text style={styles.okText}>Şarj molası olmadan varabilirsin.</Text>
         </View>
       ) : (
@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.badge,
     backgroundColor: colors.dangerSoft,
   },
-  errorText: { ...typography.caption, color: colors.danger, flex: 1, marginLeft: spacing.sm },
+  errorText: { ...typography.caption, color: colors.dangerText, flex: 1, marginLeft: spacing.sm },
 
   result: { marginTop: spacing.xxl },
   mapCard: { overflow: 'hidden', marginBottom: spacing.md },
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
   summaryValue: { ...typography.h3, color: colors.text, marginTop: 1 },
   summaryCost: {
     ...typography.caption,
-    color: colors.primaryDark,
+    color: colors.primaryText,
     marginTop: spacing.md,
     fontWeight: '600',
   },
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryStrong,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,

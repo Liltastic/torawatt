@@ -90,7 +90,7 @@ export default function PaymentMethodsScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<Refresher refreshing={isRefetching} onRefresh={refetch} />}>
         <View style={styles.notice}>
-          <Ionicons name="construct-outline" size={18} color={colors.warning} />
+          <Ionicons name="construct-outline" size={18} color={colors.warningText} />
           <Text style={styles.noticeText}>
             <Text style={styles.noticeStrong}>Yapım aşamasında. </Text>
             Buradaki kartlar tamamen sahtedir ve hiçbir ödeme alınmaz. Gerçek kart girişi, PCI
@@ -121,7 +121,7 @@ export default function PaymentMethodsScreen() {
               <Card style={styles.card}>
                 <View style={styles.cardRow}>
                   <View style={styles.brandBox}>
-                    <Ionicons name="card" size={18} color={colors.primaryDark} />
+                    <Ionicons name="card" size={18} color={colors.primaryText} />
                   </View>
 
                   <View style={styles.cardInfo}>
@@ -202,7 +202,7 @@ export default function PaymentMethodsScreen() {
       <SafeAreaView edges={['bottom']} style={[styles.actions, shadows.sheet]}>
         {!!error && (
           <Animated.View entering={FadeInDown.duration(220)} style={styles.errorBox}>
-            <Ionicons name="alert-circle-outline" size={16} color={colors.danger} />
+            <Ionicons name="alert-circle-outline" size={16} color={colors.dangerText} />
             <Text style={styles.errorText} numberOfLines={3}>
               {error}
             </Text>
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     borderRadius: radius.chip,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryStrong,
   },
   defaultText: { ...typography.caption, color: colors.white, fontWeight: '700', marginLeft: 2 },
   makeDefault: {
@@ -297,8 +297,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.chip,
     backgroundColor: colors.primarySoft,
   },
-  makeDefaultPressed: { backgroundColor: '#DCE6FF' },
-  makeDefaultText: { ...typography.caption, color: colors.primaryDark, fontWeight: '600' },
+  makeDefaultPressed: { backgroundColor: colors.primarySoftPressed },
+  makeDefaultText: { ...typography.caption, color: colors.primaryText, fontWeight: '600' },
 
   picker: { marginTop: spacing.lg },
   pickerTitle: { ...typography.captionStrong, color: colors.textSecondary },
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.badge,
     backgroundColor: colors.dangerSoft,
   },
-  errorText: { ...typography.caption, color: colors.danger, flex: 1, marginLeft: spacing.sm },
+  errorText: { ...typography.caption, color: colors.dangerText, flex: 1, marginLeft: spacing.sm },
 
   actions: {
     backgroundColor: colors.surface,

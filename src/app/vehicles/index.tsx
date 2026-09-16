@@ -171,7 +171,7 @@ export default function VehiclesScreen() {
         <SafeAreaView edges={['bottom']} style={[styles.actions, shadows.sheet]}>
           {!!actionError && (
             <Animated.View entering={FadeInDown.duration(220)} style={styles.errorBox}>
-              <Ionicons name="alert-circle-outline" size={16} color={colors.danger} />
+              <Ionicons name="alert-circle-outline" size={16} color={colors.dangerText} />
               <Text style={styles.errorText} numberOfLines={3}>
                 {actionError}
               </Text>
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     borderRadius: radius.chip,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryStrong,
   },
   activeBadgeText: { ...typography.caption, color: colors.white, fontWeight: '700', marginLeft: 2 },
 
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     marginBottom: spacing.md,
   },
-  errorText: { ...typography.caption, color: colors.danger, flex: 1 },
+  errorText: { ...typography.caption, color: colors.dangerText, flex: 1 },
   actions: {
     backgroundColor: colors.surface,
     borderTopWidth: 1,

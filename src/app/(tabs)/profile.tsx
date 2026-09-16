@@ -97,7 +97,7 @@ export default function ProfileScreen() {
               <Text style={styles.vehicleActionText}>
                 {activeVehicle ? 'Araçları yönet' : 'Araç ekle'}
               </Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.primaryDark} />
+              <Ionicons name="chevron-forward" size={16} color={colors.primaryText} />
             </AnimatedPressable>
           </Card>
         </Animated.View>
@@ -163,7 +163,7 @@ export default function ProfileScreen() {
           scaleTo={0.98}
           onPress={onLogout}
           style={({ pressed }) => [styles.logout, pressed && styles.logoutPressed]}>
-          <Ionicons name="log-out-outline" size={20} color={colors.danger} />
+          <Ionicons name="log-out-outline" size={20} color={colors.dangerText} />
           <Text style={styles.logoutLabel}>Çıkış yap</Text>
         </AnimatedPressable>
 
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   accountEmail: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
 
   vehicleCard: { marginTop: spacing.xl },
-  vehicleCardLabel: { ...typography.captionStrong, color: colors.primary, letterSpacing: 1 },
+  vehicleCardLabel: { ...typography.captionStrong, color: colors.primaryText, letterSpacing: 1 },
   vehicleName: { ...typography.h3, color: colors.text, marginTop: spacing.sm },
   vehicleEmpty: { ...typography.h3, color: colors.text, marginTop: spacing.sm },
   vehicleSpecs: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
@@ -212,11 +212,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.badge,
     backgroundColor: colors.primarySoft,
   },
-  vehicleActionPressed: { backgroundColor: '#DCE6FF' },
+  vehicleActionPressed: { backgroundColor: colors.primarySoftPressed },
   vehicleActionText: {
     ...typography.caption,
     fontWeight: '600',
-    color: colors.primaryDark,
+    color: colors.primaryText,
     marginRight: spacing.xs,
   },
 
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
   soon: { ...typography.caption, color: colors.textTertiary },
   tag: {
     ...typography.caption,
-    color: colors.warning,
+    color: colors.warningText,
     fontWeight: '700',
     marginRight: spacing.sm,
   },
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.card,
   },
   logoutPressed: { backgroundColor: colors.surfaceMuted },
-  logoutLabel: { ...typography.body, fontWeight: '600', color: colors.danger, marginLeft: spacing.sm },
+  logoutLabel: { ...typography.body, fontWeight: '600', color: colors.dangerText, marginLeft: spacing.sm },
 
   version: {
     ...typography.caption,

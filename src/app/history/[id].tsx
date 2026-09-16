@@ -80,7 +80,7 @@ export default function HistoryDetailScreen() {
         </Card>
 
         <View style={styles.notice}>
-          <Ionicons name="construct-outline" size={16} color={colors.warning} />
+          <Ionicons name="construct-outline" size={16} color={colors.warningText} />
           <Text style={styles.noticeText}>
             Belge bir demodur, resmi fatura değildir. Gerçek fatura, faturalandırma servisi ve
             e-Arşiv entegrasyonu tamamlanınca buradan alınabilecek.
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
   rowDivider: { borderBottomWidth: 1, borderBottomColor: colors.border },
   rowLabel: { ...typography.body, color: colors.textSecondary },
   rowValue: { ...typography.bodyStrong, color: colors.text },
-  rowValueEmphasis: { ...typography.h3, color: colors.primaryDark },
+  rowValueEmphasis: { ...typography.h3, color: colors.primaryText },
 
   notice: { flexDirection: 'row', alignItems: 'flex-start', marginTop: spacing.xl },
   noticeText: { ...typography.caption, color: colors.textSecondary, flex: 1, marginLeft: spacing.sm },

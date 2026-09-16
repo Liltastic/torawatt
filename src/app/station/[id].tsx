@@ -175,7 +175,7 @@ export default function StationDetailScreen() {
             haptic="tap"
             onPress={openDirections}
             style={({ pressed }) => [styles.directionsButton, pressed && styles.directionsPressed]}>
-            <Ionicons name="navigate" size={20} color={colors.primaryDark} />
+            <Ionicons name="navigate" size={20} color={colors.primaryText} />
           </AnimatedPressable>
 
           <Button
@@ -306,6 +306,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: spacing.md,
   },
-  directionsPressed: { backgroundColor: '#DCE6FF' },
+  directionsPressed: { backgroundColor: colors.primarySoftPressed },
   primaryAction: { flex: 1 },
 });
