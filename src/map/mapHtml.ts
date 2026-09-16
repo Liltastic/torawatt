@@ -643,6 +643,24 @@ ${config.onLoadScript}
         'circle-translate-anchor': 'viewport',
       },
     });
+    // Secim dalgasi: yeni bir istasyon secilince halenin disina dogru bir kez
+    // yayilip sonen ince halka (bkz. __twRipple). Pin bilerek buyumuyor;
+    // secimin gerceklestigi hissini bu dalga veriyor. Bosta gorunmez.
+    map.addLayer({
+      id: 'station-ripple',
+      type: 'circle',
+      source: 'stations',
+      filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'selected'], true]],
+      paint: {
+        'circle-radius': ['+', PIN_TIER_RADIUS, PIN_BAND + 5],
+        'circle-opacity': 0,
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '${colors.primaryDark}',
+        'circle-stroke-opacity': 0,
+        'circle-translate': [0, -PIN_HEAD_DY],
+        'circle-translate-anchor': 'viewport',
+      },
+    });
     // Kume grameri = pin grameri. Kenar ailesi birebir ayni: [koyu tel 1]
     // [beyaz 3][dolgu]. circle-stroke yaricapin DISINA cizildigi icin tel
     // dairesi r + 3 + 1. Beyaz keyline "burada sarj olabilirsin", koyu keyline
@@ -906,6 +924,30 @@ ${config.onLoadScript}
       startPulse();
     };
 
+    // Secim dalgasi. Nabiz gibi rAF ile ama tek seferlik: bitince dongu
+    // kendiliginden duruyor, yani bosta haritayi yeniden cizdirmiyor.
+    var RIPPLE_MS = 650;
+    var RIPPLE_GROWTH = 22;
+    var rippleRaf = null;
+    var reduceMotion = !!(
+      window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    );
+    window.__twRipple = function () {
+      if (reduceMotion) return;
+      if (rippleRaf !== null) cancelAnimationFrame(rippleRaf);
+      var rippleStart = null;
+      function frame(ts) {
+        if (rippleStart === null) rippleStart = ts;
+        var t = Math.min(1, (ts - rippleStart) / RIPPLE_MS);
+        var eased = 1 - Math.pow(1 - t, 3);
+        map.setPaintProperty('station-ripple', 'circle-radius',
+          ['+', PIN_TIER_RADIUS, PIN_BAND + 5 + eased * RIPPLE_GROWTH]);
+        map.setPaintProperty('station-ripple', 'circle-stroke-opacity', 0.7 * (1 - t));
+        rippleRaf = t < 1 ? requestAnimationFrame(frame) : null;
+      }
+      rippleRaf = requestAnimationFrame(frame);
+    };
+
     // TEK click isleyicisi. Eskiden katman bazli 'stations'/'clusters'
     // dinleyicileri ile bos alani sinayan genel dinleyici AYRI calisiyordu;
     // isabet alani buyudugunde ayni dokunus hem stationPress hem mapPress
@@ -980,11 +1022,31 @@ ${config.onLoadScript}
     post({ type: 'ready' });
   });
 
+  // Secim dalgasinin tetiklenmesi icin: son secili istasyon ve haritanin ilk
+  // istasyon yuklemesini alip almadigi.
+  var lastSelectedId = null;
+  var stationsPushed = false;
+
   // React Native tarafinin cagirdigi kopru.
   window.__tw = {
     setStations: function (geojson) {
       var src = map.getSource('stations');
       if (src) src.setData(geojson);
+
+      // Secim degistiyse dalga. Ilk yukleme sayilmaz - taban harita degisince
+      // yeniden kurulan harita secili pini gosterirken dalga oynatmasin,
+      // kullanici yeni bir sey secmedi.
+      var selected = null;
+      var features = (geojson && geojson.features) || [];
+      for (var i = 0; i < features.length; i++) {
+        var props = features[i].properties;
+        if (props && props.selected) { selected = props.id; break; }
+      }
+      if (stationsPushed && selected !== null && selected !== lastSelectedId && window.__twRipple) {
+        window.__twRipple();
+      }
+      lastSelectedId = selected;
+      stationsPushed = true;
     },
     setUserLocation: function (lng, lat) {
       if (window.__twSetUser) window.__twSetUser(lng, lat);
