@@ -13,6 +13,7 @@ import {
   ConnectorCard,
   DetailSkeleton,
   EmptyState,
+  FavoriteHeart,
 } from '@/components';
 import { useIsFavorite, useToggleFavorite } from '@/queries/favorites';
 import { useStation } from '@/queries/stations';
@@ -226,11 +227,7 @@ function ScreenHeader({ stationId, onBack }: { stationId?: string; onBack: () =>
           scaleTo={0.85}
           onPress={() => toggleFavorite.mutate({ stationId, favorite: !isFavorite })}
           style={styles.headerButton}>
-          <Ionicons
-            name={isFavorite ? 'heart' : 'heart-outline'}
-            size={20}
-            color={isFavorite ? colors.danger : colors.text}
-          />
+          <FavoriteHeart active={isFavorite} size={20} />
         </AnimatedPressable>
       ) : null}
     </View>

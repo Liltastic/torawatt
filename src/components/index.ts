@@ -7,6 +7,7 @@ export { ChargeRing, type ChargeRingMode } from './ChargeRing';
 export { ChargingMiniBar, useChargingMiniBarInset } from './ChargingMiniBar';
 export { CrashScreen } from './CrashScreen';
 export { EmptyState } from './EmptyState';
+export { FavoriteHeart } from './FavoriteHeart';
 export { FilterChip } from './FilterChip';
 export { SearchBar } from './SearchBar';
 export { StationCard } from './StationCard';

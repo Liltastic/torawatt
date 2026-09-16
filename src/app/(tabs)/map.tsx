@@ -37,6 +37,7 @@ import {
   ChargingMiniBar,
   ConnectorCard,
   EmptyState,
+  FavoriteHeart,
   FilterChip,
   Logo,
   SearchBar,
@@ -693,11 +694,7 @@ function StationDetail({
           scaleTo={0.85}
           onPress={() => toggleFavorite.mutate({ stationId: station.id, favorite: !isFavorite })}
           style={styles.favoriteIconButton}>
-          <Ionicons
-            name={isFavorite ? 'heart' : 'heart-outline'}
-            size={19}
-            color={isFavorite ? colors.danger : colors.text}
-          />
+          <FavoriteHeart active={isFavorite} size={19} />
         </AnimatedPressable>
 
         <AnimatedPressable
