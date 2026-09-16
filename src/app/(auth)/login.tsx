@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Keyboard, Pressable, StyleSheet, Text, TextInput } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
@@ -9,34 +9,100 @@ import { ApiError } from '@/services/api';
 import { useAuthStore } from '@/store/auth';
 import { colors, spacing, typography } from '@/theme';
 
+/**
+ * Kayitli sifreyle otomatik giris.
+ *
+ * iOS (iCloud Anahtar Zinciri, Face ID/Touch ID sonrasi) ve Android (Google
+ * Sifre Yoneticisi ya da Samsung Pass, parmak izi/yuz/PIN sonrasi) kayitli
+ * bilgiyi alanlara TEK HAMLEDE yazar. Uygulamaya bu "otomatik dolduruldu" diye
+ * bildirilmiyor; ayirt edebildigimiz tek sey sifrenin bir anda gelmesi.
+ *
+ * Bu yuzden: sifre alanina tek bir degisiklikte en az AUTOFILL_MIN_CHARS
+ * karakter eklenirse giris kendiliginden baslar. Elle yazim her tusta bir
+ * karakter ekler; hizli yazimda iki vurus tek olaya birlesebilir, dort
+ * karakterlik esik bunu guvenle disarida birakir. Guvenli alanda klavye kelime
+ * onerisi de sunmaz, yani baska bir kaynak yok. Yapistirma da ayni sekilde
+ * gorunur ve o da otomatik girer - kullanicinin niyeti zaten bu.
+ *
+ * Kayit ekraninda BILEREK yok: orada tek hamlede gelen sifre sistemin "guclu
+ * sifre" onerisi olur ve hesap, kullanici formu gozden gecirmeden acilirdi.
+ */
+const AUTOFILL_MIN_CHARS = 4;
+/**
+ * Sistem e-postayi ve sifreyi ayri olaylarla, sirasi platforma gore degisen
+ * sekilde veriyor. Gondermeden once ikisinin de yerine oturmasini bekliyoruz.
+ */
+const AUTOFILL_SETTLE_MS = 350;
+const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;
+
 export default function LoginScreen() {
   const router = useRouter();
   const login = useAuthStore((s) => s.login);
-  const passwordRef = useRef<TextInput>(null);
+  const passwordInputRef = useRef<TextInput>(null);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
 
-  const onSubmit = async () => {
+  // Zamanlayici geri cagrisi kuruldugu render'in state'ini gorur; son yazilan
+  // degerleri buradan okuyoruz.
+  const latest = useRef({ email: '', password: '' });
+  // Klavyedeki "Git" tusu, buton ve otomatik giris ayni anda tetiklenirse tek
+  // istek gitsin.
+  const inFlight = useRef(false);
+  const autoSubmitTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => () => clearTimeout(autoSubmitTimer.current), []);
+
+  const submit = async (emailValue: string, passwordValue: string) => {
+    if (inFlight.current) return;
     // Klavye kapansin ki hata satiri tam gorunen sayfada belirsin.
     Keyboard.dismiss();
-    if (!email.trim() || !password) {
+    if (!emailValue.trim() || !passwordValue) {
       setError('E-posta ve şifre gerekli.');
       return;
     }
 
+    inFlight.current = true;
     setError(undefined);
     setSubmitting(true);
     try {
-      await login(email.trim(), password);
+      await login(emailValue.trim(), passwordValue);
       router.replace('/map');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Giriş başarısız.');
     } finally {
+      inFlight.current = false;
       setSubmitting(false);
     }
+  };
+
+  const onSubmit = () => {
+    clearTimeout(autoSubmitTimer.current);
+    void submit(email, password);
+  };
+
+  const handleEmailChange = (value: string) => {
+    latest.current.email = value;
+    setEmail(value);
+  };
+
+  const handlePasswordChange = (value: string) => {
+    const previous = latest.current.password;
+    latest.current.password = value;
+    setPassword(value);
+
+    if (value.length - previous.length < AUTOFILL_MIN_CHARS) return;
+
+    clearTimeout(autoSubmitTimer.current);
+    autoSubmitTimer.current = setTimeout(() => {
+      const current = latest.current;
+      // Bu arada kullanici sifreyi silmis ya da e-posta hic gelmemis olabilir.
+      if (!EMAIL_PATTERN.test(current.email.trim())) return;
+      if (current.password.length < AUTOFILL_MIN_CHARS) return;
+      void submit(current.email, current.password);
+    }, AUTOFILL_SETTLE_MS);
   };
 
   return (
@@ -53,7 +119,7 @@ export default function LoginScreen() {
           label="E-posta"
           leadingIcon="mail-outline"
           value={email}
-          onChangeText={setEmail}
+          onChangeText={handleEmailChange}
           autoCapitalize="none"
           autoComplete="email"
           textContentType="emailAddress"
@@ -61,15 +127,15 @@ export default function LoginScreen() {
           placeholder="ornek@eposta.com"
           returnKeyType="next"
           submitBehavior="submit"
-          onSubmitEditing={() => passwordRef.current?.focus()}
+          onSubmitEditing={() => passwordInputRef.current?.focus()}
         />
         <TextField
           onDark
-          ref={passwordRef}
+          ref={passwordInputRef}
           label="Şifre"
           leadingIcon="lock-closed-outline"
           value={password}
-          onChangeText={setPassword}
+          onChangeText={handlePasswordChange}
           secureTextEntry
           secureToggle
           autoCapitalize="none"

@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState, type ComponentProps, type Ref } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
 import { colors, radius, spacing, typography } from '@/theme';
 
@@ -84,6 +84,18 @@ export function TextField({
           placeholderTextColor={onDark ? 'rgba(255, 255, 255, 0.62)' : colors.textTertiary}
           accessibilityLabel={label}
           secureTextEntry={secure}
+          // Goz ikonuyla sifre gorunur yapilinca alan siradan bir metin alanina
+          // donuyor ve klavye kelime onerisi sunup sifreyi "ogrenebiliyordu".
+          // Oneriye dokunmak birden cok karakteri tek hamlede ekledigi icin giris
+          // ekranindaki otomatik doldurma algisini da yanlis tetiklerdi.
+          // iOS autoCorrect/spellCheck'i dinliyor. Android dinlemiyor (olculdu:
+          // Gboard kapaliyken de oneri gosterdi); orada standart yol gorunur
+          // sifre klavye tipi - klavyeler onu sifre sayip oneri ve ogrenmeyi kapatir.
+          autoCorrect={secureToggle ? false : undefined}
+          spellCheck={secureToggle ? false : undefined}
+          keyboardType={
+            secureToggle && !hidden && Platform.OS === 'android' ? 'visible-password' : undefined
+          }
           onFocus={handleFocus}
           onBlur={handleBlur}
           {...rest}
