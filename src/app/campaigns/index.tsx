@@ -1,17 +1,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { AnimatedPressable, Card, EmptyState } from '@/components';
+import { AnimatedPressable, Card, EmptyState, ListCardSkeleton, Refresher } from '@/components';
 import { useCampaigns } from '@/queries/campaigns';
 import { colors, radius, spacing, typography } from '@/theme';
 import { formatDate } from '@/utils/format';
 
 export default function CampaignsScreen() {
   const router = useRouter();
-  const { data: campaigns, isLoading } = useCampaigns();
+  const { data: campaigns, isLoading, isRefetching, refetch } = useCampaigns();
 
   return (
     <View style={styles.root}>
@@ -32,8 +32,10 @@ export default function CampaignsScreen() {
       </SafeAreaView>
 
       {isLoading ? (
-        <View style={styles.emptyWrap}>
-          <ActivityIndicator color={colors.primary} />
+        <View style={styles.list}>
+          <ListCardSkeleton />
+          <ListCardSkeleton />
+          <ListCardSkeleton />
         </View>
       ) : !campaigns || campaigns.length === 0 ? (
         <View style={styles.emptyWrap}>
@@ -44,7 +46,10 @@ export default function CampaignsScreen() {
           />
         </View>
       ) : (
-        <Animated.ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+        <Animated.ScrollView
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<Refresher refreshing={isRefetching} onRefresh={refetch} />}>
           {campaigns.map((campaign, index) => (
             <Animated.View key={campaign.id} entering={FadeInDown.delay(index * 60).duration(280)}>
               <Card style={styles.card}>

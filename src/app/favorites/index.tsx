@@ -1,11 +1,18 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeOutLeft, LinearTransition } from 'react-native-reanimated';
 
-import { AnimatedPressable, Button, EmptyState, StationCard } from '@/components';
+import {
+  AnimatedPressable,
+  Button,
+  EmptyState,
+  ListCardSkeleton,
+  Refresher,
+  StationCard,
+} from '@/components';
 import { useFavoriteIds, useToggleFavorite } from '@/queries/favorites';
 import { useStations } from '@/queries/stations';
 import { haversineKm } from '@/services/routing';
@@ -16,8 +23,13 @@ import { colors, radius, spacing, typography } from '@/theme';
 /** Favori istasyonlar; secilen istasyon harita sekmesinde sheet icinde acilir. */
 export default function FavoritesScreen() {
   const router = useRouter();
-  const { data: stations, isLoading: stationsLoading } = useStations();
-  const { data: favoriteIds, isLoading: favoritesLoading } = useFavoriteIds();
+  const { data: stations, isLoading: stationsLoading, refetch: refetchStations } = useStations();
+  const {
+    data: favoriteIds,
+    isLoading: favoritesLoading,
+    isRefetching,
+    refetch: refetchFavorites,
+  } = useFavoriteIds();
   const toggleFavorite = useToggleFavorite();
   const userLocation = useLocationStore((s) => s.coords);
   const requestStationOnMap = useMapIntentStore((s) => s.openStation);
@@ -51,8 +63,10 @@ export default function FavoritesScreen() {
       </SafeAreaView>
 
       {isLoading ? (
-        <View style={styles.emptyWrap}>
-          <ActivityIndicator color={colors.primary} />
+        <View style={styles.list}>
+          <ListCardSkeleton />
+          <ListCardSkeleton />
+          <ListCardSkeleton />
         </View>
       ) : favorites.length === 0 ? (
         <View style={styles.emptyWrap}>
@@ -64,7 +78,16 @@ export default function FavoritesScreen() {
           />
         </View>
       ) : (
-        <Animated.ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+        <Animated.ScrollView
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <Refresher
+              refreshing={isRefetching}
+              // Liste iki sorgunun kesisimi: ikisi de tazelenmeli.
+              onRefresh={() => void Promise.all([refetchStations(), refetchFavorites()])}
+            />
+          }>
           {favorites.map((station, index) => (
             <Animated.View
               key={station.id}

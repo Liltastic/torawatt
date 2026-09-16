@@ -1,11 +1,21 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { AnimatedPressable, Button, Card, ConnectorBadge, EmptyState, FilterChip, PowerBadge } from '@/components';
+import {
+  AnimatedPressable,
+  Button,
+  Card,
+  ConnectorBadge,
+  DetailSkeleton,
+  EmptyState,
+  FilterChip,
+  PowerBadge,
+  SuccessOverlay,
+} from '@/components';
 import { useCreateReservation, useSetReservationStatus } from '@/queries/reservations';
 import { useStation } from '@/queries/stations';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
@@ -36,6 +46,7 @@ export default function NewReservationScreen() {
   const [startId, setStartId] = useState<string>('in15');
   const [duration, setDuration] = useState(45);
   const [error, setError] = useState<string>();
+  const [createdId, setCreatedId] = useState<string>();
 
   const { data: station, isLoading } = useStation(stationId);
   const connector = station?.connectors.find((c) => c.id === connectorId);
@@ -44,9 +55,7 @@ export default function NewReservationScreen() {
     return (
       <SafeAreaView style={styles.root}>
         <Header onClose={() => router.back()} />
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
+        <DetailSkeleton />
       </SafeAreaView>
     );
   }
@@ -85,11 +94,13 @@ export default function NewReservationScreen() {
             { id: reservation.id, status: 'CONFIRMED' },
             {
               onSuccess: () => {
-                haptics.success();
                 void scheduleReservationReminders(reservation);
               },
               onSettled: () => {
-                router.replace({ pathname: '/booking/[id]', params: { id: reservation.id } });
+                // Yonlendirmeyi onay ekrani bitirince yapiyoruz; basari
+                // titresimini de o caliyor. setStatus hata verse bile
+                // rezervasyon olusmus durumda, mesaj dogru kaliyor.
+                setCreatedId(reservation.id);
               },
             },
           );
@@ -174,6 +185,13 @@ export default function NewReservationScreen() {
       <SafeAreaView edges={['bottom']} style={[styles.actions, shadows.sheet]}>
         <Button label="Rezerve Et" loading={submitting} onPress={handleReserve} />
       </SafeAreaView>
+
+      {createdId && (
+        <SuccessOverlay
+          label="Rezervasyon oluşturuldu"
+          onDone={() => router.replace({ pathname: '/booking/[id]', params: { id: createdId } })}
+        />
+      )}
     </View>
   );
 }

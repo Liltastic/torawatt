@@ -14,6 +14,9 @@ import { useSessionStore } from '@/store/session';
 import { colors } from '@/theme';
 import { checkForImmediateUpdate } from '@/utils/autoUpdate';
 
+/** Alttan acilan, kendi kapatma carpisi olan akislar. */
+const MODAL_SCREEN = { presentation: 'modal' } as const;
+
 // Kok pencere arka planini boyar; aksi halde status bar / navigation bar
 // arkasinda sistemin varsayilan siyahi gorunuyor.
 void SystemUI.setBackgroundColorAsync(colors.background);
@@ -112,6 +115,15 @@ export default function RootLayout() {
             }}>
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(tabs)" />
+
+            {/* Bu ucu zaten kapatma carpisiyla tasarlanmisti ama normal bir
+                sayfa gibi yandan giriyordu. Modal olarak sunulunca "bir sey
+                ekliyorum / onayliyorum, isim bitince kapanacak" akisi
+                detay sayfalarindan ayrisiyor. Gecis animasyonunu her platform
+                kendi yerel bicimiyle yapiyor. */}
+            <Stack.Screen name="charger/[connectorId]" options={MODAL_SCREEN} />
+            <Stack.Screen name="booking/new" options={MODAL_SCREEN} />
+            <Stack.Screen name="vehicles/add" options={MODAL_SCREEN} />
           </Stack>
         </SafeAreaProvider>
       </QueryClientProvider>

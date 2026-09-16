@@ -55,6 +55,41 @@ export function StationCardSkeleton() {
   );
 }
 
+/**
+ * Kart listeleri (favoriler, araclar, kampanyalar, odeme yontemleri) icin
+ * yerini tutan kart. Kac tane basilacagini ekran belirler; uc tane ekranin
+ * ust yarisini doldurmaya yetiyor.
+ */
+export function ListCardSkeleton({ style }: { style?: StyleProp<ViewStyle> }) {
+  return (
+    <View style={[styles.listCard, style]}>
+      <Skeleton width="58%" height={17} />
+      <Skeleton width="38%" height={12} style={styles.gap} />
+      <View style={styles.badges}>
+        <Skeleton width={86} height={26} borderRadius={radius.badge} />
+        <Skeleton width={104} height={26} borderRadius={radius.badge} style={styles.badgeGap} />
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Detay ekranlari (istasyon, soket, rezervasyon, gecmis kaydi) icin: baslik
+ * blogu ve altinda kart yuksekliginde bloklar. Basligi ekranin kendisi zaten
+ * cizdigi icin bu yalnizca govdeyi doldurur.
+ */
+export function DetailSkeleton({ style }: { style?: StyleProp<ViewStyle> }) {
+  return (
+    <View style={[styles.detail, style]}>
+      <Skeleton width="66%" height={26} />
+      <Skeleton width="46%" height={14} style={styles.gap} />
+      <Skeleton height={132} borderRadius={radius.card} style={styles.block} />
+      <Skeleton height={96} borderRadius={radius.card} style={styles.blockGap} />
+      <Skeleton height={96} borderRadius={radius.card} style={styles.blockGap} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
@@ -66,4 +101,17 @@ const styles = StyleSheet.create({
   gap: { marginTop: spacing.sm },
   badges: { flexDirection: 'row', marginTop: spacing.md },
   badgeGap: { marginLeft: spacing.sm },
+
+  listCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+  },
+
+  detail: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg },
+  block: { marginTop: spacing.xxl },
+  blockGap: { marginTop: spacing.md },
 });

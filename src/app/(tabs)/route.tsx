@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { AnimatedPressable, Button, Card, EmptyState, TextField } from '@/components';
+import { AnimatedPressable, Button, Card, DetailSkeleton, EmptyState, TextField } from '@/components';
 import { StationMap, type MapRoute } from '@/map';
 import { useStations } from '@/queries/stations';
 import { useActiveVehicle, useVehicles } from '@/queries/vehicles';
@@ -55,9 +55,7 @@ export default function RouteScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>Rota</Text>
         </View>
-        <View style={styles.centered}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
+        <DetailSkeleton />
       </SafeAreaView>
     );
   }

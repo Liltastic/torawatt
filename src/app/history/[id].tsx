@@ -1,10 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, Card, EmptyState } from '@/components';
+import { Button, Card, DetailSkeleton, EmptyState } from '@/components';
 import { useChargingHistoryEntry } from '@/queries/history';
 import { shareInvoice } from '@/services/invoice';
 import { colors, radius, spacing, typography } from '@/theme';
@@ -27,9 +27,7 @@ export default function HistoryDetailScreen() {
     return (
       <SafeAreaView style={styles.root}>
         <Header onBack={() => router.back()} />
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
+        <DetailSkeleton />
       </SafeAreaView>
     );
   }

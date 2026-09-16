@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
   FadeInDown,
@@ -10,7 +10,15 @@ import Animated, {
   LinearTransition,
 } from 'react-native-reanimated';
 
-import { AnimatedPressable, Button, Card, EmptyState, FilterChip } from '@/components';
+import {
+  AnimatedPressable,
+  Button,
+  Card,
+  EmptyState,
+  FilterChip,
+  ListCardSkeleton,
+  Refresher,
+} from '@/components';
 import { demoCardCatalog } from '@/mocks/paymentCatalog';
 import {
   useAddPaymentMethod,
@@ -26,7 +34,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
 /** Odeme yontemleri (spec bolum 12) - demo. */
 export default function PaymentMethodsScreen() {
   const router = useRouter();
-  const { data: methods, isLoading } = usePaymentMethods();
+  const { data: methods, isLoading, isRefetching, refetch } = usePaymentMethods();
   const addPaymentMethod = useAddPaymentMethod();
   const remove = useRemovePaymentMethod();
   const setDefault = useSetDefaultPaymentMethod();
@@ -77,7 +85,10 @@ export default function PaymentMethodsScreen() {
         </View>
       </SafeAreaView>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<Refresher refreshing={isRefetching} onRefresh={refetch} />}>
         <View style={styles.notice}>
           <Ionicons name="construct-outline" size={18} color={colors.warning} />
           <Text style={styles.noticeText}>
@@ -89,7 +100,10 @@ export default function PaymentMethodsScreen() {
         </View>
 
         {isLoading ? (
-          <ActivityIndicator color={colors.primary} style={styles.empty} />
+          <>
+            <ListCardSkeleton />
+            <ListCardSkeleton />
+          </>
         ) : !methods || methods.length === 0 ? (
           <EmptyState
             icon="card-outline"

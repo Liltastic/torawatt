@@ -1,10 +1,20 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { AnimatedPressable, Button, Card, ConnectorBadge, EmptyState, PowerBadge } from '@/components';
+import {
+  AnimatedPressable,
+  Button,
+  Card,
+  ConnectorBadge,
+  DetailSkeleton,
+  EmptyState,
+  PowerBadge,
+  SuccessOverlay,
+} from '@/components';
 import { useDefaultPaymentMethod } from '@/queries/paymentMethods';
 import { useStation } from '@/queries/stations';
 import { useSessionStore } from '@/store/session';
@@ -20,6 +30,7 @@ export default function ChargeSummaryScreen() {
   }>();
   const router = useRouter();
   const startSession = useSessionStore((state) => state.start);
+  const [started, setStarted] = useState(false);
   const defaultMethod = useDefaultPaymentMethod();
 
   const { data: station, isLoading } = useStation(stationId);
@@ -29,9 +40,7 @@ export default function ChargeSummaryScreen() {
     return (
       <SafeAreaView style={styles.root}>
         <Header onClose={() => router.back()} />
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
+        <DetailSkeleton />
       </SafeAreaView>
     );
   }
@@ -52,8 +61,9 @@ export default function ChargeSummaryScreen() {
 
   const handleStart = () => {
     startSession(station, connector);
-    router.dismissAll();
-    router.replace('/charging');
+    // Oturum basladi; yonlendirmeyi onay ekrani bitirince yapiyoruz, yoksa
+    // kullanici isleminin gerceklestigini goremeden ekran degisiyordu.
+    setStarted(true);
   };
 
   return (
@@ -130,8 +140,18 @@ export default function ChargeSummaryScreen() {
       </ScrollView>
 
       <SafeAreaView edges={['bottom']} style={[styles.actions, shadows.sheet]}>
-        <Button label="Şarjı Başlat" onPress={handleStart} />
+        <Button label="Şarjı Başlat" onPress={handleStart} disabled={started} />
       </SafeAreaView>
+
+      {started && (
+        <SuccessOverlay
+          label="Şarj başlıyor"
+          onDone={() => {
+            router.dismissAll();
+            router.replace('/charging');
+          }}
+        />
+      )}
     </View>
   );
 }

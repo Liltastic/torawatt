@@ -1,11 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { AnimatedPressable, AvailabilityBadge, Button, Card, EmptyState } from '@/components';
+import { AnimatedPressable, AvailabilityBadge, Button, Card, DetailSkeleton, EmptyState } from '@/components';
 import { useReservations, useSetReservationStatus } from '@/queries/reservations';
 import { colors, radius, spacing, typography } from '@/theme';
 import {
@@ -47,9 +47,7 @@ export default function ReservationDetailScreen() {
     return (
       <SafeAreaView style={styles.root}>
         <Header onBack={() => router.back()} />
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
+        <DetailSkeleton />
       </SafeAreaView>
     );
   }

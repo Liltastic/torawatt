@@ -5,7 +5,14 @@ import { FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 
-import { AnimatedPressable, Card, EmptyState, FilterChip, StationCardSkeleton } from '@/components';
+import {
+  AnimatedPressable,
+  Card,
+  EmptyState,
+  FilterChip,
+  Refresher,
+  StationCardSkeleton,
+} from '@/components';
 import { useTabBarInset } from '@/utils/tabBar';
 import { useChargingHistory } from '@/queries/history';
 import { colors, radius, spacing, typography } from '@/theme';
@@ -38,7 +45,7 @@ const RANGES = [
 export default function HistoryScreen() {
   const router = useRouter();
   const tabBarInset = useTabBarInset();
-  const { data: items, isLoading } = useChargingHistory();
+  const { data: items, isLoading, isRefetching, refetch } = useChargingHistory();
   const [range, setRange] = useState<string>('all');
 
   const filtered = useMemo(() => {
@@ -111,6 +118,7 @@ export default function HistoryScreen() {
           )}
           contentContainerStyle={[styles.list, { paddingBottom: spacing.xxl + tabBarInset }]}
           showsVerticalScrollIndicator={false}
+          refreshControl={<Refresher refreshing={isRefetching} onRefresh={refetch} />}
         />
       )}
     </SafeAreaView>

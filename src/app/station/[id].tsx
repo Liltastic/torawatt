@@ -1,11 +1,19 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { AnimatedPressable, AvailabilityBadge, Button, Card, ConnectorCard, EmptyState } from '@/components';
+import {
+  AnimatedPressable,
+  AvailabilityBadge,
+  Button,
+  Card,
+  ConnectorCard,
+  DetailSkeleton,
+  EmptyState,
+} from '@/components';
 import { useIsFavorite, useToggleFavorite } from '@/queries/favorites';
 import { useStation } from '@/queries/stations';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
@@ -23,9 +31,7 @@ export default function StationDetailScreen() {
     return (
       <SafeAreaView style={styles.root}>
         <ScreenHeader onBack={() => router.back()} />
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
+        <DetailSkeleton />
       </SafeAreaView>
     );
   }
