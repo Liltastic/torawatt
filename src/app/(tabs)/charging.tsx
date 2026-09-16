@@ -17,6 +17,7 @@ import Animated, {
 import Svg, { Circle } from 'react-native-svg';
 
 import {
+  AnimatedNumber,
   AnimatedPressable,
   Button,
   Card,
@@ -57,6 +58,14 @@ function splitUnit(formatted: string): { value: string; unit: string } {
   if (i === -1) return { value: formatted, unit: '' };
   return { value: formatted.slice(0, i), unit: formatted.slice(i + 1) };
 }
+
+// AnimatedNumber bicimleyicileri: modul seviyesinde, yani kimlikleri sabit
+// (her render'da yeni fonksiyon verilseydi akis her tikte bastan baslardi).
+const formatWhole = (value: number) => String(Math.round(value));
+const formatEnergyValue = (kwh: number) => splitUnit(formatEnergy(kwh)).value;
+const formatPowerValue = (kw: number) => splitUnit(formatPower(kw)).value;
+const formatRangeGain = (km: number) => `+${Math.round(km)}`;
+const formatCost = (value: number) => formatPrice(value);
 
 export default function ChargingScreen() {
   const router = useRouter();
@@ -156,7 +165,8 @@ export default function ChargingScreen() {
   };
 
   const consumption = activeVehicle?.averageConsumptionKwhPer100Km ?? 0;
-  const rangeKm = consumption > 0 ? Math.round((session.energyKwh / consumption) * 100) : null;
+  // Yuvarlanmamis: yuvarlamayi bicimleyici yapiyor ki sayi akarken ara degerleri gostersin.
+  const rangeKm = consumption > 0 ? (session.energyKwh / consumption) * 100 : null;
 
   const energy = splitUnit(formatEnergy(session.energyKwh));
   const power = splitUnit(formatPower(session.powerKw));
@@ -221,7 +231,11 @@ export default function ChargingScreen() {
               {mode === 'charging' && (
                 <View style={styles.heroPower}>
                   <Ionicons name="flash" size={14} color={colors.primaryOnDark} />
-                  <Text style={[styles.heroPowerValue, TABULAR]}>{power.value}</Text>
+                  <AnimatedNumber
+                    value={session.powerKw}
+                    format={formatPowerValue}
+                    style={[styles.heroPowerValue, TABULAR]}
+                  />
                   <Text style={styles.heroPowerUnit}>{power.unit}</Text>
                 </View>
               )}
@@ -237,7 +251,11 @@ export default function ChargingScreen() {
                 ) : (
                   <>
                     <View style={styles.percentRow}>
-                      <Text style={[styles.percent, TABULAR]}>{battery}</Text>
+                      <AnimatedNumber
+                        value={session.batteryPercent ?? 0}
+                        format={formatWhole}
+                        style={[styles.percent, TABULAR]}
+                      />
                       <Text style={styles.percentSign}>%</Text>
                     </View>
                     <Text style={styles.ringCaption}>{mode === 'completed' ? 'DOLDU' : 'BATARYA'}</Text>
@@ -267,14 +285,32 @@ export default function ChargingScreen() {
         {/* Canli metrikler */}
         <Animated.View entering={FadeInDown.delay(160).duration(380)}>
           <Card padded={false} style={styles.metricsCard}>
-            <Metric icon="battery-charging-outline" label="Enerji" value={energy.value} unit={energy.unit} />
+            <Metric
+              icon="battery-charging-outline"
+              label="Enerji"
+              value={session.energyKwh}
+              format={formatEnergyValue}
+              unit={energy.unit}
+            />
             <View style={styles.metricDivider} />
-            <Metric icon="wallet-outline" label="Tutar" value={formatPrice(session.cost)} accent />
+            <Metric icon="wallet-outline" label="Tutar" value={session.cost} format={formatCost} accent />
             <View style={styles.metricDivider} />
             {rangeKm != null ? (
-              <Metric icon="navigate-outline" label="Menzil" value={`+${rangeKm}`} unit="km" />
+              <Metric
+                icon="navigate-outline"
+                label="Menzil"
+                value={rangeKm}
+                format={formatRangeGain}
+                unit="km"
+              />
             ) : (
-              <Metric icon="speedometer-outline" label="Güç" value={power.value} unit={power.unit} />
+              <Metric
+                icon="speedometer-outline"
+                label="Güç"
+                value={session.powerKw}
+                format={formatPowerValue}
+                unit={power.unit}
+              />
             )}
           </Card>
         </Animated.View>
@@ -415,12 +451,14 @@ function Metric({
   icon,
   label,
   value,
+  format,
   unit,
   accent = false,
 }: {
   icon: React.ComponentProps<typeof Ionicons>['name'];
   label: string;
-  value: string;
+  value: number;
+  format: (value: number) => string;
   unit?: string;
   accent?: boolean;
 }) {
@@ -431,9 +469,12 @@ function Metric({
       </View>
       <Text style={styles.metricLabel}>{label}</Text>
       <View style={styles.metricValueRow}>
-        <Text style={[styles.metricValue, accent && styles.metricValueAccent, TABULAR]} numberOfLines={1}>
-          {value}
-        </Text>
+        <AnimatedNumber
+          value={value}
+          format={format}
+          style={[styles.metricValue, accent && styles.metricValueAccent, TABULAR]}
+          numberOfLines={1}
+        />
         {!!unit && <Text style={styles.metricUnit}>{unit}</Text>}
       </View>
     </View>

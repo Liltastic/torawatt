@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Keyboard, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 
+import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { AnimatedPressable } from '@/components/AnimatedPressable';
 import { ProgressRing } from '@/components/ProgressRing';
 import { useSessionStore } from '@/store/session';
@@ -25,6 +26,8 @@ const TABULAR = { fontVariant: ['tabular-nums' as const] };
  * degerler zaten dokununca acilan Sarj ekraninda buyuk puntoyla var.
  */
 const MAX_FONT_SCALE = 1.2;
+
+const formatPercentLabel = (value: number) => `%${Math.round(value)}`;
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -134,7 +137,11 @@ export function ChargingMiniBar() {
           <Text style={styles.title} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
             {config.title}
             <Text style={styles.separator}> · </Text>
-            <Text style={[styles.percent, { color: config.tone }, TABULAR]}>%{battery}</Text>
+            <AnimatedNumber
+              value={battery}
+              format={formatPercentLabel}
+              style={[styles.percent, { color: config.tone }, TABULAR]}
+            />
           </Text>
           <Text style={styles.subtitle} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
             {stationName}

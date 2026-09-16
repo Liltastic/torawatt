@@ -1,3 +1,4 @@
+export { AnimatedNumber } from './AnimatedNumber';
 export { AnimatedPressable } from './AnimatedPressable';
 export { AvailabilityBadge, ConnectorBadge, PowerBadge } from './Badges';
 export { Button } from './Button';

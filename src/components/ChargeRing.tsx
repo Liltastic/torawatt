@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -7,6 +7,7 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withDelay,
   withRepeat,
   withSequence,
   withTiming,
@@ -31,6 +32,12 @@ interface ChargeRingProps {
 
 /** Bağlanırken dönen yay, halkanın bu kadarını kaplar. */
 const STARTING_ARC = 0.22;
+
+/** Sarj bittiginde halkadan disari yayilan dalganin suresi ve ikinci dalganin gecikmesi. */
+const FINISH_WAVE_MS = 1100;
+const FINISH_WAVE_GAP_MS = 220;
+/** Dalga halkanin bu katina kadar buyur; kartin kenarinda kirpilmasi bilincli. */
+const FINISH_WAVE_SCALE = 0.45;
 
 /**
  * Koyu zemin icin sarj halkasi: turkuazdan yesile gradyanli yay, arkasinda
@@ -89,6 +96,44 @@ export function ChargeRing({ progress, mode, size = 248, strokeWidth = 16, child
     }
   }, [mode, reduceMotion, glow]);
 
+  // Bitis ani: sarj tam bu ekranda gozun onunde bittiyse halkadan iki dalga
+  // yayilir, ortadaki yazi kisaca buyuyup yerine oturur. Ekran zaten
+  // tamamlanmis bir oturumla acildiysa oynamaz - kutlama anin kendisine ait.
+  const previousMode = useRef(mode);
+  const waveA = useSharedValue(0);
+  const waveB = useSharedValue(0);
+  const pop = useSharedValue(1);
+
+  useEffect(() => {
+    const finishedNow = previousMode.current !== 'completed' && mode === 'completed';
+    previousMode.current = mode;
+    if (!finishedNow || reduceMotion) return;
+
+    const wave = { duration: FINISH_WAVE_MS, easing: Easing.out(Easing.cubic) };
+    waveA.set(withSequence(withTiming(0, { duration: 0 }), withTiming(1, wave)));
+    waveB.set(
+      withSequence(withTiming(0, { duration: 0 }), withDelay(FINISH_WAVE_GAP_MS, withTiming(1, wave))),
+    );
+    pop.set(
+      withSequence(
+        withTiming(1.08, { duration: 180, easing: Easing.out(Easing.quad) }),
+        withTiming(1, { duration: 360, easing: Easing.inOut(Easing.quad) }),
+      ),
+    );
+  }, [mode, reduceMotion, waveA, waveB, pop]);
+
+  // 0 = beklemede (gorunmez), 1 = sonuna ulasti (yine gorunmez): yalnizca
+  // aradaki yolculukta, buyudukce solarak gorunur.
+  const waveAStyle = useAnimatedStyle(() => ({
+    opacity: waveA.value > 0 && waveA.value < 1 ? 0.6 * (1 - waveA.value) : 0,
+    transform: [{ scale: 0.92 + waveA.value * FINISH_WAVE_SCALE }],
+  }));
+  const waveBStyle = useAnimatedStyle(() => ({
+    opacity: waveB.value > 0 && waveB.value < 1 ? 0.45 * (1 - waveB.value) : 0,
+    transform: [{ scale: 0.92 + waveB.value * FINISH_WAVE_SCALE }],
+  }));
+  const popStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }));
+
   const arcProps = useAnimatedProps(() => ({
     strokeDashoffset: circumference * (1 - animatedProgress.value / 100),
   }));
@@ -112,6 +157,16 @@ export function ChargeRing({ progress, mode, size = 248, strokeWidth = 16, child
 
   return (
     <View style={{ width: size, height: size }}>
+      {/* Bitis dalgalari: halkanin arkasinda, yalnizca tamamlanma aninda gorunur. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.wave, { borderRadius: size / 2 }, waveAStyle]}
+      />
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.wave, { borderRadius: size / 2 }, waveBStyle]}
+      />
+
       {/* Hale: yayin hemen arkasinda halka biciminde, merkezde ve disarida saydam. */}
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, glowStyle]}>
         <Svg width={size} height={size}>
@@ -179,14 +234,23 @@ export function ChargeRing({ progress, mode, size = 248, strokeWidth = 16, child
         </Svg>
       </Animated.View>
 
-      <View style={styles.center} pointerEvents="none">
+      <Animated.View style={[styles.center, popStyle]} pointerEvents="none">
         {children}
-      </View>
+      </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wave: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderWidth: 2,
+    borderColor: colors.successOnDark,
+  },
   center: {
     position: 'absolute',
     top: 0,
