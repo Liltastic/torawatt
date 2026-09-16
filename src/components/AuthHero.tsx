@@ -38,7 +38,19 @@ const FADE_H = 96;
 const HEADLINE_BOTTOM = AUTH_HERO_SMALL ? 96 : 112;
 const LINE_W = 56;
 
-const scrim = (alpha: number) => `rgba(11, 59, 53, ${alpha})`;
+/**
+ * Turkuaz tonlama (%16) ve baslik perdesi (heroDark, ust %58 -> alt %94) TEK
+ * gradyanda birlesik. Ayri bir tonlama katmani gorsel olarak ayni sonucu
+ * veriyordu ama fotografin uzerinde her karede beste edilen bir tam ekran
+ * katman daha demekti; duraklar iki katmanin alfa bindirmesinin cozumu.
+ */
+const SCRIM_COLORS = [
+  'rgba(11, 68, 61, 0.647)',
+  'rgba(12, 143, 130, 0.16)',
+  'rgba(11, 69, 62, 0.622)',
+  'rgba(11, 60, 54, 0.95)',
+] as const;
+const SCRIM_LOCATIONS = [0, 0.24, 0.56, 1] as const;
 
 /**
  * Klavye modeli: 0 = hero acik, 1 = hero daraltilmis. iOS'ta keyboardWill*
@@ -119,32 +131,36 @@ export function AuthHero({
   const reduceMotion = useReducedMotion();
   const compactHeight = insets.top + spacing.sm + TOP_ROW_H + spacing.md;
 
-  // Acilista hafif "Ken Burns" yakinlasmasi ve dolan enerji cizgisi.
-  const kenBurns = useSharedValue(reduceMotion ? 1 : 1.08);
+  // Acilista dolan enerji cizgisi. Fotografin "Ken Burns" yakinlasmasi
+  // kaldirildi: overflow:hidden icindeki tam ekran bir dokuyu 900 ms boyunca
+  // her karede yeniden orneklemek, ekranin en pahali isiydi.
   const line = useSharedValue(reduceMotion ? 1 : 0);
   useEffect(() => {
     if (reduceMotion) return;
-    kenBurns.set(withTiming(1, { duration: 900, easing: Easing.out(Easing.cubic) }));
     line.set(withDelay(320, withTiming(1, { duration: 620, easing: Easing.out(Easing.cubic) })));
-  }, [kenBurns, line, reduceMotion]);
+  }, [line, reduceMotion]);
 
   const containerStyle = useAnimatedStyle(() => ({
     height: interpolate(kb.value, [0, 1], [HERO_H, compactHeight]),
   }));
+  // Daraltilmis halde fotograf sonup altindaki heroDark zemin one cikiyor.
+  // Ayni etkiyi ustune serilen bir ortu katmaniyla yapmak, surekli beste
+  // edilen bir tam ekran katman daha demekti.
   const photoStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: kenBurns.value * interpolate(kb.value, [0, 1], [1, 1.12]) }],
+    opacity: interpolate(kb.value, [0.4, 1], [1, 0.22], Extrapolation.CLAMP),
   }));
   const pageFadeStyle = useAnimatedStyle(() => ({
     opacity: interpolate(kb.value, [0.6, 1], [1, 0], Extrapolation.CLAMP),
-  }));
-  const compactStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(kb.value, [0.4, 1], [0, 0.78], Extrapolation.CLAMP),
   }));
   const headlineStyle = useAnimatedStyle(() => ({
     opacity: interpolate(kb.value, [0, 0.45], [1, 0], Extrapolation.CLAMP),
     transform: [{ translateY: interpolate(kb.value, [0, 1], [0, -16]) }],
   }));
-  const lineStyle = useAnimatedStyle(() => ({ width: line.value * LINE_W }));
+  // width yerine translateX: genislik animasyonu her karede yerlesim hesabi
+  // tetikliyordu, bu ise GPU'da kalan saf donusum.
+  const lineStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: (line.value - 1) * LINE_W }],
+  }));
 
   return (
     <Animated.View style={[styles.container, containerStyle]}>
@@ -161,12 +177,11 @@ export function AuthHero({
         />
       </Animated.View>
 
-      {/* Fotografi paletin turkuazina ceker; ardindan baslik yatagini koyulastiran perde. */}
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.tint]} />
+      {/* Tonlama + baslik perdesi tek gecis (bkz. SCRIM_COLORS). */}
       <LinearGradient
         pointerEvents="none"
-        colors={[scrim(0.58), scrim(0), scrim(0.55), scrim(0.94)]}
-        locations={[0, 0.24, 0.56, 1]}
+        colors={SCRIM_COLORS}
+        locations={SCRIM_LOCATIONS}
         style={StyleSheet.absoluteFill}
       />
 
@@ -174,9 +189,6 @@ export function AuthHero({
       <Animated.View pointerEvents="none" style={[styles.pageFade, pageFadeStyle]}>
         <LinearGradient colors={['rgba(242, 251, 246, 0)', colors.background]} style={StyleSheet.absoluteFill} />
       </Animated.View>
-
-      {/* Daraltilmis halde fotograf dilimi degil, duz koyu bir bant gorunsun. */}
-      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.compact, compactStyle]} />
 
       <Animated.View entering={FadeIn.duration(300)} style={[styles.topRow, { top: insets.top + spacing.sm }]}>
         <AnimatedPressable
@@ -230,9 +242,7 @@ export function AuthHero({
 
 const styles = StyleSheet.create({
   container: { overflow: 'hidden', backgroundColor: colors.heroDark },
-  tint: { backgroundColor: 'rgba(12, 143, 130, 0.16)' },
   pageFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: FADE_H },
-  compact: { backgroundColor: colors.heroDark },
 
   topRow: {
     position: 'absolute',
@@ -271,7 +281,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.22)',
     overflow: 'hidden',
   },
-  lineFill: { height: 3 },
+  lineFill: { width: LINE_W, height: 3 },
   lineGradient: { flex: 1, borderRadius: 2 },
   subtitle: { ...typography.body, color: 'rgba(255, 255, 255, 0.82)', marginTop: spacing.sm, maxWidth: 320 },
 });

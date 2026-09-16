@@ -4,8 +4,6 @@ import { StatusBar } from 'expo-status-bar';
 import { useRef, useState } from 'react';
 import {
   Keyboard,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -70,84 +68,88 @@ export default function LoginScreen() {
         kb={kb}
       />
 
-      {/* Hero KAV'in disinda: klavye yalnizca formu iter, hero kendi daralir. */}
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView
-          style={styles.flex}
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          showsVerticalScrollIndicator={false}
-          contentInsetAdjustmentBehavior="never"
-          onScrollBeginDrag={onScrollBeginDrag}>
-          {AUTH_HERO_SMALL && <Text style={styles.smallSubtitle}>{SUBTITLE}</Text>}
+      {/* KeyboardAvoidingView BILEREK yok: iOS'ta alt dolgusunu JavaScript
+          tarafinda animasyonluyor, yani klavye her acilip kapandiginda kare
+          basina bir yerlesim hesabi daha cikiyordu - hero'nun kendi yukseklik
+          animasyonuyla ust uste. automaticallyAdjustKeyboardInsets ayni isi
+          UIScrollView'in icinde yapiyor. Android'de zaten adjustResize
+          pencereyi kucultuyor, bu prop orada yok sayiliyor. */}
+      <ScrollView
+        style={styles.flex}
+        automaticallyAdjustKeyboardInsets
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="never"
+        onScrollBeginDrag={onScrollBeginDrag}>
+        {AUTH_HERO_SMALL && <Text style={styles.smallSubtitle}>{SUBTITLE}</Text>}
 
-          <Animated.View entering={FadeInUp.delay(200).duration(380)}>
-            <TextField
-              label="E-posta"
-              leadingIcon="mail-outline"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              autoComplete="email"
-              textContentType="emailAddress"
-              keyboardType="email-address"
-              placeholder="ornek@eposta.com"
-              returnKeyType="next"
-              submitBehavior="submit"
-              onSubmitEditing={() => passwordRef.current?.focus()}
-              onFocus={onFieldFocus}
-            />
-            <TextField
-              ref={passwordRef}
-              label="Şifre"
-              leadingIcon="lock-closed-outline"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              secureToggle
-              autoCapitalize="none"
-              autoComplete="password"
-              textContentType="password"
-              placeholder="••••••••"
-              returnKeyType="go"
-              onSubmitEditing={onSubmit}
-              onFocus={onFieldFocus}
-            />
+        <Animated.View entering={FadeInUp.delay(200).duration(380)}>
+          <TextField
+            label="E-posta"
+            leadingIcon="mail-outline"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            autoComplete="email"
+            textContentType="emailAddress"
+            keyboardType="email-address"
+            placeholder="ornek@eposta.com"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => passwordRef.current?.focus()}
+            onFocus={onFieldFocus}
+          />
+          <TextField
+            ref={passwordRef}
+            label="Şifre"
+            leadingIcon="lock-closed-outline"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            secureToggle
+            autoCapitalize="none"
+            autoComplete="password"
+            textContentType="password"
+            placeholder="••••••••"
+            returnKeyType="go"
+            onSubmitEditing={onSubmit}
+            onFocus={onFieldFocus}
+          />
+        </Animated.View>
+
+        {!!error && (
+          <Animated.View
+            entering={FadeInDown.duration(220)}
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+            style={styles.errorRow}>
+            <Ionicons name="alert-circle-outline" size={16} color={colors.danger} style={styles.errorIcon} />
+            <Text style={styles.errorText}>{error}</Text>
           </Animated.View>
+        )}
 
-          {!!error && (
-            <Animated.View
-              entering={FadeInDown.duration(220)}
-              accessibilityRole="alert"
-              accessibilityLiveRegion="polite"
-              style={styles.errorRow}>
-              <Ionicons name="alert-circle-outline" size={16} color={colors.danger} style={styles.errorIcon} />
-              <Text style={styles.errorText}>{error}</Text>
-            </Animated.View>
-          )}
+        <Animated.View entering={FadeInUp.delay(300).duration(380)}>
+          <Button
+            label="Giriş yap"
+            onPress={onSubmit}
+            loading={submitting}
+            style={styles.submit}
+            trailingIcon={<Ionicons name="arrow-forward" size={18} color={colors.white} />}
+          />
 
-          <Animated.View entering={FadeInUp.delay(300).duration(380)}>
-            <Button
-              label="Giriş yap"
-              onPress={onSubmit}
-              loading={submitting}
-              style={styles.submit}
-              trailingIcon={<Ionicons name="arrow-forward" size={18} color={colors.white} />}
-            />
-
-            <Pressable
-              accessibilityRole="button"
-              hitSlop={8}
-              onPress={() => router.replace('/register')}
-              style={styles.switchLink}>
-              <Text style={styles.switchText}>
-                Hesabın yok mu? <Text style={styles.switchTextStrong}>Kayıt ol</Text>
-              </Text>
-            </Pressable>
-          </Animated.View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() => router.replace('/register')}
+            style={styles.switchLink}>
+            <Text style={styles.switchText}>
+              Hesabın yok mu? <Text style={styles.switchTextStrong}>Kayıt ol</Text>
+            </Text>
+          </Pressable>
+        </Animated.View>
+      </ScrollView>
     </View>
   );
 }
