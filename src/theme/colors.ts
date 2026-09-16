@@ -29,8 +29,12 @@ export const colors = {
 
   success: '#16C784',
   successSoft: '#E1FAEE',
+  /** KOYU zeminde (sarj karti, mini sarj cubugu) "tamamlandi" vurgusu. */
+  successOnDark: '#7BF0B8',
   warning: '#FF8A3D',
   warningSoft: '#FFECDD',
+  /** KOYU zeminde "baglaniyor" vurgusu. */
+  warningOnDark: '#FFC58F',
   danger: '#FF4D6D',
   dangerSoft: '#FFE2E9',
   /** KOYU zeminde hata metni; danger perde uzerinde 3.9:1'de kaliyor, bu 5.8:1. */

@@ -13,7 +13,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { AnimatedPressable, Button, Card, DetailSkeleton, EmptyState, TextField } from '@/components';
+import {
+  AnimatedPressable,
+  Button,
+  Card,
+  ChargingMiniBar,
+  DetailSkeleton,
+  EmptyState,
+  TextField,
+  useChargingMiniBarInset,
+} from '@/components';
 import { StationMap, type MapRoute } from '@/map';
 import { useStations } from '@/queries/stations';
 import { useActiveVehicle, useVehicles } from '@/queries/vehicles';
@@ -31,6 +40,7 @@ export default function RouteScreen() {
   const router = useRouter();
   // iOS sekme cubugu icerigin uzerine biniyor (bkz. utils/tabBar).
   const tabBarInset = useTabBarInset();
+  const miniBarInset = useChargingMiniBarInset();
   const { isLoading: vehiclesLoading } = useVehicles();
   const vehicle = useActiveVehicle();
   const { data: stations } = useStations();
@@ -56,6 +66,7 @@ export default function RouteScreen() {
           <Text style={styles.title}>Rota</Text>
         </View>
         <DetailSkeleton />
+        <ChargingMiniBar />
       </SafeAreaView>
     );
   }
@@ -74,6 +85,7 @@ export default function RouteScreen() {
             action={<Button label="Araç ekle" onPress={() => router.push('/vehicles/add')} />}
           />
         </View>
+        <ChargingMiniBar />
       </SafeAreaView>
     );
   }
@@ -117,7 +129,10 @@ export default function RouteScreen() {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
-          contentContainerStyle={[styles.content, { paddingBottom: spacing.huge + tabBarInset }]}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: spacing.huge + tabBarInset + miniBarInset },
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           <Text style={styles.title}>Rota</Text>
@@ -157,6 +172,8 @@ export default function RouteScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ChargingMiniBar />
     </SafeAreaView>
   );
 }

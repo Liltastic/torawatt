@@ -8,10 +8,12 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 import {
   AnimatedPressable,
   Card,
+  ChargingMiniBar,
   EmptyState,
   FilterChip,
   Refresher,
   StationCardSkeleton,
+  useChargingMiniBarInset,
 } from '@/components';
 import { useTabBarInset } from '@/utils/tabBar';
 import { useChargingHistory } from '@/queries/history';
@@ -45,6 +47,7 @@ const RANGES = [
 export default function HistoryScreen() {
   const router = useRouter();
   const tabBarInset = useTabBarInset();
+  const miniBarInset = useChargingMiniBarInset();
   const { data: items, isLoading, isRefetching, refetch } = useChargingHistory();
   const [range, setRange] = useState<string>('all');
 
@@ -116,11 +119,16 @@ export default function HistoryScreen() {
               onPress={() => router.push({ pathname: '/history/[id]', params: { id: item.id } })}
             />
           )}
-          contentContainerStyle={[styles.list, { paddingBottom: spacing.xxl + tabBarInset }]}
+          contentContainerStyle={[
+            styles.list,
+            { paddingBottom: spacing.xxl + tabBarInset + miniBarInset },
+          ]}
           showsVerticalScrollIndicator={false}
           refreshControl={<Refresher refreshing={isRefetching} onRefresh={refetch} />}
         />
       )}
+
+      <ChargingMiniBar />
     </SafeAreaView>
   );
 }

@@ -107,7 +107,7 @@ export function ChargeRing({ progress, mode, size = 248, strokeWidth = 16, child
 
   const completed = mode === 'completed';
   const gradientFrom = completed ? colors.success : colors.primary;
-  const gradientTo = completed ? '#7BF0B8' : colors.success;
+  const gradientTo = completed ? colors.successOnDark : colors.success;
   const showKnob = mode === 'charging' && clamped > 1;
 
   return (

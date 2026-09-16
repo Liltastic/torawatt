@@ -387,9 +387,9 @@ function LiveDot({ mode }: { mode: ChargeRingMode }) {
 
 function HeroStatus({ mode }: { mode: ChargeRingMode }) {
   const config = {
-    starting: { icon: 'sync-outline' as const, label: 'Bağlanıyor', tone: '#FFC58F' },
+    starting: { icon: 'sync-outline' as const, label: 'Bağlanıyor', tone: colors.warningOnDark },
     charging: { icon: 'flash' as const, label: 'Şarj oluyor', tone: colors.primaryOnDark },
-    completed: { icon: 'checkmark-circle' as const, label: 'Tamamlandı', tone: '#7BF0B8' },
+    completed: { icon: 'checkmark-circle' as const, label: 'Tamamlandı', tone: colors.successOnDark },
   }[mode];
 
   return (
@@ -602,7 +602,7 @@ const styles = StyleSheet.create({
   heroDivider: { width: 1, backgroundColor: 'rgba(255, 255, 255, 0.10)' },
   heroStatLabel: { ...typography.caption, color: ON_DARK_MUTED },
   heroStatValue: { ...typography.h3, fontSize: 20, lineHeight: 26, color: colors.white, marginTop: 4 },
-  heroStatValueAccent: { color: '#7BF0B8' },
+  heroStatValueAccent: { color: colors.successOnDark },
 
   // --- Metrikler
   metricsCard: {

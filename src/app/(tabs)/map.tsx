@@ -34,6 +34,7 @@ import {
   AnimatedPressable,
   AvailabilityBadge,
   Button,
+  ChargingMiniBar,
   ConnectorCard,
   EmptyState,
   FilterChip,
@@ -42,6 +43,7 @@ import {
   SegmentedControl,
   StationCard,
   StationCardSkeleton,
+  useChargingMiniBarInset,
 } from '@/components';
 import { BASEMAPS, StationMap, type StationMapHandle } from '@/map';
 import { useIsFavorite, useToggleFavorite } from '@/queries/favorites';
@@ -111,8 +113,18 @@ const MAP_FAB_STACK_HEIGHT = MAP_FAB_SIZE * 2 + spacing.sm;
 function DetailFooter({
   animatedFooterPosition,
   bottomInset,
+  reservedBottom,
   children,
-}: BottomSheetFooterProps & { bottomInset: number; children: React.ReactNode }) {
+}: BottomSheetFooterProps & {
+  bottomInset: number;
+  /**
+   * Butonlarin altinda bos birakilan alan: sarj surerken mini cubuk tam
+   * buraya oturuyor. Footer'i yukari kaydirmak yerine kendi zeminini uzatiyoruz;
+   * boylece butonlarla mini cubuk arasinda kayan liste gorunmuyor.
+   */
+  reservedBottom: number;
+  children: React.ReactNode;
+}) {
   const { animatedIndex } = useBottomSheet();
   const [interactive, setInteractive] = useState(true);
 
@@ -136,7 +148,11 @@ function DetailFooter({
     <BottomSheetFooter animatedFooterPosition={animatedFooterPosition} bottomInset={bottomInset}>
       <Animated.View
         pointerEvents={interactive ? 'auto' : 'none'}
-        style={[styles.detailFooter, animatedStyle]}>
+        style={[
+          styles.detailFooter,
+          reservedBottom > 0 && { paddingBottom: spacing.md + reservedBottom },
+          animatedStyle,
+        ]}>
         {children}
       </Animated.View>
     </BottomSheetFooter>
@@ -191,19 +207,25 @@ export default function MapScreen() {
   // cubugun altindan kayar, listenin son ogesi ise bu kadar yukarida bitmeli
   // (bkz. utils/tabBar). Android'de 0.
   const tabBarInset = useTabBarInset();
-  const listContentStyle = { ...styles.list, paddingBottom: spacing.xl + tabBarInset };
+  // Sarj surerken sekme cubugunun ustunde mini sarj cubugu duruyor; o da
+  // sheet'in uzerine biniyor (bkz. components/ChargingMiniBar).
+  const miniBarInset = useChargingMiniBarInset();
+  const bottomChrome = tabBarInset + miniBarInset;
+  const listContentStyle = { ...styles.list, paddingBottom: spacing.xl + bottomChrome };
 
   // Yuzdelik snap noktalari cubugun arkasinda kalan ~83pt'yi de sayiyordu;
   // peek konumunda cubugun ustunde neredeyse bir sey kalmiyordu. Oranlari
   // cubugun ustundeki kullanilabilir yukseklige uygulayip payi geri ekliyoruz:
-  // gorunen kisim tasarimdaki oran, govde yine cubugun altina uzaniyor.
-  // Kapsayici olculene kadar (ve Android'de her zaman) yuzdeler aynen kalir.
+  // gorunen kisim tasarimdaki oran, govde yine cubugun altina uzaniyor. Mini
+  // sarj cubugu da ayni sekilde sayiliyor; yoksa peek'teki baslik onun altinda
+  // kaliyordu. Kapsayici olculene kadar (ve Android'de, sarj yokken) yuzdeler
+  // aynen kalir.
   const [sheetContainerHeight, setSheetContainerHeight] = useState(0);
   const sheetSnapPoints = useMemo<(string | number)[]>(() => {
-    if (tabBarInset <= 0 || sheetContainerHeight <= 0) return SHEET_SNAP_POINTS;
-    const usable = sheetContainerHeight - tabBarInset;
-    return SHEET_SNAP_FRACTIONS.map((f) => Math.round(usable * f + tabBarInset));
-  }, [tabBarInset, sheetContainerHeight]);
+    if (bottomChrome <= 0 || sheetContainerHeight <= 0) return SHEET_SNAP_POINTS;
+    const usable = sheetContainerHeight - bottomChrome;
+    return SHEET_SNAP_FRACTIONS.map((f) => Math.round(usable * f + bottomChrome));
+  }, [bottomChrome, sheetContainerHeight]);
 
   const basemap = useMapStyleStore((s) => s.basemap);
   const toggleBasemap = useMapStyleStore((s) => s.toggle);
@@ -346,7 +368,7 @@ export default function MapScreen() {
       // Sheet ekranin dibine kadar iniyor; iOS'ta cam cubuk yer kaplamayip
       // icerigin ustune bindigi icin butonlari o kadar yukari aliyoruz.
       return (
-        <DetailFooter {...footerProps} bottomInset={tabBarInset}>
+        <DetailFooter {...footerProps} bottomInset={tabBarInset} reservedBottom={miniBarInset}>
           <Button
             label="Rezerve Et"
             variant="secondary"
@@ -375,7 +397,7 @@ export default function MapScreen() {
         </DetailFooter>
       );
     },
-    [selectedStation, selectedConnectorId, router, tabBarInset],
+    [selectedStation, selectedConnectorId, router, tabBarInset, miniBarInset],
   );
 
   return (
@@ -594,6 +616,9 @@ export default function MapScreen() {
           </>
         )}
       </BottomSheet>
+
+      {/* Sheet'ten SONRA: ikisi de mutlak konumlu, cubuk ustte cizilmeli. */}
+      <ChargingMiniBar />
     </View>
   );
 }

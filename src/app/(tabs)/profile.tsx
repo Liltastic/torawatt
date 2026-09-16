@@ -6,7 +6,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { useMemo } from 'react';
 
-import { AnimatedPressable, Card } from '@/components';
+import { AnimatedPressable, Card, ChargingMiniBar, useChargingMiniBarInset } from '@/components';
 import { useChargingHistory } from '@/queries/history';
 import { useActiveVehicle } from '@/queries/vehicles';
 import { useAuthStore } from '@/store/auth';
@@ -34,6 +34,7 @@ export default function ProfileScreen() {
   const { data: history } = useChargingHistory();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const miniBarInset = useChargingMiniBarInset();
 
   const onLogout = async () => {
     await logout();
@@ -54,7 +55,9 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: spacing.xxl + miniBarInset }]}
+        showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Profil</Text>
         {!!user && (
           <Text style={styles.accountEmail} numberOfLines={1}>
@@ -166,6 +169,8 @@ export default function ProfileScreen() {
 
         <Text style={styles.version}>TORA WATT · {getRunningUpdateLabel()}</Text>
       </ScrollView>
+
+      <ChargingMiniBar />
     </SafeAreaView>
   );
 }
