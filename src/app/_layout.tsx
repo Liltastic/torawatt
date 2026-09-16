@@ -1,3 +1,9 @@
+import {
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold,
+  useFonts,
+} from '@expo-google-fonts/plus-jakarta-sans';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack, usePathname, type ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -101,6 +107,16 @@ export default function RootLayout() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Marka yazi tipi (bkz. theme/layout fontFamilies). Yuklenene kadar acilis
+  // ekrani bekler ki basliklar once sistem fontuyla cizilip sonra degismesin.
+  // Yuklenemezse (bozuk paket, dosya hatasi) uygulama sistem fontuyla acilir.
+  const [fontsLoaded, fontError] = useFonts({
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
+  });
+  const fontsReady = fontsLoaded || !!fontError;
+
   const authStatus = useAuthStore((s) => s.status);
   const hydrateAuth = useAuthStore((s) => s.hydrate);
   useEffect(() => {
@@ -133,7 +149,7 @@ export default function RootLayout() {
   // chunk'lari henuz kayitli olmadan gelen bu gecikmis navigasyon
   // "onUnhandledAction" ile sessizce basarisiz olup (auth) grubunun rastgele
   // bulunan bir cocugunda (login/register) kalinmasina yol aciyordu.
-  if (authStatus === 'hydrating' || !bootDelayDone) {
+  if (authStatus === 'hydrating' || !bootDelayDone || !fontsReady) {
     return <BootScreen />;
   }
 

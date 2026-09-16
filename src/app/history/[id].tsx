@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Card, DetailSkeleton, EmptyState } from '@/components';
 import { useChargingHistoryEntry } from '@/queries/history';
 import { shareInvoice } from '@/services/invoice';
-import { colors, radius, spacing, typography } from '@/theme';
+import { colors, fontFamilies, radius, spacing, typography } from '@/theme';
 import {
   formatDate,
   formatEnergy,
@@ -161,7 +161,13 @@ const styles = StyleSheet.create({
   },
 
   content: { paddingHorizontal: spacing.xl, paddingBottom: spacing.huge },
-  total: { fontSize: 40, lineHeight: 46, fontWeight: '800', color: colors.text, marginTop: spacing.lg },
+  total: {
+    fontSize: 40,
+    lineHeight: 48,
+    fontFamily: fontFamilies.displayExtraBold,
+    color: colors.text,
+    marginTop: spacing.lg,
+  },
   station: { ...typography.h3, color: colors.text, marginTop: spacing.sm },
   date: { ...typography.body, color: colors.textSecondary, marginTop: 2 },
 

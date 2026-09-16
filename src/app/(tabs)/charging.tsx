@@ -30,7 +30,7 @@ import {
 import { useCreateHistoryEntry } from '@/queries/history';
 import { useActiveVehicle } from '@/queries/vehicles';
 import { estimateChargeMinutes, useSessionStore } from '@/store/session';
-import { colors, radius, spacing, typography } from '@/theme';
+import { colors, fontFamilies, radius, spacing, typography } from '@/theme';
 import { currentTypeOf } from '@/types/domain';
 import { formatDuration, formatEnergy, formatPower, formatPrice } from '@/utils/format';
 import { haptics } from '@/utils/haptics';
@@ -649,7 +649,13 @@ const styles = StyleSheet.create({
 
   ringWrap: { alignItems: 'center', marginTop: spacing.lg, marginBottom: spacing.md },
   percentRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  percent: { fontSize: 68, lineHeight: 74, fontWeight: '800', color: colors.white, letterSpacing: -2 },
+  percent: {
+    fontSize: 68,
+    lineHeight: 78,
+    fontFamily: fontFamilies.displayExtraBold,
+    color: colors.white,
+    letterSpacing: -2,
+  },
   percentSign: {
     fontSize: 26,
     lineHeight: 34,

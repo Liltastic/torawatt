@@ -47,10 +47,28 @@ export const shadows = {
 } as const;
 
 /** Tipografi olcegi (spec bolum 17). */
+/**
+ * Marka yazi tipi: Plus Jakarta Sans (Google Fonts, OFL). Logonun yuvarlak
+ * geometrik harfleriyle ayni aileden; Turkce harfleri, ₺ isaretini ve sabit
+ * genislikli rakamlari (tnum) iceriyor - sarj ekranindaki sayilar her saniye
+ * degistigi icin bu sart. Uygulama kok layout'ta useFonts ile yukleniyor.
+ *
+ * Her agirlik ayri bir aile adi. Bu adlarla birlikte fontWeight VERILMEZ:
+ * Android, agirliga ozel bir fontun ustune yapay kalinlastirma uygulayip
+ * harfleri oldugundan kalin cizer.
+ */
+export const fontFamilies = {
+  headingSemiBold: 'PlusJakartaSans_600SemiBold',
+  headingBold: 'PlusJakartaSans_700Bold',
+  /** Buyuk gosterge sayilari (sarj yuzdesi, fatura toplami). */
+  displayExtraBold: 'PlusJakartaSans_800ExtraBold',
+} as const;
+
+/** Basliklar marka yazi tipinde; govde metni sistem yazi tipinde kaliyor. */
 export const typography = {
-  h1: { fontSize: 32, lineHeight: 36, fontWeight: '700' },
-  h2: { fontSize: 24, lineHeight: 30, fontWeight: '700' },
-  h3: { fontSize: 18, lineHeight: 24, fontWeight: '600' },
+  h1: { fontSize: 32, lineHeight: 38, fontFamily: fontFamilies.headingBold },
+  h2: { fontSize: 24, lineHeight: 30, fontFamily: fontFamilies.headingBold },
+  h3: { fontSize: 18, lineHeight: 24, fontFamily: fontFamilies.headingSemiBold },
   body: { fontSize: 15, lineHeight: 22, fontWeight: '400' },
   bodyStrong: { fontSize: 15, lineHeight: 22, fontWeight: '600' },
   caption: { fontSize: 12, lineHeight: 16, fontWeight: '400' },
