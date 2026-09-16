@@ -1,13 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState, type ComponentProps, type Ref } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  type TextInputProps,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
 import { colors, radius, spacing, typography } from '@/theme';
 
@@ -26,6 +19,11 @@ interface TextFieldProps extends Omit<TextInputProps, 'style'> {
    * gizlilik durumunu alan kendisi yonetir.
    */
   secureToggle?: boolean;
+  /**
+   * Koyu bir zeminin (giris/kayit ekranlarindaki tam ekran fotograf) uzerinde
+   * kullanildiginda: beyaz metin, saydam alan, acik kenarlik.
+   */
+  onDark?: boolean;
   /** Ust bilesenin odagi yonetebilmesi icin (ornegin "ileri" ile sonraki alana gecis). */
   ref?: Ref<TextInput>;
 }
@@ -36,6 +34,7 @@ export function TextField({
   suffix,
   leadingIcon,
   secureToggle,
+  onDark,
   secureTextEntry,
   onFocus,
   onBlur,
@@ -45,7 +44,15 @@ export function TextField({
   const [focused, setFocused] = useState(false);
   const [hidden, setHidden] = useState(true);
   const secure = secureToggle ? hidden : secureTextEntry;
-  const iconColor = error ? colors.danger : focused ? colors.primary : colors.textTertiary;
+
+  const dangerColor = onDark ? colors.dangerOnDark : colors.danger;
+  const iconColor = error
+    ? dangerColor
+    : focused
+      ? colors.primary
+      : onDark
+        ? 'rgba(255, 255, 255, 0.62)'
+        : colors.textTertiary;
 
   const handleFocus: NonNullable<TextInputProps['onFocus']> = (event) => {
     setFocused(true);
@@ -58,24 +65,30 @@ export function TextField({
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, onDark && styles.labelOnDark]}>{label}</Text>
 
       {/* Odak ve hata yalnizca rengi degistirir; kenarlik kalinligi sabit, yani yerlesim oynamaz. */}
-      <View style={[styles.inputWrap, focused && styles.inputWrapFocused, !!error && styles.inputWrapError]}>
+      <View
+        style={[
+          styles.inputWrap,
+          onDark && styles.inputWrapOnDark,
+          focused && styles.inputWrapFocused,
+          !!error && (onDark ? styles.inputWrapErrorOnDark : styles.inputWrapError),
+        ]}>
         {!!leadingIcon && (
           <Ionicons name={leadingIcon} size={18} color={iconColor} style={styles.leadingIcon} />
         )}
         <TextInput
           ref={ref}
-          style={styles.input}
-          placeholderTextColor={colors.textTertiary}
+          style={[styles.input, onDark && styles.inputOnDark]}
+          placeholderTextColor={onDark ? 'rgba(255, 255, 255, 0.62)' : colors.textTertiary}
           accessibilityLabel={label}
           secureTextEntry={secure}
           onFocus={handleFocus}
           onBlur={handleBlur}
           {...rest}
         />
-        {!!suffix && <Text style={styles.suffix}>{suffix}</Text>}
+        {!!suffix && <Text style={[styles.suffix, onDark && styles.labelOnDark]}>{suffix}</Text>}
         {secureToggle && (
           <Pressable
             accessibilityRole="button"
@@ -83,12 +96,16 @@ export function TextField({
             hitSlop={6}
             onPress={() => setHidden((value) => !value)}
             style={styles.eye}>
-            <Ionicons name={hidden ? 'eye-outline' : 'eye-off-outline'} size={20} color={colors.textSecondary} />
+            <Ionicons
+              name={hidden ? 'eye-outline' : 'eye-off-outline'}
+              size={20}
+              color={onDark ? 'rgba(255, 255, 255, 0.78)' : colors.textSecondary}
+            />
           </Pressable>
         )}
       </View>
 
-      {!!error && <Text style={styles.error}>{error}</Text>}
+      {!!error && <Text style={[styles.error, { color: dangerColor }]}>{error}</Text>}
     </View>
   );
 }
@@ -96,6 +113,7 @@ export function TextField({
 const styles = StyleSheet.create({
   wrap: { marginBottom: spacing.lg },
   label: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.sm },
+  labelOnDark: { color: 'rgba(255, 255, 255, 0.78)' },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -106,8 +124,16 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.border,
   },
+  // Saydam BEYAZ degil, saydam KOYU: alanin kontrasti fotografin altindaki
+  // bolgeye gore degismesin, acik bir zemine denk geldiginde sinirlari
+  // kaybolmasin.
+  inputWrapOnDark: {
+    backgroundColor: 'rgba(7, 30, 26, 0.58)',
+    borderColor: 'rgba(255, 255, 255, 0.34)',
+  },
   inputWrapFocused: { borderColor: colors.primary },
   inputWrapError: { borderColor: colors.danger },
+  inputWrapErrorOnDark: { borderColor: colors.dangerOnDark },
   leadingIcon: { marginRight: spacing.sm },
   input: {
     flex: 1,
@@ -116,6 +142,7 @@ const styles = StyleSheet.create({
     // Android'de TextInput'un varsayilan dikey padding'i hizalamayi bozuyor.
     paddingVertical: 0,
   },
+  inputOnDark: { color: colors.white },
   suffix: { ...typography.caption, color: colors.textSecondary, marginLeft: spacing.sm },
   // 44x44 dokunma hedefi; alanin ic bosluguna tasarak sagdaki 16dp'yi geri kazanir.
   eye: {
@@ -125,5 +152,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  error: { ...typography.caption, color: colors.danger, marginTop: spacing.xs },
+  error: { ...typography.caption, marginTop: spacing.xs },
 });

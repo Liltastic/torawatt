@@ -24,6 +24,8 @@ export const colors = {
   heroDark: '#0B3B35',
   /** Acik zeminde LINK/vurgu metni: primaryDark 3.8:1'de kaliyordu, bu 5.4:1 (AA). */
   primaryText: '#0A7468',
+  /** KOYU zeminde (giris/kayit fotografi) link ve vurgu metni; perde uzerinde 7.2:1. */
+  primaryOnDark: '#53D9C6',
 
   success: '#16C784',
   successSoft: '#E1FAEE',
@@ -31,6 +33,8 @@ export const colors = {
   warningSoft: '#FFECDD',
   danger: '#FF4D6D',
   dangerSoft: '#FFE2E9',
+  /** KOYU zeminde hata metni; danger perde uzerinde 3.9:1'de kaliyor, bu 5.8:1. */
+  dangerOnDark: '#FF8FA3',
 
   neutral: '#93A79D',
   neutralSoft: '#E9F3EE',
