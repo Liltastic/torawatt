@@ -566,6 +566,14 @@ ${config.setupScript}
     15,
     ['case', LABEL_KW_KNOWN, ['concat', LABEL_KW, '\\n', LABEL_FREE], LABEL_FREE]];
   map.on('load', function () {
+    // Yukleme bekcisini HEMEN sustur. 'load' geldiyse harita takilmamistir;
+    // bundan sonra patlayan bir sey olursa window.onerror gercek hatayi
+    // bildirir. Bu satir pin yeniden tasariminda (c46aaa7) cevresindeki kodla
+    // birlikte silinmisti ve bekci her acilista, harita calisirken, 20 sn sonra
+    // "Harita acilamadi - son asama: stil geldi" basiyordu. check-map-html bu
+    // atamanin varligini artik denetliyor.
+    opened = true;
+    stage = 'yuklendi';
 ${config.onLoadScript}
     map.addSource('stations', {
       type: 'geojson',

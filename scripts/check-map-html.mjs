@@ -74,6 +74,21 @@ try {
       console.error(String(error.stderr ?? error.message));
       process.exit(1);
     }
+    // Sozdizimi gecerli ama davranisi bozuk bir betik de sessizce yayina
+    // gidebiliyor: yukleme bekcisinin bayragi bir kez, buyuk bir yeniden
+    // duzenlemede silindi ve bekci her acilista calisan bir harita icin
+    // "Harita acilamadi" demeye basladi. Bayrak kurulup hic set edilmiyorsa dur.
+    const script = match[1];
+    // Satir basina capali: yorum satirindaki "// opened = true" SAYILMAZ, yalnizca
+    // gercekten calisan bir atama sayilir.
+    if (/var opened = false/.test(script) && !/^\s*opened\s*=\s*true\s*;/m.test(script)) {
+      console.error(
+        `✗ ${SOURCE} [${basemap}]: yukleme bekcisinin 'opened' bayragi hic true yapilmiyor; ` +
+          "bekci her acilista sahte 'Harita acilamadi' hatasi basar",
+      );
+      process.exit(1);
+    }
+
     console.log(`✓ ${SOURCE} [${basemap}]: uretilen betik gecerli`);
   }
 } finally {
