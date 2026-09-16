@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useIsFocused, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -38,6 +38,11 @@ import { useTabBarInset } from '@/utils/tabBar';
 
 /** Grafikte tutulan en fazla ornek sayisi. */
 const HISTORY_LIMIT = 40;
+
+/** Bekleme cizimindeki kesikli halkanin bir tam donusu: fark edilir ama dikkat cekmez. */
+const IDLE_SPIN_MS = 24_000;
+/** Bekleme cizimindeki simsegin bir yukari-bir asagi suzulme suresi (tek yon). */
+const IDLE_FLOAT_MS = 1800;
 
 /** Sayilar her saniye degisiyor: esit genislikli rakamlar yazinin titremesini onler. */
 const TABULAR = { fontVariant: ['tabular-nums' as const] };
@@ -505,6 +510,30 @@ function DetailRow({
 
 /** Oturum yokken: esmerkezli halkalar ve ortada simsek, altinda tek eylem. */
 function IdleState({ onFindStation, bottomInset }: { onFindStation: () => void; bottomInset: number }) {
+  // Bekleme cizimi canli dursun: kesikli halka cok yavas doner, simsek hafifce
+  // suzulur. Yalnizca sekme odaktayken ve "hareketi azalt" kapaliyken.
+  const isFocused = useIsFocused();
+  const reduceMotion = useReducedMotion();
+  const animate = isFocused && !reduceMotion;
+  const spin = useSharedValue(0);
+  const float = useSharedValue(0);
+
+  useEffect(() => {
+    if (!animate) {
+      cancelAnimation(spin);
+      cancelAnimation(float);
+      // Halka gorunmezken sifira doner; yeniden basladiginda 0-360 dongusu dikissiz.
+      spin.set(0);
+      float.set(withTiming(0, { duration: 250 }));
+      return;
+    }
+    spin.set(withRepeat(withTiming(360, { duration: IDLE_SPIN_MS, easing: Easing.linear }), -1, false));
+    float.set(withRepeat(withTiming(1, { duration: IDLE_FLOAT_MS, easing: Easing.inOut(Easing.sin) }), -1, true));
+  }, [animate, spin, float]);
+
+  const ringStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.value}deg` }] }));
+  const boltStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -4 * float.value }] }));
+
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <View style={styles.header}>
@@ -516,20 +545,25 @@ function IdleState({ onFindStation, bottomInset }: { onFindStation: () => void; 
           <Svg width={196} height={196}>
             <Circle cx={98} cy={98} r={96} fill={colors.primarySoft} fillOpacity={0.45} />
             <Circle cx={98} cy={98} r={72} fill={colors.primarySoft} fillOpacity={0.8} />
-            <Circle
-              cx={98}
-              cy={98}
-              r={84}
-              stroke={colors.primary}
-              strokeOpacity={0.25}
-              strokeWidth={1.5}
-              strokeDasharray="2 6"
-              fill="none"
-            />
           </Svg>
-          <View style={styles.idleBolt}>
+          {/* Kesikli halka kendi katmaninda: yalnizca o doner. */}
+          <Animated.View style={[styles.idleRing, ringStyle]}>
+            <Svg width={196} height={196}>
+              <Circle
+                cx={98}
+                cy={98}
+                r={84}
+                stroke={colors.primary}
+                strokeOpacity={0.25}
+                strokeWidth={1.5}
+                strokeDasharray="2 6"
+                fill="none"
+              />
+            </Svg>
+          </Animated.View>
+          <Animated.View style={[styles.idleBolt, boltStyle]}>
             <Ionicons name="flash" size={34} color={colors.white} />
-          </View>
+          </Animated.View>
         </Animated.View>
 
         <Animated.Text entering={FadeInDown.delay(100).duration(420)} style={styles.idleHeadline}>
@@ -734,6 +768,7 @@ const styles = StyleSheet.create({
   idleTitle: { ...typography.h2, color: colors.text },
   idleBody: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xxl },
   idleArt: { width: 196, height: 196, alignItems: 'center', justifyContent: 'center' },
+  idleRing: { position: 'absolute', top: 0, left: 0 },
   idleBolt: {
     position: 'absolute',
     width: 72,
