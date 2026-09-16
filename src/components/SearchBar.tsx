@@ -1,17 +1,29 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { GlassView } from 'expo-glass-effect';
 import { StyleSheet, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 
 import { colors, radius, shadows, spacing, typography } from '@/theme';
+import { GLASS_ENABLED } from '@/utils/glass';
 
 interface SearchBarProps extends Omit<TextInputProps, 'style'> {
   containerStyle?: StyleProp<ViewStyle>;
   /** Sagda gosterilecek aksiyon (ornegin filtre butonu). */
   trailing?: React.ReactNode;
+  /**
+   * Haritanin ustunde: iOS 26+'da zemin Liquid Glass olur. Android'de ve eski
+   * iOS'ta hicbir sey degismez, markali beyaz yuzey kalir.
+   */
+  glass?: boolean;
 }
 
-export function SearchBar({ containerStyle, trailing, ...rest }: SearchBarProps) {
+export function SearchBar({ containerStyle, trailing, glass = false, ...rest }: SearchBarProps) {
+  const useGlass = glass && GLASS_ENABLED;
+
   return (
-    <View style={[styles.container, shadows.card, containerStyle]}>
+    <View style={[styles.container, useGlass ? styles.containerGlass : shadows.card, containerStyle]}>
+      {useGlass && (
+        <GlassView pointerEvents="none" glassEffectStyle="regular" style={styles.glass} />
+      )}
       <Ionicons name="search" size={19} color={colors.textSecondary} />
       <TextInput
         style={styles.input}
@@ -34,6 +46,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  // Cam kendi derinligini ve kenarini ciziyor: dolgu, kenarlik ve golge kalkar.
+  containerGlass: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+  },
+  glass: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: radius.search,
   },
   input: {
     flex: 1,

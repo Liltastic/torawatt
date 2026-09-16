@@ -6,6 +6,7 @@ import BottomSheet, {
   type BottomSheetBackgroundProps,
   type BottomSheetFooterProps,
 } from '@gorhom/bottom-sheet';
+import { GlassView } from 'expo-glass-effect';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -64,6 +65,7 @@ import {
   type Vehicle,
 } from '@/types/domain';
 import { formatPrice, formatTime } from '@/utils/format';
+import { GLASS_ENABLED } from '@/utils/glass';
 import { haptics } from '@/utils/haptics';
 import { useTabBarInset } from '@/utils/tabBar';
 
@@ -105,6 +107,12 @@ const FOOTER_VISIBLE_FROM_INDEX = 0.6;
 /** Harita uzerindeki yuvarlak butonlar (katman secici + konumuma git). */
 const MAP_FAB_SIZE = 48;
 const MAP_FAB_STACK_HEIGHT = MAP_FAB_SIZE * 2 + spacing.sm;
+/**
+ * Butonlar sheet bu indekse yaklasinca tamamen soluyor (mapFabsStyle). iOS'ta cam
+ * zeminleri bu noktadan sonra kapatiliyor: opakligi 0'a inen bir ust gorunumun
+ * icindeki cam, gorunur olunca bir daha cizilmiyor (bkz. utils/glass).
+ */
+const FAB_GLASS_OFF_FROM_INDEX = 1.45;
 
 /**
  * Kutuphanenin footer'i sheet'in gorunur alaninin altina yapisir; sheet
@@ -332,6 +340,15 @@ export default function MapScreen() {
     opacity: interpolate(sheetIndex.value, [1, 1.5], [1, 0], Extrapolation.CLAMP),
   }));
 
+  // Yalnizca iOS cam butonlar icin; Android'de hep false kalir ve hic render tetiklemez.
+  const [fabGlassOff, setFabGlassOff] = useState(false);
+  useAnimatedReaction(
+    () => GLASS_ENABLED && sheetIndex.value >= FAB_GLASS_OFF_FROM_INDEX,
+    (off, previous) => {
+      if (off !== previous) runOnJS(setFabGlassOff)(off);
+    },
+  );
+
   const closeStationDetail = useCallback(() => {
     setSelectedId(undefined);
     setSelectedConnectorId(undefined);
@@ -427,7 +444,14 @@ export default function MapScreen() {
           accessibilityLabel={`Harita görünümü: ${BASEMAPS[basemap].label}. Değiştirmek için dokun.`}
           haptic="tap"
           onPress={toggleBasemap}
-          style={[styles.mapFab, styles.basemapFab]}>
+          style={[styles.mapFab, GLASS_ENABLED && styles.glassSurface, styles.basemapFab]}>
+          {GLASS_ENABLED && (
+            <GlassView
+              pointerEvents="none"
+              glassEffectStyle={fabGlassOff ? 'none' : 'regular'}
+              style={styles.fabGlass}
+            />
+          )}
           <Ionicons
             name={basemap === 'studio' ? 'layers' : 'layers-outline'}
             size={20}
@@ -442,7 +466,14 @@ export default function MapScreen() {
           }
           haptic="none"
           onPress={handleLocate}
-          style={styles.mapFab}>
+          style={[styles.mapFab, GLASS_ENABLED && styles.glassSurface]}>
+          {GLASS_ENABLED && (
+            <GlassView
+              pointerEvents="none"
+              glassEffectStyle={fabGlassOff ? 'none' : 'regular'}
+              style={styles.fabGlass}
+            />
+          )}
           <Ionicons
             name={locationStatus === 'denied' ? 'navigate-outline' : 'navigate'}
             size={20}
@@ -464,7 +495,10 @@ export default function MapScreen() {
             hitSlop={10}
             haptic="tap"
             onPress={() => router.push('/notifications')}
-            style={styles.iconButton}>
+            style={[styles.iconButton, GLASS_ENABLED && styles.glassSurface]}>
+            {GLASS_ENABLED && (
+              <GlassView pointerEvents="none" glassEffectStyle="regular" style={styles.iconButtonGlass} />
+            )}
             <Ionicons name="notifications-outline" size={20} color={colors.text} />
           </AnimatedPressable>
         </View>
@@ -474,6 +508,7 @@ export default function MapScreen() {
           value={query}
           onChangeText={setQuery}
           containerStyle={styles.search}
+          glass
         />
 
         {activeReservation && (
@@ -810,6 +845,25 @@ const styles = StyleSheet.create({
     ...shadows.card,
   },
   basemapFab: { marginBottom: spacing.sm },
+  // iOS 26+ cam zemin (bkz. utils/glass): dolgu, kenarlik ve golge camdan geliyor.
+  // Android'de bu stiller hic uygulanmiyor.
+  glassSurface: { backgroundColor: 'transparent', borderWidth: 0, shadowOpacity: 0 },
+  fabGlass: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: MAP_FAB_SIZE / 2,
+  },
+  iconButtonGlass: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 20,
+  },
 
   reservationBanner: {
     flexDirection: 'row',

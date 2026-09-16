@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { GlassView } from 'expo-glass-effect';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Keyboard, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeOutDown, runOnJS } from 'react-native-reanimated';
 
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { AnimatedPressable } from '@/components/AnimatedPressable';
@@ -11,6 +12,7 @@ import { useSessionStore } from '@/store/session';
 import { colors, radius, spacing, typography } from '@/theme';
 import type { ChargingSessionStatus } from '@/types/domain';
 import { formatEnergy, formatPower } from '@/utils/format';
+import { GLASS_ENABLED } from '@/utils/glass';
 import { useTabBarInset } from '@/utils/tabBar';
 
 /** Sabit yukseklik: ekranlar alt paylarini bu degerden hesapliyor. */
@@ -31,13 +33,40 @@ const formatPercentLabel = (value: number) => `%${Math.round(value)}`;
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
-/** Etiketler ve tonlar Sarj ekranindaki durum rozetiyle ayni. */
-const STATUS: Record<ChargingSessionStatus, { title: string; icon: IoniconName; tone: string }> = {
-  STARTING: { title: 'Bağlanıyor', icon: 'sync-outline', tone: colors.warningOnDark },
-  CHARGING: { title: 'Şarj sürüyor', icon: 'flash', tone: colors.primaryOnDark },
-  STOPPING: { title: 'Durduruluyor', icon: 'stop', tone: colors.warningOnDark },
-  COMPLETED: { title: 'Şarj tamamlandı', icon: 'checkmark', tone: colors.successOnDark },
-  ERROR: { title: 'Şarj hatası', icon: 'alert', tone: colors.dangerOnDark },
+/**
+ * Etiketler ve tonlar Sarj ekranindaki durum rozetiyle ayni. `tone` koyu
+ * markali zemin icin; `glassTone` iOS'taki acik cam zemin icin ayni ailenin
+ * okunur koyu tonu.
+ */
+const STATUS: Record<
+  ChargingSessionStatus,
+  { title: string; icon: IoniconName; tone: string; glassTone: string }
+> = {
+  STARTING: {
+    title: 'Bağlanıyor',
+    icon: 'sync-outline',
+    tone: colors.warningOnDark,
+    glassTone: colors.warningText,
+  },
+  CHARGING: {
+    title: 'Şarj sürüyor',
+    icon: 'flash',
+    tone: colors.primaryOnDark,
+    glassTone: colors.primaryText,
+  },
+  STOPPING: {
+    title: 'Durduruluyor',
+    icon: 'stop',
+    tone: colors.warningOnDark,
+    glassTone: colors.warningText,
+  },
+  COMPLETED: {
+    title: 'Şarj tamamlandı',
+    icon: 'checkmark',
+    tone: colors.successOnDark,
+    glassTone: colors.successText,
+  },
+  ERROR: { title: 'Şarj hatası', icon: 'alert', tone: colors.dangerOnDark, glassTone: colors.dangerText },
 };
 
 /**
@@ -87,13 +116,22 @@ function useKeyboardVisible(): boolean {
  * ancak sekme ekraninin icindeki guvenli alan biliyor (bkz. utils/tabBar).
  */
 export function ChargingMiniBar() {
-  const router = useRouter();
   const tabBarInset = useTabBarInset();
   const keyboardVisible = useKeyboardVisible();
+  const status = useSessionStore((state) => state.session?.status);
+
+  if (!status || keyboardVisible) return null;
+
+  // Ayri bilesen: cubuk her gorundugunde yeniden kuruluyor, yani iOS'taki cam
+  // durumu (bkz. MiniBar) her giriste bastan basliyor.
+  return <MiniBar status={status} bottom={tabBarInset + BAR_GAP} />;
+}
+
+function MiniBar({ status, bottom }: { status: ChargingSessionStatus; bottom: number }) {
+  const router = useRouter();
 
   // Her biri ilkel deger: oturum her saniye yeni bir nesne uretiyor, nesneyi
   // secseydik cubuk degismeyen alanlar icin de her tikte yeniden cizilirdi.
-  const status = useSessionStore((state) => state.session?.status);
   const battery = useSessionStore((state) => Math.round(state.session?.batteryPercent ?? 0));
   const powerKw = useSessionStore((state) => state.session?.powerKw ?? 0);
   const energyKwh = useSessionStore((state) =>
@@ -101,9 +139,14 @@ export function ChargingMiniBar() {
   );
   const stationName = useSessionStore((state) => state.meta?.stationName ?? '');
 
-  if (!status || keyboardVisible) return null;
+  // iOS 26+: zemin Liquid Glass. Cubuk solarak giriyor ve opaklik 0'dan
+  // basliyor; bu sirada cam hic cizilmiyor ve sonra da gelmiyor (bkz.
+  // utils/glass). Cam, giris bitince aciliyor; o ana kadar yari saydam beyaz
+  // bir zemin cubugu okunur tutuyor.
+  const [glassOn, setGlassOn] = useState(false);
 
   const config = STATUS[status];
+  const tone = GLASS_ENABLED ? config.glassTone : config.tone;
   const detail =
     status === 'CHARGING' && powerKw > 0
       ? formatPower(powerKw)
@@ -111,45 +154,73 @@ export function ChargingMiniBar() {
         ? formatEnergy(energyKwh)
         : null;
 
+  const entering = GLASS_ENABLED
+    ? FadeInDown.duration(280).withCallback((finished) => {
+        'worklet';
+        if (finished) runOnJS(setGlassOn)(true);
+      })
+    : FadeInDown.duration(280);
+
   return (
     <Animated.View
-      entering={FadeInDown.duration(280)}
+      entering={entering}
       exiting={FadeOutDown.duration(180)}
       pointerEvents="box-none"
-      style={[styles.wrap, { bottom: tabBarInset + BAR_GAP }]}>
+      style={[styles.wrap, { bottom }]}>
       <AnimatedPressable
         accessibilityRole="button"
         accessibilityLabel={`${config.title}, yüzde ${battery}, ${stationName}. Şarj ekranını aç.`}
         haptic="tap"
         scaleTo={0.98}
         onPress={() => router.navigate('/charging')}
-        style={styles.bar}>
+        style={[styles.bar, GLASS_ENABLED && (glassOn ? styles.barGlass : styles.barGlassPending)]}>
+        {GLASS_ENABLED && (
+          <GlassView
+            pointerEvents="none"
+            glassEffectStyle={
+              glassOn ? { style: 'regular', animate: true, animationDuration: 0.25 } : 'none'
+            }
+            colorScheme="light"
+            style={styles.glass}
+          />
+        )}
+
         <ProgressRing
           progress={battery}
           size={38}
           strokeWidth={3}
-          color={config.tone}
-          trackColor="rgba(255, 255, 255, 0.14)">
-          <Ionicons name={config.icon} size={15} color={config.tone} />
+          color={tone}
+          trackColor={GLASS_ENABLED ? 'rgba(15, 42, 34, 0.12)' : 'rgba(255, 255, 255, 0.14)'}>
+          <Ionicons name={config.icon} size={15} color={tone} />
         </ProgressRing>
 
         <View style={styles.texts}>
-          <Text style={styles.title} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+          <Text
+            style={[styles.title, GLASS_ENABLED && styles.titleOnGlass]}
+            numberOfLines={1}
+            maxFontSizeMultiplier={MAX_FONT_SCALE}>
             {config.title}
-            <Text style={styles.separator}> · </Text>
+            <Text style={[styles.separator, GLASS_ENABLED && styles.mutedOnGlass]}> · </Text>
             <AnimatedNumber
               value={battery}
               format={formatPercentLabel}
-              style={[styles.percent, { color: config.tone }, TABULAR]}
+              style={[styles.percent, { color: tone }, TABULAR]}
             />
           </Text>
-          <Text style={styles.subtitle} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+          <Text
+            style={[styles.subtitle, GLASS_ENABLED && styles.mutedOnGlass]}
+            numberOfLines={1}
+            maxFontSizeMultiplier={MAX_FONT_SCALE}>
             {stationName}
             {detail ? ` · ${detail}` : ''}
           </Text>
         </View>
 
-        <Ionicons name="chevron-forward" size={18} color={ON_DARK_MUTED} />
+        <Ionicons
+          name="chevron-forward"
+          size={18}
+          color={GLASS_ENABLED ? colors.textSecondary : ON_DARK_MUTED}
+        />
       </AnimatedPressable>
     </Animated.View>
   );
@@ -183,9 +254,27 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 8,
   },
+  // iOS 26+ cam: dolgu, kenarlik ve derinlik camin kendisinden geliyor.
+  barGlass: { backgroundColor: 'transparent', borderWidth: 0, shadowOpacity: 0 },
+  // Cam acilana kadar (giris solmasi) okunur bir zemin.
+  barGlassPending: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderWidth: 0,
+    shadowOpacity: 0.12,
+  },
+  glass: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: radius.search,
+  },
   texts: { flex: 1, marginHorizontal: spacing.md },
   title: { ...typography.bodyStrong, lineHeight: 20, color: colors.white },
+  titleOnGlass: { color: colors.text },
   separator: { color: ON_DARK_MUTED, fontWeight: '400' },
   percent: { fontWeight: '700' },
   subtitle: { ...typography.caption, color: ON_DARK_MUTED, marginTop: 1 },
+  mutedOnGlass: { color: colors.textSecondary },
 });
