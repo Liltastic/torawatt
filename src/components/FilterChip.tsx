@@ -1,4 +1,12 @@
-import { StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
+import { useEffect } from 'react';
+import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import Animated, {
+  Easing,
+  interpolateColor,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { AnimatedPressable } from '@/components/AnimatedPressable';
 import { colors, radius, spacing, typography } from '@/theme';
@@ -10,8 +18,30 @@ interface FilterChipProps {
   style?: StyleProp<ViewStyle>;
 }
 
-/** Harita ustundeki birinci seviye filtreler (spec bolum 6). */
+/** Secime gecis: listenin yeniden siralanma gecisiyle (220 ms) ayni ritimde, biraz once biter. */
+const SELECT = { duration: 180, easing: Easing.out(Easing.quad) } as const;
+
+/**
+ * Harita ustundeki birinci seviye filtreler (spec bolum 6).
+ *
+ * Secilince zemin, kenar ve yazi rengi bir kareden digerine atlamak yerine
+ * yumusakca gecer. Renk gecisi yerlesim hesabi tetiklemiyor.
+ */
 export function FilterChip({ label, selected = false, onPress, style }: FilterChipProps) {
+  const progress = useSharedValue(selected ? 1 : 0);
+
+  useEffect(() => {
+    progress.set(withTiming(selected ? 1 : 0, SELECT));
+  }, [selected, progress]);
+
+  const chipStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(progress.value, [0, 1], [colors.surface, colors.primaryStrong]),
+    borderColor: interpolateColor(progress.value, [0, 1], [colors.border, colors.primaryStrong]),
+  }));
+  const labelStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(progress.value, [0, 1], [colors.textSecondary, colors.white]),
+  }));
+
   return (
     <AnimatedPressable
       accessibilityRole="button"
@@ -20,13 +50,11 @@ export function FilterChip({ label, selected = false, onPress, style }: FilterCh
       haptic="selection"
       scaleTo={0.93}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        selected && styles.chipSelected,
-        pressed && styles.chipPressed,
-        style,
-      ]}>
-      <Text style={[styles.label, selected && styles.labelSelected]}>{label}</Text>
+      style={({ pressed }) => [pressed && styles.chipPressed, style]}>
+      {/* Renkler ic katmanda: basma olcegi ve dis bosluklar (style) dis katmanda kalir. */}
+      <Animated.View style={[styles.chip, chipStyle]}>
+        <Animated.Text style={[styles.label, labelStyle]}>{label}</Animated.Text>
+      </Animated.View>
     </AnimatedPressable>
   );
 }
@@ -37,15 +65,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
     borderRadius: radius.chip,
-    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
-  },
-  chipSelected: {
-    backgroundColor: colors.primaryStrong,
-    borderColor: colors.primaryStrong,
   },
   chipPressed: { opacity: 0.7 },
-  label: { ...typography.caption, fontWeight: '600', color: colors.textSecondary },
-  labelSelected: { color: colors.white },
+  label: { ...typography.caption, fontWeight: '600' },
 });

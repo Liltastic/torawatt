@@ -95,6 +95,7 @@ export default function RootLayout() {
   // Marka acilis ekrani en az BOOT_SCREEN_MS gorunsun: oturum onbellekten
   // aninda kurulunca (bkz. store/auth hydrate) ekran bir kare gorunup kayboluyordu.
   const [bootDelayDone, setBootDelayDone] = useState(false);
+  const [bootCurtainGone, setBootCurtainGone] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => setBootDelayDone(true), BOOT_SCREEN_MS);
     return () => clearTimeout(timer);
@@ -160,6 +161,10 @@ export default function RootLayout() {
           </Stack>
         </SafeAreaProvider>
       </QueryClientProvider>
+
+      {/* Acilis ekrani uygulamanin ustunde perde olarak kalip solarak kalkar;
+          ilk ekran arkasinda cizilip yerlesir (bkz. BootScreen exiting). */}
+      {!bootCurtainGone && <BootScreen exiting onExited={() => setBootCurtainGone(true)} />}
     </GestureHandlerRootView>
   );
 }
