@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
+import { logError } from '@/services/errorLog';
 import { useMapStyleStore } from '@/store/mapStyle';
 import { colors, radius, spacing, typography } from '@/theme';
 import {
@@ -167,13 +168,17 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
 
   const showError = useCallback(
     (message: string) => {
+      // Afis birkac saniye sonra kapaniyor ve yalnizca o an bakan gorebiliyor;
+      // kalici iz hata kaydinda kalsin (betik hatasi, WebView ve HTTP hatalari
+      // hepsi buradan geciyor).
+      logError(message, { source: 'map', context: { basemap, opened: readyRef.current } });
       setError(message);
       clearErrorTimer();
       if (readyRef.current) {
         errorTimer.current = setTimeout(() => setError(null), ERROR_BANNER_TIMEOUT_MS);
       }
     },
-    [clearErrorTimer],
+    [basemap, clearErrorTimer],
   );
 
   useEffect(() => clearErrorTimer, [clearErrorTimer]);
@@ -185,6 +190,12 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
   }, [basemap, reload.nonce, clearErrorTimer]);
 
   const handleCrash = useCallback(() => {
+    // Sessizce yeniden yukleniyor; kayit olmasa kullanici bunu hic fark etmez,
+    // biz de iPhone'da ne siklikla oldugunu bilemeyiz.
+    logError('Harita WebView içerik süreci kapandı (genelde bellek yetersizliği)', {
+      source: 'map',
+      context: { basemap },
+    });
     // Sayfa gitti: ready'yi dusurmezsek olu WebView'in uzerinde hicbir
     // gosterge cikmaz. Bekleyen sayac sifirlamasini da iptal ediyoruz - harita
     // ayakta kalamadi, o hakki kazanmadi.
@@ -195,7 +206,7 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
         ? { nonce: prev.nonce, crashes: prev.crashes + 1 }
         : { nonce: prev.nonce + 1, crashes: prev.crashes + 1 },
     );
-  }, [clearCrashResetTimer]);
+  }, [basemap, clearCrashResetTimer]);
 
   const retryAfterCrash = useCallback(() => {
     setReload((prev) => ({ nonce: prev.nonce + 1, crashes: 0 }));

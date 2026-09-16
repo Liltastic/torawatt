@@ -4,6 +4,7 @@ export { Button } from './Button';
 export { Card } from './Card';
 export { ChargeRing, type ChargeRingMode } from './ChargeRing';
 export { ChargingMiniBar, useChargingMiniBarInset } from './ChargingMiniBar';
+export { CrashScreen } from './CrashScreen';
 export { EmptyState } from './EmptyState';
 export { FilterChip } from './FilterChip';
 export { SearchBar } from './SearchBar';

@@ -11,6 +11,7 @@ import express from 'express';
 
 import { authRouter } from './routes/auth.js';
 import { campaignsRouter } from './routes/campaigns.js';
+import { clientErrorsRouter } from './routes/clientErrors.js';
 import { favoritesRouter } from './routes/favorites.js';
 import { historyRouter } from './routes/history.js';
 import { paymentMethodsRouter } from './routes/paymentMethods.js';
@@ -37,6 +38,7 @@ app.use('/charging-history', historyRouter);
 app.use('/payment-methods', paymentMethodsRouter);
 app.use('/favorites', favoritesRouter);
 app.use('/support', supportRouter);
+app.use('/client-errors', clientErrorsRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'not_found' });

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Stack } from 'expo-router';
+import { Stack, usePathname, type ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect, useState } from 'react';
@@ -7,8 +7,9 @@ import { AppState, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { BOOT_SCREEN_MS, BootScreen } from '@/components';
+import { BOOT_SCREEN_MS, BootScreen, CrashScreen } from '@/components';
 import { warmUpServer } from '@/services/api';
+import { installErrorLog, logError, setErrorLogRoute, setErrorLogUser } from '@/services/errorLog';
 import { setQueryClientForAuth, useAuthStore } from '@/store/auth';
 import { useSessionStore } from '@/store/session';
 import { colors } from '@/theme';
@@ -17,11 +18,40 @@ import { checkForImmediateUpdate } from '@/utils/autoUpdate';
 /** Alttan acilan, kendi kapatma carpisi olan akislar. */
 const MODAL_SCREEN = { presentation: 'modal' } as const;
 
+// Olabildigince erken: bu modul yuklenirken ve ilk cizimde firlayan hatalar da kayda dussun.
+installErrorLog();
+
 // Kok pencere arka planini boyar; aksi halde status bar / navigation bar
 // arkasinda sistemin varsayilan siyahi gorunuyor.
 void SystemUI.setBackgroundColorAsync(colors.background);
 
+/**
+ * Ekran cizilirken firlayan hatalar global hata yakalayiciya UGRAMIYOR: React
+ * Native onlari dogrudan kendi rapor yoluna veriyor (bkz.
+ * react-native/src/private/renderer/errorhandling/ErrorHandlers.js). Kok
+ * layout'tan export edildigi icin kendi sinirini tanimlamayan her ekranin
+ * cizim hatasi buraya gelir, kaydedilir ve uygulama kapanmak yerine tekrar
+ * denenebilir bir ekrana duser.
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  // Rota burada da okunuyor: yeni bir ekrana gecerken patlayan cizim yarida
+  // kaldigi icin asagidaki RootLayout'un rota effect'i hic calismiyor ve kayda
+  // bir onceki ekran yaziliyordu (emulatorde /map yerine /welcome goruldu).
+  const pathname = usePathname();
+  useEffect(() => {
+    setErrorLogRoute(pathname);
+    logError(error, { source: 'render' });
+  }, [error, pathname]);
+
+  return <CrashScreen message={error.message} onRetry={retry} />;
+}
+
 export default function RootLayout() {
+  const pathname = usePathname();
+  useEffect(() => {
+    setErrorLogRoute(pathname);
+  }, [pathname]);
+
   // Her acilista yayinlanmis en son EAS Update'i hemen indirip uygular;
   // varsayilan davranista bir sonraki acilisa kadar beklerdi.
   useEffect(() => {
@@ -86,6 +116,9 @@ export default function RootLayout() {
   // Sarj sekmesi A'nin canli oturumunu gostermeye devam ediyor, dahasi oturum
   // COMPLETED olunca A'nin sarj kaydi B'nin token'iyla B'nin gecmisine yaziliyor.
   const userId = useAuthStore((s) => s.user?.id);
+  useEffect(() => {
+    setErrorLogUser(userId);
+  }, [userId]);
   useEffect(() => {
     if (userId) return;
     queryClient.clear();
