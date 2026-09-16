@@ -1,12 +1,19 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { useMemo } from 'react';
 
-import { AnimatedPressable, Card, ChargingMiniBar, useChargingMiniBarInset } from '@/components';
+import {
+  AnimatedPressable,
+  Card,
+  ChargingMiniBar,
+  CompactHeader,
+  useChargingMiniBarInset,
+  useCollapsingTitle,
+} from '@/components';
 import { useChargingHistory } from '@/queries/history';
 import { useActiveVehicle } from '@/queries/vehicles';
 import { useAuthStore } from '@/store/auth';
@@ -35,6 +42,7 @@ export default function ProfileScreen() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const miniBarInset = useChargingMiniBarInset();
+  const { scrollY, onScroll } = useCollapsingTitle();
 
   const onLogout = async () => {
     await logout();
@@ -55,7 +63,9 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
-      <ScrollView
+      <Animated.ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         contentContainerStyle={[styles.content, { paddingBottom: spacing.xxl + miniBarInset }]}
         showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Profil</Text>
@@ -168,8 +178,9 @@ export default function ProfileScreen() {
         </AnimatedPressable>
 
         <Text style={styles.version}>TORA WATT · {getRunningUpdateLabel()}</Text>
-      </ScrollView>
+      </Animated.ScrollView>
 
+      <CompactHeader title="Profil" scrollY={scrollY} />
       <ChargingMiniBar />
     </SafeAreaView>
   );

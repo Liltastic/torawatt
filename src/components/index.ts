@@ -5,6 +5,7 @@ export { Button } from './Button';
 export { Card } from './Card';
 export { ChargeRing, type ChargeRingMode } from './ChargeRing';
 export { ChargingMiniBar, useChargingMiniBarInset } from './ChargingMiniBar';
+export { CompactHeader, useCollapsingTitle } from './CollapsingHeader';
 export { CrashScreen } from './CrashScreen';
 export { EmptyState } from './EmptyState';
 export { FavoriteHeart } from './FavoriteHeart';

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 
@@ -9,11 +9,13 @@ import {
   AnimatedPressable,
   Card,
   ChargingMiniBar,
+  CompactHeader,
   EmptyState,
   FilterChip,
   Refresher,
   StationCardSkeleton,
   useChargingMiniBarInset,
+  useCollapsingTitle,
 } from '@/components';
 import { useTabBarInset } from '@/utils/tabBar';
 import { useChargingHistory } from '@/queries/history';
@@ -50,6 +52,7 @@ export default function HistoryScreen() {
   const miniBarInset = useChargingMiniBarInset();
   const { data: items, isLoading, isRefetching, refetch } = useChargingHistory();
   const [range, setRange] = useState<string>('all');
+  const { scrollY, onScroll } = useCollapsingTitle();
 
   const filtered = useMemo(() => {
     const active = RANGES.find((r) => r.id === range) ?? RANGES[0];
@@ -68,8 +71,19 @@ export default function HistoryScreen() {
     [filtered],
   );
 
-  return (
-    <SafeAreaView edges={['top']} style={styles.root}>
+  const hasList = !isLoading && filtered.length > 0;
+
+  // Liste her yeniden kuruldugunda (bos durumdan donus) en ustten basliyor;
+  // eski kaydirma degeri kalirsa kompakt baslik buyuk basligin ustune binerdi.
+  useEffect(() => {
+    scrollY.set(0);
+  }, [hasList, scrollY]);
+
+  // Baslik ve aralik cipleri. Liste varken listenin basligi olarak icerikle
+  // birlikte kayar ve gozden cikinca ustte kompakt baslik belirir (bkz.
+  // CompactHeader); yukleniyor/bos durumlarinda sabit durur.
+  const titleAndChips = (
+    <>
       <View style={styles.header}>
         <Text style={styles.title}>Geçmiş</Text>
       </View>
@@ -88,6 +102,12 @@ export default function HistoryScreen() {
           />
         ))}
       </ScrollView>
+    </>
+  );
+
+  return (
+    <SafeAreaView edges={['top']} style={styles.root}>
+      {!hasList && titleAndChips}
 
       {isLoading ? (
         <View style={styles.list}>
@@ -107,12 +127,20 @@ export default function HistoryScreen() {
         // Kayit sayisi kullanildikca tek yonlu buyuyor ve ne istemcide ne
         // sunucuda ust sinir var; ScrollView tum satirlari ekran acilirken
         // birden kuruyordu.
-        <FlatList
+        <Animated.FlatList
           data={filtered}
           keyExtractor={(item) => item.id}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
           // Eleman olarak veriliyor: satir ici bir bilesen tipi her render'da
           // basligi unmount/remount eder ve giris animasyonunu tekrar oynatirdi.
-          ListHeaderComponent={<HistorySummary energy={totals.energy} cost={totals.cost} />}
+          ListHeaderComponent={
+            <>
+              {/* Listenin yatay boslugunu geri alir: baslik ve cipler kendi boslugunu tasiyor. */}
+              <View style={styles.bleed}>{titleAndChips}</View>
+              <HistorySummary energy={totals.energy} cost={totals.cost} />
+            </>
+          }
           renderItem={({ item }) => (
             <HistoryRow
               item={item}
@@ -128,6 +156,7 @@ export default function HistoryScreen() {
         />
       )}
 
+      {hasList && <CompactHeader title="Geçmiş" scrollY={scrollY} />}
       <ChargingMiniBar />
     </SafeAreaView>
   );
@@ -192,6 +221,7 @@ const styles = StyleSheet.create({
   chip: { marginRight: spacing.sm },
 
   emptyWrap: { flex: 1, justifyContent: 'center' },
+  bleed: { marginHorizontal: -spacing.xl },
   list: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl },
 
   summary: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
