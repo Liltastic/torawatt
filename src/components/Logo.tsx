@@ -1,7 +1,7 @@
 import { type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { G, Path } from 'react-native-svg';
 
-import { colors } from '@/theme';
+import { useColors } from '@/theme';
 
 /**
  * Kaynak: kullanicinin gonderdigi ora.svg. Orijinal dosyada ikon iki kez
@@ -57,26 +57,29 @@ const ASPECT = 440 / 1200;
 interface LogoProps {
   /** Genislik (dp); yukseklik oran korunarak hesaplanir. */
   width?: number;
-  /** "tora" ve "WATT" yazi rengi. */
+  /** "tora" ve "WATT" yazi rengi; verilmezse temanin metin rengi. */
   color?: string;
-  /** Ikon (fis/priz halkasi) rengi. */
+  /** Ikon (fis/priz halkasi) rengi; verilmezse temanin ana rengi. */
   accentColor?: string;
   style?: StyleProp<ViewStyle>;
 }
 
-export function Logo({ width = 180, color = colors.text, accentColor = colors.primary, style }: LogoProps) {
+export function Logo({ width = 180, color, accentColor, style }: LogoProps) {
+  const colors = useColors();
   const height = width * ASPECT;
+  const textColor = color ?? colors.text;
+  const iconColor = accentColor ?? colors.primary;
 
   return (
     <Svg width={width} height={height} viewBox={VIEW_BOX} style={style}>
-      <Path fillRule="evenodd" fill={accentColor} d={ICON_PATH} />
+      <Path fillRule="evenodd" fill={iconColor} d={ICON_PATH} />
       {TORA_LETTERS.map((letter, index) => (
-        <G key={`tora-${index}`} fill={color} transform={letter.transform}>
+        <G key={`tora-${index}`} fill={textColor} transform={letter.transform}>
           <Path d={letter.d} />
         </G>
       ))}
       {WATT_LETTERS.map((letter, index) => (
-        <G key={`watt-${index}`} fill={color} transform={letter.transform}>
+        <G key={`watt-${index}`} fill={textColor} transform={letter.transform}>
           <Path d={letter.d} />
         </G>
       ))}

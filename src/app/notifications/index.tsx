@@ -1,12 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { AppState, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AppState, Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { Button, Card, EmptyState } from '@/components';
-import { colors, radius, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, spacing, typography, useColors } from '@/theme';
 import {
   ensureNotificationPermission,
   getNotificationPermissionStatus,
@@ -16,6 +16,8 @@ import {
 type PermissionState = 'checking' | 'granted' | 'denied' | 'undetermined';
 
 export default function NotificationsScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const [permission, setPermission] = useState<PermissionState>('checking');
 
@@ -133,6 +135,8 @@ function InfoRow({
   description: string;
   last?: boolean;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={[styles.infoRow, !last && styles.infoRowDivider]}>
       <Ionicons name={icon} size={20} color={colors.primary} style={styles.infoIcon} />
@@ -144,7 +148,7 @@ function InfoRow({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background },
 
   header: {
@@ -183,4 +187,4 @@ const styles = StyleSheet.create({
   infoText: { flex: 1, marginLeft: spacing.md },
   infoTitle: { ...typography.bodyStrong, color: colors.text },
   infoDescription: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-});
+}));

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
@@ -18,7 +18,7 @@ import {
 } from '@/components';
 import { useCreateReservation, useSetReservationStatus } from '@/queries/reservations';
 import { useStation } from '@/queries/stations';
-import { colors, radius, shadows, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, shadows, spacing, typography, useColors } from '@/theme';
 import { RESERVATION_GRACE_MINUTES, currentTypeOf } from '@/types/domain';
 import { formatTime } from '@/utils/format';
 import { haptics } from '@/utils/haptics';
@@ -35,6 +35,8 @@ const START_OPTIONS = [
 const DURATION_OPTIONS = [30, 45, 60, 90];
 
 export default function NewReservationScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const { stationId, connectorId } = useLocalSearchParams<{
     stationId: string;
     connectorId: string;
@@ -197,6 +199,8 @@ export default function NewReservationScreen() {
 }
 
 function Header({ onClose }: { onClose: () => void }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.header}>
       <AnimatedPressable
@@ -212,7 +216,7 @@ function Header({ onClose }: { onClose: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background },
   loadingWrap: { flex: 1, justifyContent: 'center' },
   header: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
@@ -274,4 +278,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
   },
-});
+}));

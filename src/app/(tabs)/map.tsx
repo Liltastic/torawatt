@@ -13,7 +13,6 @@ import {
   Linking,
   Platform,
   ScrollView,
-  StyleSheet,
   Text,
   View,
   useWindowDimensions,
@@ -56,7 +55,7 @@ import { haversineKm } from '@/services/routing';
 import { useLocationStore } from '@/store/location';
 import { useMapIntentStore } from '@/store/mapIntent';
 import { useMapStyleStore } from '@/store/mapStyle';
-import { colors, radius, shadows, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, shadows, spacing, typography, useColors } from '@/theme';
 import {
   effectiveReservationStatus,
   reservationStatusLabels,
@@ -94,6 +93,7 @@ type DetailTab = (typeof DETAIL_TABS)[number]['value'];
  * altindaki harita hafifce sezilir, acikken liste/detay tek basina one cikar.
  */
 function SheetBackground({ animatedIndex, style }: BottomSheetBackgroundProps) {
+  const styles = useStyles();
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: interpolate(animatedIndex.value, [0, 1, 2], [0.88, 0.97, 1], Extrapolation.CLAMP),
   }));
@@ -134,6 +134,7 @@ function DetailFooter({
   reservedBottom: number;
   children: React.ReactNode;
 }) {
+  const styles = useStyles();
   const { animatedIndex } = useBottomSheet();
   const [interactive, setInteractive] = useState(true);
 
@@ -195,6 +196,8 @@ function buildFilters(vehicle?: Vehicle): MapFilter[] {
 }
 
 export default function MapScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const [query, setQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string>();
@@ -415,7 +418,7 @@ export default function MapScreen() {
         </DetailFooter>
       );
     },
-    [selectedStation, selectedConnectorId, router, tabBarInset, miniBarInset],
+    [selectedStation, selectedConnectorId, router, tabBarInset, miniBarInset, styles],
   );
 
   return (
@@ -677,6 +680,8 @@ function StationDetail({
   onBack: () => void;
   onDirections: () => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   // enableFooterMarginAdjustment yalnizca footer'in OLCULEN yuksekligini pay
   // olarak ekliyor; DetailFooter'a verdigimiz bottomInset footer'i yukari
   // kaydiriyor ama o olcuye girmiyor. Payi biz ekliyoruz; yoksa iOS'ta icerigin
@@ -801,6 +806,7 @@ function StationDetail({
 }
 
 function InfoRow({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
+  const styles = useStyles();
   return (
     <View style={[styles.infoRow, !last && styles.infoRowDivider]}>
       <Text style={styles.infoLabel}>{label}</Text>
@@ -809,7 +815,7 @@ function InfoRow({ label, value, last = false }: { label: string; value: string;
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background },
   map: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
 
@@ -978,4 +984,4 @@ const styles = StyleSheet.create({
   },
   secondaryAction: { flex: 1, marginRight: spacing.md },
   primaryAction: { flex: 1 },
-});
+}));

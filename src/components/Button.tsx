@@ -1,6 +1,5 @@
 import {
   ActivityIndicator,
-  StyleSheet,
   Text,
   View,
   type PressableProps,
@@ -9,7 +8,7 @@ import {
 } from 'react-native';
 
 import { AnimatedPressable } from '@/components/AnimatedPressable';
-import { colors, radius, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, spacing, typography, useColors } from '@/theme';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type Size = 'md' | 'lg';
@@ -37,6 +36,8 @@ export function Button({
   style,
   ...rest
 }: ButtonProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const isDisabled = disabled || loading;
 
   return (
@@ -72,7 +73,7 @@ export function Button({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   base: {
     borderRadius: radius.button,
     alignItems: 'center',
@@ -104,4 +105,4 @@ const styles = StyleSheet.create({
   label_secondary: { color: colors.primaryText },
   label_ghost: { color: colors.primaryText },
   label_danger: { color: colors.white },
-});
+}));

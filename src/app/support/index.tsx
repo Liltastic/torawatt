@@ -6,7 +6,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -16,7 +15,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { Button, Card } from '@/components';
 import { ApiError, supportApi } from '@/services/api';
-import { colors, radius, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, spacing, typography, useColors } from '@/theme';
 
 const MIN_MESSAGE_LENGTH = 10;
 
@@ -43,6 +42,8 @@ const FAQ_ITEMS = [
 ];
 
 export default function SupportScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const [expanded, setExpanded] = useState<number>();
 
@@ -154,7 +155,7 @@ export default function SupportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
 
@@ -211,4 +212,4 @@ const styles = StyleSheet.create({
 
   sentRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm },
   sentText: { ...typography.body, color: colors.text, marginLeft: spacing.sm, flex: 1 },
-});
+}));

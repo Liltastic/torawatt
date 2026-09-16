@@ -1,15 +1,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { AnimatedPressable, Card, EmptyState, ListCardSkeleton, Refresher } from '@/components';
 import { useCampaigns } from '@/queries/campaigns';
-import { colors, radius, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, spacing, typography, useColors } from '@/theme';
 import { formatDate } from '@/utils/format';
 
 export default function CampaignsScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const { data: campaigns, isLoading, isRefetching, refetch } = useCampaigns();
 
@@ -73,7 +75,7 @@ export default function CampaignsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background },
 
   header: {
@@ -117,4 +119,4 @@ const styles = StyleSheet.create({
   title: { ...typography.h3, color: colors.text, marginTop: spacing.md },
   description: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
   validUntil: { ...typography.caption, color: colors.textTertiary, marginTop: spacing.md },
-});
+}));

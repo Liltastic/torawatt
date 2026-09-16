@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeOutLeft, LinearTransition } from 'react-native-reanimated';
 
@@ -14,10 +14,20 @@ import {
   Refresher,
 } from '@/components';
 import { useActivateVehicle, useRemoveVehicle, useVehicles } from '@/queries/vehicles';
-import { colors, MIN_TOUCH_TARGET, radius, shadows, spacing, typography } from '@/theme';
+import {
+  createThemedStyles,
+  MIN_TOUCH_TARGET,
+  radius,
+  shadows,
+  spacing,
+  typography,
+  useColors,
+} from '@/theme';
 
 /** Araclarim (spec bolum 14). */
 export default function VehiclesScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const { data: vehicles, isLoading, isRefetching, refetch } = useVehicles();
   const activate = useActivateVehicle();
@@ -185,6 +195,7 @@ export default function VehiclesScreen() {
 }
 
 function Spec({ label, value }: { label: string; value: string }) {
+  const styles = useStyles();
   return (
     <View style={styles.spec}>
       <Text style={styles.specLabel}>{label}</Text>
@@ -193,7 +204,7 @@ function Spec({ label, value }: { label: string; value: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background },
 
   header: {
@@ -285,4 +296,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
   },
-});
+}));

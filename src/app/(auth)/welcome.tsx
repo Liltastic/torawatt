@@ -1,13 +1,15 @@
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AuthBackdrop, Button, Logo } from '@/components';
-import { colors, spacing, typography } from '@/theme';
+import { createThemedStyles, spacing, typography, useColors } from '@/theme';
 import { getRunningUpdateLabel } from '@/utils/buildInfo';
 
 export default function WelcomeScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
 
   return (
@@ -51,7 +53,7 @@ export default function WelcomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.heroDark },
   safeArea: {
     flex: 1,
@@ -73,4 +75,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.lg,
   },
-});
+}));

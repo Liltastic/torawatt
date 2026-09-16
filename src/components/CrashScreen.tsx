@@ -1,9 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StatusBar } from 'expo-status-bar';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { colors, monoFont, radius, spacing, typography } from '@/theme';
+import { createThemedStyles, monoFont, radius, spacing, typography, useColors } from '@/theme';
 
 interface CrashScreenProps {
   /** Teknik hata mesaji; kullanici ekran goruntusu paylastiginda ise yarasin diye kucuk puntoyla. */
@@ -21,9 +21,11 @@ interface CrashScreenProps {
  * cizilemezdi.
  */
 export function CrashScreen({ message, onRetry }: CrashScreenProps) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <SafeAreaView style={styles.root}>
-      <StatusBar style="dark" />
+      <StatusBar style="auto" />
 
       <View style={styles.body}>
         <View style={styles.icon}>
@@ -52,7 +54,7 @@ export function CrashScreen({ message, onRetry }: CrashScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.xxl },
   body: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   icon: {
@@ -90,4 +92,4 @@ const styles = StyleSheet.create({
   },
   buttonPressed: { backgroundColor: colors.primaryStrongPressed },
   buttonLabel: { ...typography.body, fontWeight: '600', color: colors.white, marginLeft: spacing.sm },
-});
+}));

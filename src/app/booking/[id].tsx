@@ -1,13 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { AnimatedPressable, AvailabilityBadge, Button, Card, DetailSkeleton, EmptyState } from '@/components';
 import { useReservations, useSetReservationStatus } from '@/queries/reservations';
-import { colors, radius, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, spacing, typography, useColors } from '@/theme';
 import {
   RESERVATION_GRACE_MINUTES,
   effectiveReservationStatus,
@@ -29,6 +29,8 @@ const STATUS_TONE: Record<ReservationStatus, 'AVAILABLE' | 'OCCUPIED' | 'FAULTED
 };
 
 export default function ReservationDetailScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
@@ -180,6 +182,8 @@ export default function ReservationDetailScreen() {
 }
 
 function Header({ onBack }: { onBack: () => void }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.header}>
       <AnimatedPressable
@@ -196,6 +200,7 @@ function Header({ onBack }: { onBack: () => void }) {
 }
 
 function Row({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
+  const styles = useStyles();
   return (
     <View style={[styles.row, !last && styles.rowDivider]}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -204,7 +209,7 @@ function Row({ label, value, last = false }: { label: string; value: string; las
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background },
   loadingWrap: { flex: 1, justifyContent: 'center' },
   header: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
@@ -267,4 +272,4 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
   },
   cancelButton: { marginTop: spacing.xs },
-});
+}));

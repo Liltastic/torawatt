@@ -5,8 +5,8 @@
  * inline bir <script> ayristirilamazsa hic calismaz, yani window.onerror bile
  * kurulamaz ve harita sonsuza kadar "yukleniyor"da kalir.
  *
- * Bu script modulu GERCEKTEN derleyip buildMapHtml'i her taban harita icin
- * calistirir ve uretilen betigi node --check'ten gecirir.
+ * Bu script modulu GERCEKTEN derleyip buildMapHtml'i her taban harita ve her
+ * tema (acik/koyu) icin calistirir ve uretilen betigi node --check'ten gecirir.
  *
  * Neden gercek degerler: onceki surum ${...} yerlestirmelerini PLACEHOLDER ile
  * degistiriyordu ve tam da bu yuzden gercek bir hatayi kacirdi - bir yorum
@@ -20,36 +20,87 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const SOURCE = 'src/map/mapHtml.ts';
+// Harita HTML'inin temadan kullandigi her sey (paletler, durum renkleri,
+// withAlpha) bu dosyada ve React Native'e bagli degil.
+const THEME_SOURCE = 'src/theme/colors.ts';
+const COLOR_SCHEMES = ['light', 'dark'];
 const out = mkdtempSync(join(tmpdir(), 'tora-map-'));
 
-// Temadaki gercek degerler yerine sabitler: amac stil dogrulamak degil, uretilen
-// betigin ayristirilabildigini kanitlamak. Alias cozumlemesi icin tsc'yi tek
-// dosya modunda calistirdigimizdan import'u elle karsiliyoruz.
-const THEME_STUB =
-  'const theme_1={colors:{background:"#F2FBF6",surface:"#FFFFFF",surfaceMuted:"#EAF7F0",' +
-  'text:"#0F2A22",textSecondary:"#5B7268",textTertiary:"#93A79D",border:"#DCEFE4",' +
-  'primary:"#0FB5A3",primaryDark:"#0C8F82",primarySoft:"#DCF6EF",success:"#16C784",' +
-  'warning:"#FF8A3D",danger:"#FF4D6D",neutral:"#93A79D",location:"#2F7DFF",white:"#FFFFFF"},' +
-  'statusColors:{AVAILABLE:"#16C784",PARTIAL:"#FF8A3D",FULL:"#FF4D6D",UNKNOWN:"#93A79D"}};';
+/**
+ * Eksik bir palet anahtari ya da tanimsiz bir tema varyanti hata vermeden
+ * "undefined" yaziyor: CSS'te gecersiz renk, betikte 'undefined' adli bir
+ * stil ya da renk. Uretilen HTML'de mesru olan yalnizca bu ikisi.
+ */
+const LEGIT_UNDEFINED = [/typeof \w+ === 'undefined'/g, /projection: undefined,/g];
+
+function checkGenerated(label, html) {
+  const stripped = LEGIT_UNDEFINED.reduce((text, pattern) => text.replace(pattern, ''), html);
+  const index = stripped.search(/\bundefined\b/);
+  if (index !== -1) {
+    const line = stripped.slice(0, index).split('\n').length;
+    console.error(
+      `✗ ${SOURCE} [${label}]: uretilen HTML'de tanimsiz bir deger var: ` +
+        stripped.split('\n')[line - 1].trim(),
+    );
+    process.exit(1);
+  }
+
+  const match = html.match(/<script>\n([\s\S]*?)<\/script>/);
+  if (!match) {
+    console.error(`✗ ${SOURCE} [${label}]: <script> blogu bulunamadi`);
+    process.exit(1);
+  }
+  const scriptFile = join(out, `${label.replace('/', '-')}.js`);
+  writeFileSync(scriptFile, match[1], 'utf8');
+  try {
+    execSync(`node --check "${scriptFile}"`, { stdio: 'pipe' });
+  } catch (error) {
+    console.error(`✗ ${SOURCE} [${label}]: uretilen betikte sozdizimi hatasi\n`);
+    console.error(String(error.stderr ?? error.message));
+    process.exit(1);
+  }
+  // Sozdizimi gecerli ama davranisi bozuk bir betik de sessizce yayina
+  // gidebiliyor: yukleme bekcisinin bayragi bir kez, buyuk bir yeniden
+  // duzenlemede silindi ve bekci her acilista calisan bir harita icin
+  // "Harita acilamadi" demeye basladi. Bayrak kurulup hic set edilmiyorsa dur.
+  const script = match[1];
+  // Satir basina capali: yorum satirindaki "// opened = true" SAYILMAZ, yalnizca
+  // gercekten calisan bir atama sayilir.
+  if (/var opened = false/.test(script) && !/^\s*opened\s*=\s*true\s*;/m.test(script)) {
+    console.error(
+      `✗ ${SOURCE} [${label}]: yukleme bekcisinin 'opened' bayragi hic true yapilmiyor; ` +
+        "bekci her acilista sahte 'Harita acilamadi' hatasi basar",
+    );
+    process.exit(1);
+  }
+
+  console.log(`✓ ${SOURCE} [${label}]: uretilen betik gecerli`);
+}
 
 try {
   try {
     execSync(
-      `npx tsc ${SOURCE} --ignoreConfig --outDir "${out}" --module commonjs --target es2020 --skipLibCheck`,
+      `npx tsc ${SOURCE} ${THEME_SOURCE} --ignoreConfig --rootDir src --outDir "${out}" --module commonjs --target es2020 --skipLibCheck`,
       { stdio: 'pipe' },
     );
   } catch {
-    // Tek dosya modunda '@/theme', 'process' ve '__DEV__' cozumlenmiyor; tip
-    // hatalari bekleniyor ve JS yine de uretiliyor. Gercek tip denetimi
-    // `npm run typecheck` isi.
+    // Tek dosya modunda '@/theme', '@/types/domain', 'process' ve '__DEV__'
+    // cozumlenmiyor; tip hatalari bekleniyor ve JS yine de uretiliyor. Gercek
+    // tip denetimi `npm run typecheck` isi.
   }
 
-  const compiled = join(out, 'mapHtml.js');
+  // Stub yerine gercek palet: renkler de betige gomuluyor. '@/theme' alias'ini
+  // derlenmis colors modulune yonlendiriyoruz.
+  const colorsModule = join(out, 'colors.cjs');
+  writeFileSync(colorsModule, readFileSync(join(out, 'theme', 'colors.js'), 'utf8'), 'utf8');
+
+  const compiled = readFileSync(join(out, 'map', 'mapHtml.js'), 'utf8');
+  const js = compiled.replace(/require\("@\/theme"\)/, `require(${JSON.stringify(colorsModule)})`);
+  if (js === compiled) {
+    console.error(`✗ ${SOURCE}: derlenmis ciktida require("@/theme") bulunamadi`);
+    process.exit(1);
+  }
   const patched = join(out, 'mapHtml.cjs');
-  const js = readFileSync(compiled, 'utf8').replace(
-    /const theme_1 = require\("@\/theme"\);/,
-    THEME_STUB,
-  );
   writeFileSync(
     patched,
     `globalThis.__DEV__=false;process.env.EXPO_PUBLIC_MAPBOX_TOKEN="pk.check";\n${js}`,
@@ -59,37 +110,16 @@ try {
   const { buildMapHtml, BASEMAPS } = createRequire(import.meta.url)(patched);
 
   for (const basemap of Object.keys(BASEMAPS)) {
-    const html = buildMapHtml({ centerLatitude: 41, centerLongitude: 29, zoom: 10, basemap });
-    const match = html.match(/<script>\n([\s\S]*?)<\/script>/);
-    if (!match) {
-      console.error(`✗ ${SOURCE} [${basemap}]: <script> blogu bulunamadi`);
-      process.exit(1);
+    for (const colorScheme of COLOR_SCHEMES) {
+      const html = buildMapHtml({
+        centerLatitude: 41,
+        centerLongitude: 29,
+        zoom: 10,
+        basemap,
+        colorScheme,
+      });
+      checkGenerated(`${basemap}/${colorScheme}`, html);
     }
-    const scriptFile = join(out, `${basemap}.js`);
-    writeFileSync(scriptFile, match[1], 'utf8');
-    try {
-      execSync(`node --check "${scriptFile}"`, { stdio: 'pipe' });
-    } catch (error) {
-      console.error(`✗ ${SOURCE} [${basemap}]: uretilen betikte sozdizimi hatasi\n`);
-      console.error(String(error.stderr ?? error.message));
-      process.exit(1);
-    }
-    // Sozdizimi gecerli ama davranisi bozuk bir betik de sessizce yayina
-    // gidebiliyor: yukleme bekcisinin bayragi bir kez, buyuk bir yeniden
-    // duzenlemede silindi ve bekci her acilista calisan bir harita icin
-    // "Harita acilamadi" demeye basladi. Bayrak kurulup hic set edilmiyorsa dur.
-    const script = match[1];
-    // Satir basina capali: yorum satirindaki "// opened = true" SAYILMAZ, yalnizca
-    // gercekten calisan bir atama sayilir.
-    if (/var opened = false/.test(script) && !/^\s*opened\s*=\s*true\s*;/m.test(script)) {
-      console.error(
-        `✗ ${SOURCE} [${basemap}]: yukleme bekcisinin 'opened' bayragi hic true yapilmiyor; ` +
-          "bekci her acilista sahte 'Harita acilamadi' hatasi basar",
-      );
-      process.exit(1);
-    }
-
-    console.log(`✓ ${SOURCE} [${basemap}]: uretilen betik gecerli`);
   }
 } finally {
   rmSync(out, { recursive: true, force: true });

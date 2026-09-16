@@ -2,7 +2,9 @@ import { File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
-import { colors } from '@/theme';
+// Belge beyaz kagida basiliyor / PDF olarak paylasiliyor: uygulamanin temasi
+// koyu olsa da her zaman acik palet.
+import { lightColors as colors } from '@/theme';
 import type { ChargingHistoryDetail } from '@/types/domain';
 import {
   formatDate,

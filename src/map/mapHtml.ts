@@ -1,4 +1,4 @@
-import { colors, statusColors } from '@/theme';
+import { darkColors, lightColors, statusColorsFor, withAlpha, type ColorScheme } from '@/theme';
 
 /**
  * Uygulamada iki taban harita var, kullanici haritadaki katman butonuyla
@@ -18,6 +18,11 @@ import { colors, statusColors } from '@/theme';
  * kodu ikisinde de degismeden calisiyor; yalnizca CDN, global ad, stil URL'i ve
  * glif (font) adi degisiyor. Kutuphaneleri bilerek ayri tutuyoruz: Mapbox GL JS
  * v3 kendi lisansi geregi Mapbox disi karolarla kullanilamaz.
+ *
+ * Iki taban haritanin da koyu hali var; harita uygulamanin temasini izliyor
+ * (bkz. buildMapHtml `colorScheme`). Klasikte OpenFreeMap "dark" stili ayni
+ * yontemle TORA WATT'in koyu paletine cekiliyor, detayli haritada ayni Studio
+ * stili Mapbox Standard'in "night" isigiyla aciliyor.
  */
 export type BasemapId = 'classic' | 'studio';
 
@@ -57,6 +62,26 @@ const PARK_COLOR = '#BFEBD2';
 const BUILDING_COLOR = '#FFF1DE';
 
 /**
+ * Koyu tema. OpenFreeMap "dark" (Dark Matter) bilerek cok soluk: ara yollar
+ * zeminden 1.10:1, yer adlari 3.36:1. Zemini koyu paletin turkuaza calan
+ * siyahina, suyu koyu petrol mavisine, yesil alanlari koyu yesile cekip yol ve
+ * adlari okunur hale getiriyoruz. Olculdu (zemine karsi): ara yol 1.28, ana
+ * yol 1.57, yol kenari 2.02, su 1.24; yer adi 6.36, yol adi 4.55, su adi
+ * suyun uzerinde 5.09.
+ */
+const DARK_LAND_COLOR = '#0E1B18';
+const DARK_WATER_COLOR = '#0C2E3D';
+const DARK_PARK_COLOR = '#11291F';
+const DARK_BUILDING_COLOR = '#1A2A26';
+const DARK_ROAD_MINOR_COLOR = '#1F302B';
+const DARK_ROAD_MAJOR_COLOR = '#2A3F39';
+const DARK_ROAD_CASING_COLOR = '#35504A';
+const DARK_PLACE_LABEL_COLOR = '#8AA098';
+const DARK_ROAD_LABEL_COLOR = '#71867E';
+const DARK_WATER_LABEL_COLOR = '#66A3B8';
+const DARK_LABEL_HALO_COLOR = 'rgba(6, 14, 12, 0.8)';
+
+/**
  * Positron'un tam katman kimliklerini varsayamayiz (surum/CDN degisebilir);
  * isimlerine gore eslesen dolgu katmanlarini tarayip Solar Fresh paletine
  * ceviriyoruz. Beklenmeyen bir katman turu patlatirsa tek bir katman yuzunden
@@ -89,6 +114,60 @@ const RECOLOR_SCRIPT = `
     });
 `;
 
+/**
+ * RECOLOR_SCRIPT'in koyu karsiligi. Dark Matter'da yollar ve adlar da soluk
+ * oldugu icin dolgularin yaninda cizgi ve yazi katmanlari da boyaniyor. Katman
+ * adlari positron'la ayni OpenMapTiles semasindan geliyor.
+ */
+const DARK_RECOLOR_SCRIPT = `
+    if (map.getLayer('background')) map.setPaintProperty('background', 'background-color', '${DARK_LAND_COLOR}');
+
+    map.getStyle().layers.forEach(function (layer) {
+      var id = layer.id.toLowerCase();
+      var isWater = id.indexOf('water') !== -1;
+      var isRoad = id.indexOf('highway') !== -1 || id.indexOf('road') !== -1;
+      try {
+        if (layer.type === 'fill') {
+          if (isWater) {
+            map.setPaintProperty(layer.id, 'fill-color', '${DARK_WATER_COLOR}');
+          } else if (
+            id.indexOf('park') !== -1 ||
+            id.indexOf('wood') !== -1 ||
+            id.indexOf('forest') !== -1 ||
+            id.indexOf('grass') !== -1
+          ) {
+            map.setPaintProperty(layer.id, 'fill-color', '${DARK_PARK_COLOR}');
+          } else if (id.indexOf('building') !== -1) {
+            map.setPaintProperty(layer.id, 'fill-color', '${DARK_BUILDING_COLOR}');
+          } else if (id.indexOf('pier') !== -1) {
+            map.setPaintProperty(layer.id, 'fill-color', '${DARK_LAND_COLOR}');
+          }
+        } else if (layer.type === 'line') {
+          if (isWater) {
+            map.setPaintProperty(layer.id, 'line-color', '${DARK_WATER_COLOR}');
+          } else if (id.indexOf('pier') !== -1 || id.indexOf('dashline') !== -1) {
+            // Iskele ve demiryolu kesikleri zemin renginde cizilip alttaki cizgiyi boluyor.
+            map.setPaintProperty(layer.id, 'line-color', '${DARK_LAND_COLOR}');
+          } else if (isRoad) {
+            var roadColor = '${DARK_ROAD_MINOR_COLOR}';
+            if (id.indexOf('casing') !== -1) roadColor = '${DARK_ROAD_CASING_COLOR}';
+            else if (id.indexOf('major') !== -1 || id.indexOf('motorway') !== -1) roadColor = '${DARK_ROAD_MAJOR_COLOR}';
+            map.setPaintProperty(layer.id, 'line-color', roadColor);
+          }
+        } else if (layer.type === 'symbol' && layer.layout && layer.layout['text-field']) {
+          // Yalnizca yazili semboller; tek yon oklari gibi ikon katmanlari oldugu gibi kalir.
+          var labelColor = '${DARK_PLACE_LABEL_COLOR}';
+          if (isWater) labelColor = '${DARK_WATER_LABEL_COLOR}';
+          else if (isRoad) labelColor = '${DARK_ROAD_LABEL_COLOR}';
+          map.setPaintProperty(layer.id, 'text-color', labelColor);
+          map.setPaintProperty(layer.id, 'text-halo-color', '${DARK_LABEL_HALO_COLOR}');
+        }
+      } catch (e) {
+        // Bu katman beklenen paint ozelligini desteklemiyor olabilir; digerlerini etkilemesin.
+      }
+    });
+`;
+
 interface BasemapConfig {
   /** Katman butonunda ve erisilebilirlik etiketinde gecen ad. */
   label: string;
@@ -98,7 +177,8 @@ interface BasemapConfig {
   scriptSrc: string;
   /** CDN betiginin tanimladigi global ad; ayni zamanda ctrl CSS siniflarinin oneki. */
   globalName: string;
-  styleUrl: string;
+  /** Acik ve koyu temadaki stil ve ayarlari. */
+  themes: Record<ColorScheme, BasemapTheme>;
   /**
    * Pin ici rakamlar icin kalin glif. Mapbox "Noto Sans Bold"u sunmuyor (404
    * doner ve yazilar hic cizilmez); DIN Pro onun kendi standart fontu.
@@ -108,11 +188,25 @@ interface BasemapConfig {
   setupScript: string;
   /** Map yapicisindaki `projection` degeri; anlamsizsa 'undefined' (yani yok sayilir). */
   projection: string;
-  /** `load` olayinda, kendi katmanlarimizi eklemeden once calisan kod. */
-  onLoadScript: string;
   /** Logo kontrolu gizlenebilir mi - Mapbox'ta kullanim kosullari geregi hayir. */
   hideLogo: boolean;
+  /**
+   * Stil kendi 3B isigini tanimliyor (Mapbox Standard) ve bu isik stile
+   * sonradan eklenen katmanlari da aydinlatip karartiyor. Oyleyse kendi
+   * katmanlarimiz isiktan ayriliyor (bkz. 'load' sonundaki emissive-strength).
+   */
+  litStyle: boolean;
 }
+
+interface BasemapTheme {
+  styleUrl: string;
+  /** Map yapicisina eklenen secenekler (virgulle biten JS ozellikleri); yoksa bos. */
+  mapOptions: string;
+  /** `load` olayinda, kendi katmanlarimizi eklemeden once calisan kod. */
+  onLoadScript: string;
+}
+
+const STUDIO_STYLE_URL = `mapbox://styles/${MAPBOX_USERNAME}/${MAPBOX_STYLE_ID}`;
 
 export const BASEMAPS: Record<BasemapId, BasemapConfig> = {
   classic: {
@@ -121,12 +215,23 @@ export const BASEMAPS: Record<BasemapId, BasemapConfig> = {
     cssHref: `https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.css`,
     scriptSrc: `https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.js`,
     globalName: 'maplibregl',
-    styleUrl: 'https://tiles.openfreemap.org/styles/positron',
+    themes: {
+      light: {
+        styleUrl: 'https://tiles.openfreemap.org/styles/positron',
+        mapOptions: '',
+        onLoadScript: RECOLOR_SCRIPT,
+      },
+      dark: {
+        styleUrl: 'https://tiles.openfreemap.org/styles/dark',
+        mapOptions: '',
+        onLoadScript: DARK_RECOLOR_SCRIPT,
+      },
+    },
     boldFont: 'Noto Sans Bold',
     setupScript: '',
     projection: 'undefined',
-    onLoadScript: RECOLOR_SCRIPT,
     hideLogo: true,
+    litStyle: false,
   },
   studio: {
     label: 'Detaylı harita',
@@ -134,7 +239,17 @@ export const BASEMAPS: Record<BasemapId, BasemapConfig> = {
     cssHref: `https://api.mapbox.com/mapbox-gl-js/v${MAPBOX_GL_VERSION}/mapbox-gl.css`,
     scriptSrc: `https://api.mapbox.com/mapbox-gl-js/v${MAPBOX_GL_VERSION}/mapbox-gl.js`,
     globalName: 'mapboxgl',
-    styleUrl: `mapbox://styles/${MAPBOX_USERNAME}/${MAPBOX_STYLE_ID}`,
+    themes: {
+      light: { styleUrl: STUDIO_STYLE_URL, mapOptions: '', onLoadScript: '' },
+      // Studio stili Standard'i "basemap" kimligiyle ve "dawn" isigiyla iceri
+      // aliyor; koyu temada ayni stil gece isigiyla. Yapicidaki config, stilin
+      // kendi import ayarinin ustune yaziliyor.
+      dark: {
+        styleUrl: STUDIO_STYLE_URL,
+        mapOptions: "config: { basemap: { lightPreset: 'night' } },",
+        onLoadScript: '',
+      },
+    },
     boldFont: 'DIN Pro Bold',
     // Token bos kalirsa Mapbox'in kendi hatasi ("An API access token is
     // required...") neyin eksik oldugunu soylemiyor. Bu bir kez gercekten
@@ -149,8 +264,8 @@ export const BASEMAPS: Record<BasemapId, BasemapConfig> = {
     // cizilir. Uygulama zaten duz 2D bir harita istiyor (pitch/bearing sifir,
     // dondurme kapali), ustelik kure bambaska ve cok daha agir bir WebGL yolu.
     projection: `'mercator'`,
-    onLoadScript: '',
     hideLogo: false,
+    litStyle: true,
   },
 };
 
@@ -159,6 +274,28 @@ export interface MapHtmlOptions {
   centerLongitude: number;
   zoom: number;
   basemap: BasemapId;
+  /** Uygulamanin o anki temasi; degisince WebView yeni HTML ile bastan kuruluyor. */
+  colorScheme: ColorScheme;
+}
+
+/**
+ * Atif (OSM icin ODbL, Mapbox icin kullanim kosullari) gorunur kalmali;
+ * yalnizca tipografiye ve temaya uyduruyoruz.
+ */
+function attributionCss(globalName: string, colorScheme: ColorScheme): string {
+  const g = globalName;
+  if (colorScheme === 'light') {
+    return `.${g}-ctrl-attrib { font-size: 9px; background: rgba(255,255,255,0.75); }
+  .${g}-ctrl-attrib a { color: ${lightColors.textSecondary}; }`;
+  }
+  // Kutuphanelerin CSS'i atfi beyaz kutuda siyah yaziyla, kompakt dugmenin "i"
+  // simgesini de siyah bir SVG ile ciziyor. Seciciler kutuphanedekilerle ayni
+  // ozgullukte (iki sinif) ve sonra geldikleri icin kazaniyor; SVG'nin rengi
+  // CSS'ten degismedigi icin dugme ters cevriliyor.
+  return `.${g}-ctrl-attrib { font-size: 9px; }
+  .${g}-ctrl.${g}-ctrl-attrib, .${g}-ctrl-attrib.${g}-compact { background-color: ${withAlpha(darkColors.surface, 0.85)}; color: ${darkColors.textSecondary}; }
+  .${g}-ctrl-attrib a { color: ${darkColors.textSecondary}; }
+  .${g}-ctrl-attrib-button { filter: invert(1); }`;
 }
 
 export function buildMapHtml({
@@ -166,9 +303,22 @@ export function buildMapHtml({
   centerLongitude,
   zoom,
   basemap,
+  colorScheme,
 }: MapHtmlOptions): string {
   const config = BASEMAPS[basemap];
+  const variant = config.themes[colorScheme];
   const { globalName, boldFont } = config;
+  const dark = colorScheme === 'dark';
+  // Sayfa zemini, atif, secim halkasi, konum ve rota temaya uyuyor.
+  const palette = dark ? darkColors : lightColors;
+  // Pin ve kume MURKKEBI ise iki temada da acik paletten: asagidaki akromatik
+  // kontrast sistemi (koyu murekkep + beyaz rim + renkli govde) bu degerlerle
+  // olculdu ve isaretin kendi icinde kaldigi icin zeminden bagimsiz.
+  const ink = lightColors;
+  const statusColors = statusColorsFor(lightColors);
+  // Secim halkasi. Acik zeminde primary 3:1'i gecemiyor, primaryDark geciyor
+  // (bkz. station-halo); koyu zeminde tersine parlak primary: 8.06.
+  const selectionRing = dark ? darkColors.primary : lightColors.primaryDark;
 
   return `<!doctype html>
 <html lang="tr">
@@ -180,10 +330,8 @@ export function buildMapHtml({
 <style>
   html, body { margin: 0; padding: 0; height: 100%; width: 100%; }
   #map { height: 100%; width: 100%; }
-  body { background: ${colors.background}; overflow: hidden; }
-  /* Atif (OSM icin ODbL, Mapbox icin kullanim kosullari) gorunur kalmali; yalnizca tipografiye uyduruyoruz. */
-  .${globalName}-ctrl-attrib { font-size: 9px; background: rgba(255,255,255,0.75); }
-  .${globalName}-ctrl-attrib a { color: ${colors.textSecondary}; }
+  body { background: ${palette.background}; overflow: hidden; }
+  ${attributionCss(globalName, colorScheme)}
   ${config.hideLogo ? `.${globalName}-ctrl-bottom-left { display: none; }` : ''}
 </style>
 </head>
@@ -220,7 +368,7 @@ ${config.setupScript}
 
   var map = new ${globalName}.Map({
     container: 'map',
-    style: '${config.styleUrl}',
+    style: '${variant.styleUrl}',${variant.mapOptions ? `\n    ${variant.mapOptions}` : ''}
     center: [${centerLongitude}, ${centerLatitude}],
     zoom: ${zoom},
     // Mapbox stilinin Studio'daki varsayilani egimli/dondurulmus (3D onizleme
@@ -318,7 +466,7 @@ ${config.setupScript}
   var PIN_EDGE = 1;
   var PIN_BAND = PIN_RING + PIN_EDGE;
 
-  var PIN_INK = '${colors.text}';
+  var PIN_INK = '${ink.text}';
   var PIN_KEYLINE = '#FFFFFF';
 
   // ink: rim'in KOYU kapatilan orani. Bu, stationAvailability()'nin uc durumunun
@@ -574,7 +722,7 @@ ${config.setupScript}
     // atamanin varligini artik denetliyor.
     opened = true;
     stage = 'yuklendi';
-${config.onLoadScript}
+${variant.onLoadScript}
     map.addSource('stations', {
       type: 'geojson',
       data: EMPTY,
@@ -635,10 +783,10 @@ ${config.onLoadScript}
       paint: {
         // Pinin dis kenari r + 4; hale 5 dp disinda duruyor.
         'circle-radius': ['+', PIN_TIER_RADIUS, PIN_BAND + 5],
-        'circle-color': '${colors.primary}',
+        'circle-color': '${palette.primary}',
         'circle-opacity': 0.2,
         'circle-stroke-width': 2.5,
-        'circle-stroke-color': '${colors.primaryDark}',
+        'circle-stroke-color': '${selectionRing}',
         'circle-translate': [0, -PIN_HEAD_DY],
         'circle-translate-anchor': 'viewport',
       },
@@ -655,7 +803,7 @@ ${config.onLoadScript}
         'circle-radius': ['+', PIN_TIER_RADIUS, PIN_BAND + 5],
         'circle-opacity': 0,
         'circle-stroke-width': 2,
-        'circle-stroke-color': '${colors.primaryDark}',
+        'circle-stroke-color': '${selectionRing}',
         'circle-stroke-opacity': 0,
         'circle-translate': [0, -PIN_HEAD_DY],
         'circle-translate-anchor': 'viewport',
@@ -681,7 +829,7 @@ ${config.onLoadScript}
       source: 'stations',
       filter: ['has', 'point_count'],
       paint: {
-        'circle-color': '${colors.text}',
+        'circle-color': '${ink.text}',
         'circle-radius': ['+', CLUSTER_RADIUS, PIN_RING + PIN_EDGE],
       },
     });
@@ -695,7 +843,7 @@ ${config.onLoadScript}
         'circle-color': CLUSTER_COLOR,
         'circle-radius': CLUSTER_RADIUS,
         'circle-stroke-width': PIN_RING,
-        'circle-stroke-color': ['case', ['>', ['get', 'free'], 0], '#FFFFFF', '${colors.text}'],
+        'circle-stroke-color': ['case', ['>', ['get', 'free'], 0], '#FFFFFF', '${ink.text}'],
       },
     });
 
@@ -718,7 +866,7 @@ ${config.onLoadScript}
       },
       // Beyaz murekkep #0FB5A3 uzerinde 2.57:1 idi. Koyu murekkep dort kume
       // renginin hepsinde AA: 6.94 / 6.51 / 4.75 / 6.01.
-      paint: { 'text-color': '${colors.text}' },
+      paint: { 'text-color': '${ink.text}' },
     });
     // Istasyon pini. Katman KIMLIGI degismiyor ('stations'), cunku tiklama
     // sorgusu ona gore yazilmis.
@@ -766,7 +914,7 @@ ${config.onLoadScript}
           'circle-stroke-width': PIN_RING,
           'circle-stroke-color': ['match', ['get', 'status'],
             ['AVAILABLE', 'PARTIAL'], '#FFFFFF',
-            '${colors.text}'],
+            '${ink.text}'],
         },
       });
     }
@@ -774,7 +922,8 @@ ${config.onLoadScript}
     // Iki sebep: 12 px beyaz rakam durum renkleri uzerinde 2.20-3.21:1 kaliyordu
     // (AA 4.5 istiyor) ve paydasiz "2" bir istasyonda 2/2, digerinde 2/40
     // anlamina geliyordu. Burada koyu murekkep + beyaz halo: zemine karsi 13.69,
-    // halo uzerinde 15.28.
+    // halo uzerinde 15.28. Etiket pinin disinda, dogrudan zeminde durdugu icin
+    // koyu temada tersine donuyor: acik yazi + koyu halo, zeminde 15.52.
     //
     // minzoom 13, clusterMaxZoom 14 ile bilincli olarak ortusuyor: z13-14
     // arasinda yalnizca KUME DISI kalmis ayrik pinler gorunur - yani "komsu pin
@@ -805,8 +954,8 @@ ${config.onLoadScript}
         'symbol-sort-key': PIN_PLACE_RANK,
       },
       paint: {
-        'text-color': '${colors.text}',
-        'text-halo-color': '#FFFFFF',
+        'text-color': '${palette.text}',
+        'text-halo-color': '${dark ? DARK_LAND_COLOR : '#FFFFFF'}',
         'text-halo-width': 1.4,
       },
     });
@@ -826,7 +975,7 @@ ${config.onLoadScript}
       },
     });
     // Kullanici konumu: nabiz gibi genisleyen hale + mavi nokta. Marka mavisi
-    // (colors.location) kasitli olarak istasyon turkuazindan farkli - "ben
+    // (paletin location rengi) kasitli olarak istasyon turkuazindan farkli - "ben
     // buradayim" noktasi diger tum turkuaz/renkli pinlerden hemen ayrissin.
     map.addSource('user', { type: 'geojson', data: EMPTY });
     map.addLayer({
@@ -835,7 +984,7 @@ ${config.onLoadScript}
       source: 'user',
       paint: {
         'circle-radius': 14,
-        'circle-color': '${colors.location}',
+        'circle-color': '${palette.location}',
         'circle-opacity': 0.25,
       },
     });
@@ -845,27 +994,29 @@ ${config.onLoadScript}
       source: 'user',
       paint: {
         'circle-radius': 7,
-        'circle-color': '${colors.location}',
+        'circle-color': '${palette.location}',
         'circle-stroke-width': 2.5,
         'circle-stroke-color': '#FFFFFF',
       },
     });
 
     // Rota cizgisi pinlerin altinda kalsin diye station-halo'nun onune ekleniyor.
+    // Kenar cizgisi rotayi alttaki yollardan ayiriyor: acik temada beyaz, koyu
+    // temada zemin rengi (beyaz kenar koyu haritada goz aliyordu).
     map.addSource('route', { type: 'geojson', data: EMPTY });
     map.addLayer({
       id: 'route-casing',
       type: 'line',
       source: 'route',
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#FFFFFF', 'line-width': 9 },
+      paint: { 'line-color': '${dark ? DARK_LAND_COLOR : '#FFFFFF'}', 'line-width': 9 },
     }, 'station-halo');
     map.addLayer({
       id: 'route-line',
       type: 'line',
       source: 'route',
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '${colors.primary}', 'line-width': 5 },
+      paint: { 'line-color': '${palette.primary}', 'line-width': 5 },
     }, 'station-halo');
 
     // Baslangic (koyu) ve varis (marka mavisi) noktalari.
@@ -876,11 +1027,38 @@ ${config.onLoadScript}
       source: 'endpoints',
       paint: {
         'circle-radius': 7,
-        'circle-color': ['match', ['get', 'kind'], 'start', '${colors.text}', '${colors.location}'],
+        'circle-color': ['match', ['get', 'kind'], 'start', '${ink.text}', '${palette.location}'],
         'circle-stroke-width': 3,
         'circle-stroke-color': '#FFFFFF',
       },
     });
+
+    // Mapbox Standard'in isigi (Studio stilinde "dawn", koyu temada "night")
+    // bizim katmanlarimizi da aydinlatip karartiyor. Emulatorde olculdu: konum
+    // noktasi gece isiginda #5A9BFF yerine #000A29 (neredeyse siyah), dawn'da
+    // #2F7DFF yerine #2E6FCA cikiyordu. Pin, kume, rota ve konum sahnenin degil
+    // arayuzun parcasi: emissive-strength 1 onlari isiktan bagimsiz, tam kendi
+    // renginde cizdiriyor ve yukaridaki kontrast olculeri ancak boyle gecerli.
+    // MapLibre bu ozellikleri tanimiyor; yalnizca isikli stilde uygulaniyor.
+    if (${config.litStyle}) {
+      [
+        'station-halo', 'station-ripple', 'cluster-edge', 'clusters', 'cluster-count', 'stations',
+        'station-label', 'user-pulse', 'user-dot', 'route-casing', 'route-line', 'endpoints'
+      ].forEach(function (id) {
+        var layer = map.getLayer(id);
+        if (!layer) return;
+        try {
+          if (layer.type === 'symbol') {
+            map.setPaintProperty(id, 'icon-emissive-strength', 1);
+            map.setPaintProperty(id, 'text-emissive-strength', 1);
+          } else {
+            map.setPaintProperty(id, layer.type + '-emissive-strength', 1);
+          }
+        } catch (e) {
+          // Yalnizca gorunum: katman karanlik kalir ama calismaya devam eder.
+        }
+      });
+    }
 
     // Nabiz dongusu rAF'i BOSA dondurmemeli. Eskiden 'load' aninda baslayip
     // kullanici konumu hic gelmese bile sonsuza kadar donuyordu (rota

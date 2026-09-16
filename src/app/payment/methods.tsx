@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
   FadeInDown,
@@ -26,13 +26,15 @@ import {
   useRemovePaymentMethod,
   useSetDefaultPaymentMethod,
 } from '@/queries/paymentMethods';
-import { colors, radius, shadows, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, shadows, spacing, typography, useColors } from '@/theme';
 import { haptics } from '@/utils/haptics';
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
 /** Odeme yontemleri (spec bolum 12) - demo. */
 export default function PaymentMethodsScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const { data: methods, isLoading, isRefetching, refetch } = usePaymentMethods();
   const addPaymentMethod = useAddPaymentMethod();
@@ -219,7 +221,7 @@ export default function PaymentMethodsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background },
 
   header: {
@@ -323,4 +325,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
   },
-});
+}));

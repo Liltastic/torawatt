@@ -10,7 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Logo } from '@/components/Logo';
-import { colors, radius } from '@/theme';
+import { lightColors, radius } from '@/theme';
 
 /** Acilis ekraninin en az gorunecegi sure. */
 export const BOOT_SCREEN_MS = 2000;
@@ -39,7 +39,8 @@ interface BootScreenProps {
  *
  * Arka plan, app.json'daki yerel acilis ekraniyla AYNI turkuaz. Yerel ekran
  * kaybolup bu ekran devraldiginda renk atlamasi olmuyor, tek bir ekran gibi
- * gorunuyor.
+ * gorunuyor. Bu yuzden koyu temada da acik paletin turkuazi: yerel ekranin
+ * rengi temaya gore degismiyor.
  *
  * Cikis: onceden uygulama hazir oldugu karede bu ekran tek seferde yok olup
  * yerine harita/hos geldin ekrani geliyordu. Artik kok layout uygulamayi
@@ -90,7 +91,7 @@ export function BootScreen({ exiting = false, onExited }: BootScreenProps) {
       importantForAccessibility={exiting ? 'no-hide-descendants' : 'auto'}
       style={[styles.root, exiting && styles.curtain, curtainStyle]}>
       <Animated.View style={logoStyle} accessibilityRole="image" accessibilityLabel="TORA WATT">
-        <Logo width={208} color={colors.white} accentColor={colors.white} />
+        <Logo width={208} color={lightColors.white} accentColor={lightColors.white} />
       </Animated.View>
 
       <Animated.View
@@ -109,7 +110,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary,
+    backgroundColor: lightColors.primary,
   },
   curtain: {
     position: 'absolute',
@@ -133,6 +134,6 @@ const styles = StyleSheet.create({
     width: BAR_W,
     height: BAR_H,
     borderRadius: radius.chip,
-    backgroundColor: colors.white,
+    backgroundColor: lightColors.white,
   },
 });

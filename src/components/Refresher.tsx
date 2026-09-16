@@ -1,6 +1,6 @@
 import { RefreshControl, type RefreshControlProps } from 'react-native';
 
-import { colors } from '@/theme';
+import { useColors } from '@/theme';
 
 /**
  * Listelerin "asagi cekip yenile" kontrolu. Tek yerde toplandi ki gostergenin
@@ -16,6 +16,7 @@ import { colors } from '@/theme';
  * tamami ekrandan kayboluyordu - ilk surumde tam olarak bu oldu.
  */
 export function Refresher(props: RefreshControlProps) {
+  const colors = useColors();
   return (
     <RefreshControl
       tintColor={colors.primary}

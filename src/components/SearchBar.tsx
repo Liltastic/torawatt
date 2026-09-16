@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { GlassView } from 'expo-glass-effect';
-import { StyleSheet, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
+import { TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 
-import { colors, radius, shadows, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, shadows, spacing, typography, useColors } from '@/theme';
 import { GLASS_ENABLED } from '@/utils/glass';
 
 interface SearchBarProps extends Omit<TextInputProps, 'style'> {
@@ -17,6 +17,8 @@ interface SearchBarProps extends Omit<TextInputProps, 'style'> {
 }
 
 export function SearchBar({ containerStyle, trailing, glass = false, ...rest }: SearchBarProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const useGlass = glass && GLASS_ENABLED;
 
   return (
@@ -36,7 +38,7 @@ export function SearchBar({ containerStyle, trailing, glass = false, ...rest }: 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -68,4 +70,4 @@ const styles = StyleSheet.create({
     // Android'de TextInput'un varsayilan dikey padding'i hizalamayi bozuyor.
     paddingVertical: 0,
   },
-});
+}));

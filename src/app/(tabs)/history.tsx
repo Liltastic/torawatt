@@ -19,7 +19,7 @@ import {
 } from '@/components';
 import { useTabBarInset } from '@/utils/tabBar';
 import { useChargingHistory } from '@/queries/history';
-import { colors, radius, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, spacing, typography, useColors } from '@/theme';
 import type { ChargingHistoryDetail } from '@/types/domain';
 import { formatDate, formatEnergy, formatMinutes, formatPrice } from '@/utils/format';
 
@@ -47,6 +47,7 @@ const RANGES = [
 ] as const;
 
 export default function HistoryScreen() {
+  const styles = useStyles();
   const tabBarInset = useTabBarInset();
   const miniBarInset = useChargingMiniBarInset();
   const { data: items, isLoading, isRefetching, refetch } = useChargingHistory();
@@ -157,6 +158,7 @@ export default function HistoryScreen() {
 }
 
 function HistorySummary({ energy, cost }: { energy: number; cost: number }) {
+  const styles = useStyles();
   return (
     <Animated.View entering={FadeInDown.duration(320)}>
       <Card style={styles.summary}>
@@ -175,6 +177,8 @@ function HistorySummary({ energy, cost }: { energy: number; cost: number }) {
 }
 
 function HistoryRow({ item }: { item: ChargingHistoryDetail }) {
+  const colors = useColors();
+  const styles = useStyles();
   // Basili zemin karti cizen ic gorunumde; dokunmayi Link disaridaki
   // basilabilir alana veriyor, o yuzden durum burada tutuluyor.
   const [pressed, setPressed] = useState(false);
@@ -223,7 +227,7 @@ function HistoryRow({ item }: { item: ChargingHistoryDetail }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background },
   header: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
   title: { ...typography.h2, color: colors.text },
@@ -258,4 +262,4 @@ const styles = StyleSheet.create({
   energy: { ...typography.caption, color: colors.primaryText, marginTop: spacing.sm, fontWeight: '600' },
   rowTrailing: { flexDirection: 'row', alignItems: 'center', marginLeft: spacing.md },
   cost: { ...typography.bodyStrong, color: colors.text, marginRight: spacing.xs },
-});
+}));

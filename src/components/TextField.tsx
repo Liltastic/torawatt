@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState, type ComponentProps, type Ref } from 'react';
-import { Platform, Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
+import { Platform, Pressable, Text, TextInput, View, type TextInputProps } from 'react-native';
 
-import { colors, radius, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, spacing, typography, useColors } from '@/theme';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -41,6 +41,8 @@ export function TextField({
   ref,
   ...rest
 }: TextFieldProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const [focused, setFocused] = useState(false);
   const [hidden, setHidden] = useState(true);
   const secure = secureToggle ? hidden : secureTextEntry;
@@ -124,7 +126,7 @@ export function TextField({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   wrap: { marginBottom: spacing.lg },
   label: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.sm },
   labelOnDark: { color: 'rgba(255, 255, 255, 0.78)' },
@@ -170,4 +172,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   error: { ...typography.caption, marginTop: spacing.xs },
-});
+}));

@@ -3,7 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm, type Control } from 'react-hook-form';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { z } from 'zod';
@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { Button, FilterChip, TextField } from '@/components';
 import { vehicleCatalog, type VehiclePreset } from '@/mocks/vehicleCatalog';
 import { useCreateVehicle } from '@/queries/vehicles';
-import { colors, radius, shadows, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, shadows, spacing, typography, useColors } from '@/theme';
 import { connectorLabels, type ConnectorType } from '@/types/domain';
 import { haptics } from '@/utils/haptics';
 
@@ -46,6 +46,8 @@ type VehicleFormInput = z.input<typeof vehicleSchema>;
 type VehicleFormOutput = z.output<typeof vehicleSchema>;
 
 export default function AddVehicleScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const createVehicle = useCreateVehicle();
   const [connectors, setConnectors] = useState<ConnectorType[]>(['CCS2', 'TYPE_2']);
@@ -279,7 +281,7 @@ function FormInput({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
 
@@ -344,4 +346,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
   },
-});
+}));

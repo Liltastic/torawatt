@@ -1,17 +1,19 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Keyboard, Pressable, StyleSheet, Text, TextInput } from 'react-native';
+import { Keyboard, Pressable, Text, TextInput } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 import { AuthLayout, Button, TextField } from '@/components';
 import { ApiError } from '@/services/api';
 import { useAuthStore } from '@/store/auth';
-import { colors, spacing, typography } from '@/theme';
+import { createThemedStyles, spacing, typography, useColors } from '@/theme';
 
 const MIN_PASSWORD_LENGTH = 8;
 
 export default function RegisterScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const register = useAuthStore((s) => s.register);
   const emailRef = useRef<TextInput>(null);
@@ -142,7 +144,7 @@ export default function RegisterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   // Alanlar kendi 16dp alt paylarini tasir; satir son alanin 12dp altina oturur.
   errorRow: {
     flexDirection: 'row',
@@ -169,4 +171,4 @@ const styles = StyleSheet.create({
   },
   switchText: { ...typography.body, color: 'rgba(255, 255, 255, 0.82)' },
   switchTextStrong: { color: colors.primaryOnDark, fontWeight: '700' },
-});
+}));

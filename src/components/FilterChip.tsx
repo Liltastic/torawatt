@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { AnimatedPressable } from '@/components/AnimatedPressable';
-import { colors, radius, spacing, typography } from '@/theme';
+import { radius, spacing, typography, useColors } from '@/theme';
 
 interface FilterChipProps {
   label: string;
@@ -28,6 +28,7 @@ const SELECT = { duration: 180, easing: Easing.out(Easing.quad) } as const;
  * yumusakca gecer. Renk gecisi yerlesim hesabi tetiklemiyor.
  */
 export function FilterChip({ label, selected = false, onPress, style }: FilterChipProps) {
+  const colors = useColors();
   const progress = useSharedValue(selected ? 1 : 0);
 
   useEffect(() => {

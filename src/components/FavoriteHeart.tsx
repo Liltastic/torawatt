@@ -8,7 +8,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { colors } from '@/theme';
+import { useColors } from '@/theme';
 
 interface FavoriteHeartProps {
   active: boolean;
@@ -24,6 +24,7 @@ interface FavoriteHeartProps {
  * ikonu olcekliyor, ikisi ust uste binebilir.
  */
 export function FavoriteHeart({ active, size }: FavoriteHeartProps) {
+  const colors = useColors();
   const scale = useSharedValue(1);
   const wasActive = useRef(active);
 

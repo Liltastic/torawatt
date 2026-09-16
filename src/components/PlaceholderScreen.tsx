@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { colors, spacing, typography } from '@/theme';
+import { createThemedStyles, spacing, typography } from '@/theme';
 
 import { EmptyState } from './EmptyState';
 
@@ -18,6 +18,7 @@ export function PlaceholderScreen({
   headline: string;
   description: string;
 }) {
+  const styles = useStyles();
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <View style={styles.header}>
@@ -30,9 +31,9 @@ export function PlaceholderScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background },
   header: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
   title: { ...typography.h2, color: colors.text },
   body: { flex: 1, justifyContent: 'center' },
-});
+}));

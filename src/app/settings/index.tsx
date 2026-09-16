@@ -7,7 +7,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
@@ -16,11 +15,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Card, TextField } from '@/components';
 import { ApiError } from '@/services/api';
 import { useAuthStore } from '@/store/auth';
-import { colors, radius, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, spacing, typography, useColors } from '@/theme';
 
 const MIN_PASSWORD_LENGTH = 8;
 
 export default function SettingsScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const updateProfile = useAuthStore((s) => s.updateProfile);
@@ -189,7 +190,7 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
 
@@ -223,4 +224,4 @@ const styles = StyleSheet.create({
   error: { ...typography.caption, color: colors.dangerText, marginTop: spacing.sm },
 
   dangerText: { ...typography.body, color: colors.textSecondary },
-});
+}));

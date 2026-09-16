@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { StyleSheet, View, type DimensionValue, type StyleProp, type ViewStyle } from 'react-native';
+import { View, type DimensionValue, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -8,7 +8,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { colors, radius, spacing } from '@/theme';
+import { createThemedStyles, radius, spacing, useColors } from '@/theme';
 
 interface SkeletonProps {
   width?: DimensionValue;
@@ -19,6 +19,7 @@ interface SkeletonProps {
 
 /** Icerik yuklenirken yerini tutan, nefes alan gri blok. */
 export function Skeleton({ width = '100%', height = 14, borderRadius = radius.badge, style }: SkeletonProps) {
+  const colors = useColors();
   const opacity = useSharedValue(0.45);
 
   useEffect(() => {
@@ -40,6 +41,7 @@ export function Skeleton({ width = '100%', height = 14, borderRadius = radius.ba
 
 /** Istasyon satiri yuklenirken gosterilen iskelet; StationCard ile ayni olculerde. */
 export function StationCardSkeleton() {
+  const styles = useStyles();
   return (
     <View style={styles.card}>
       <View style={styles.main}>
@@ -61,6 +63,7 @@ export function StationCardSkeleton() {
  * ust yarisini doldurmaya yetiyor.
  */
 export function ListCardSkeleton({ style }: { style?: StyleProp<ViewStyle> }) {
+  const styles = useStyles();
   return (
     <View style={[styles.listCard, style]}>
       <Skeleton width="58%" height={17} />
@@ -79,6 +82,7 @@ export function ListCardSkeleton({ style }: { style?: StyleProp<ViewStyle> }) {
  * cizdigi icin bu yalnizca govdeyi doldurur.
  */
 export function DetailSkeleton({ style }: { style?: StyleProp<ViewStyle> }) {
+  const styles = useStyles();
   return (
     <View style={[styles.detail, style]}>
       <Skeleton width="66%" height={26} />
@@ -90,7 +94,7 @@ export function DetailSkeleton({ style }: { style?: StyleProp<ViewStyle> }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -114,4 +118,4 @@ const styles = StyleSheet.create({
   detail: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg },
   block: { marginTop: spacing.xxl },
   blockGap: { marginTop: spacing.md },
-});
+}));

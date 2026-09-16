@@ -2,14 +2,23 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { GlassView } from 'expo-glass-effect';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Keyboard, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Text, View } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown, runOnJS } from 'react-native-reanimated';
 
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { AnimatedPressable } from '@/components/AnimatedPressable';
 import { ProgressRing } from '@/components/ProgressRing';
 import { useSessionStore } from '@/store/session';
-import { colors, radius, spacing, typography } from '@/theme';
+import {
+  createThemedStyles,
+  radius,
+  spacing,
+  typography,
+  useColors,
+  useColorSchemeName,
+  withAlpha,
+  type Palette,
+} from '@/theme';
 import type { ChargingSessionStatus } from '@/types/domain';
 import { formatEnergy, formatPower } from '@/utils/format';
 import { GLASS_ENABLED } from '@/utils/glass';
@@ -35,38 +44,39 @@ type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 /**
  * Etiketler ve tonlar Sarj ekranindaki durum rozetiyle ayni. `tone` koyu
- * markali zemin icin; `glassTone` iOS'taki acik cam zemin icin ayni ailenin
- * okunur koyu tonu.
+ * markali zemin icin; `glassTone` iOS'taki cam zemin icin ayni ailenin o
+ * temada okunur tonu (acik temada koyu, koyu temada acik). Renk degil palet
+ * anahtari tutuluyor: deger o anki temadan okunuyor.
  */
 const STATUS: Record<
   ChargingSessionStatus,
-  { title: string; icon: IoniconName; tone: string; glassTone: string }
+  { title: string; icon: IoniconName; tone: keyof Palette; glassTone: keyof Palette }
 > = {
   STARTING: {
     title: 'Bağlanıyor',
     icon: 'sync-outline',
-    tone: colors.warningOnDark,
-    glassTone: colors.warningText,
+    tone: 'warningOnDark',
+    glassTone: 'warningText',
   },
   CHARGING: {
     title: 'Şarj sürüyor',
     icon: 'flash',
-    tone: colors.primaryOnDark,
-    glassTone: colors.primaryText,
+    tone: 'primaryOnDark',
+    glassTone: 'primaryText',
   },
   STOPPING: {
     title: 'Durduruluyor',
     icon: 'stop',
-    tone: colors.warningOnDark,
-    glassTone: colors.warningText,
+    tone: 'warningOnDark',
+    glassTone: 'warningText',
   },
   COMPLETED: {
     title: 'Şarj tamamlandı',
     icon: 'checkmark',
-    tone: colors.successOnDark,
-    glassTone: colors.successText,
+    tone: 'successOnDark',
+    glassTone: 'successText',
   },
-  ERROR: { title: 'Şarj hatası', icon: 'alert', tone: colors.dangerOnDark, glassTone: colors.dangerText },
+  ERROR: { title: 'Şarj hatası', icon: 'alert', tone: 'dangerOnDark', glassTone: 'dangerText' },
 };
 
 /**
@@ -128,6 +138,9 @@ export function ChargingMiniBar() {
 }
 
 function MiniBar({ status, bottom }: { status: ChargingSessionStatus; bottom: number }) {
+  const colors = useColors();
+  const colorScheme = useColorSchemeName();
+  const styles = useStyles();
   const router = useRouter();
 
   // Her biri ilkel deger: oturum her saniye yeni bir nesne uretiyor, nesneyi
@@ -141,12 +154,12 @@ function MiniBar({ status, bottom }: { status: ChargingSessionStatus; bottom: nu
 
   // iOS 26+: zemin Liquid Glass. Cubuk solarak giriyor ve opaklik 0'dan
   // basliyor; bu sirada cam hic cizilmiyor ve sonra da gelmiyor (bkz.
-  // utils/glass). Cam, giris bitince aciliyor; o ana kadar yari saydam beyaz
-  // bir zemin cubugu okunur tutuyor.
+  // utils/glass). Cam, giris bitince aciliyor; o ana kadar yari saydam yuzey
+  // rengi bir zemin cubugu okunur tutuyor.
   const [glassOn, setGlassOn] = useState(false);
 
   const config = STATUS[status];
-  const tone = GLASS_ENABLED ? config.glassTone : config.tone;
+  const tone = colors[GLASS_ENABLED ? config.glassTone : config.tone];
   const detail =
     status === 'CHARGING' && powerKw > 0
       ? formatPower(powerKw)
@@ -180,7 +193,8 @@ function MiniBar({ status, bottom }: { status: ChargingSessionStatus; bottom: nu
             glassEffectStyle={
               glassOn ? { style: 'regular', animate: true, animationDuration: 0.25 } : 'none'
             }
-            colorScheme="light"
+            // Yazi renkleri temadan geliyor; cam da ayni temada cizilmeli.
+            colorScheme={colorScheme}
             style={styles.glass}
           />
         )}
@@ -190,7 +204,7 @@ function MiniBar({ status, bottom }: { status: ChargingSessionStatus; bottom: nu
           size={38}
           strokeWidth={3}
           color={tone}
-          trackColor={GLASS_ENABLED ? 'rgba(15, 42, 34, 0.12)' : 'rgba(255, 255, 255, 0.14)'}>
+          trackColor={GLASS_ENABLED ? withAlpha(colors.text, 0.12) : 'rgba(255, 255, 255, 0.14)'}>
           <Ionicons name={config.icon} size={15} color={tone} />
         </ProgressRing>
 
@@ -226,7 +240,7 @@ function MiniBar({ status, bottom }: { status: ChargingSessionStatus; bottom: nu
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   wrap: {
     position: 'absolute',
     left: spacing.lg,
@@ -258,7 +272,7 @@ const styles = StyleSheet.create({
   barGlass: { backgroundColor: 'transparent', borderWidth: 0, shadowOpacity: 0 },
   // Cam acilana kadar (giris solmasi) okunur bir zemin.
   barGlassPending: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: withAlpha(colors.surface, 0.9),
     borderWidth: 0,
     shadowOpacity: 0.12,
   },
@@ -277,4 +291,4 @@ const styles = StyleSheet.create({
   percent: { fontWeight: '700' },
   subtitle: { ...typography.caption, color: ON_DARK_MUTED, marginTop: 1 },
   mutedOnGlass: { color: colors.textSecondary },
-});
+}));

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeOutLeft, LinearTransition } from 'react-native-reanimated';
 
@@ -18,10 +18,12 @@ import { useStations } from '@/queries/stations';
 import { haversineKm } from '@/services/routing';
 import { useLocationStore } from '@/store/location';
 import { useMapIntentStore } from '@/store/mapIntent';
-import { colors, radius, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, spacing, typography, useColors } from '@/theme';
 
 /** Favori istasyonlar; secilen istasyon harita sekmesinde sheet icinde acilir. */
 export default function FavoritesScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const { data: stations, isLoading: stationsLoading, refetch: refetchStations } = useStations();
   const {
@@ -125,7 +127,7 @@ export default function FavoritesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background },
 
   header: {
@@ -170,4 +172,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

@@ -18,7 +18,7 @@ import { warmUpServer } from '@/services/api';
 import { installErrorLog, logError, setErrorLogRoute, setErrorLogUser } from '@/services/errorLog';
 import { setQueryClientForAuth, useAuthStore } from '@/store/auth';
 import { useSessionStore } from '@/store/session';
-import { colors } from '@/theme';
+import { useColors } from '@/theme';
 import { checkForImmediateUpdate } from '@/utils/autoUpdate';
 
 /** Alttan acilan, kendi kapatma carpisi olan akislar. */
@@ -26,10 +26,6 @@ const MODAL_SCREEN = { presentation: 'modal' } as const;
 
 // Olabildigince erken: bu modul yuklenirken ve ilk cizimde firlayan hatalar da kayda dussun.
 installErrorLog();
-
-// Kok pencere arka planini boyar; aksi halde status bar / navigation bar
-// arkasinda sistemin varsayilan siyahi gorunuyor.
-void SystemUI.setBackgroundColorAsync(colors.background);
 
 /**
  * Ekran cizilirken firlayan hatalar global hata yakalayiciya UGRAMIYOR: React
@@ -53,6 +49,15 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 }
 
 export default function RootLayout() {
+  const colors = useColors();
+
+  // Kok pencere arka planini boyar; aksi halde status bar / navigation bar
+  // arkasinda sistemin varsayilan siyahi gorunuyor. Tema degisince yeniden
+  // boyanir, yoksa ekran gecislerinde eski temanin zemini parliyor.
+  useEffect(() => {
+    void SystemUI.setBackgroundColorAsync(colors.background);
+  }, [colors.background]);
+
   const pathname = usePathname();
   useEffect(() => {
     setErrorLogRoute(pathname);
@@ -157,7 +162,8 @@ export default function RootLayout() {
     <GestureHandlerRootView style={styles.flex}>
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
-          <StatusBar style="dark" />
+          {/* auto: acik temada koyu, koyu temada acik simgeler. */}
+          <StatusBar style="auto" />
           <Stack
             screenOptions={{
               headerShown: false,

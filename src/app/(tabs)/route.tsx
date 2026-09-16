@@ -6,7 +6,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
@@ -28,7 +27,7 @@ import { useStations } from '@/queries/stations';
 import { useActiveVehicle, useVehicles } from '@/queries/vehicles';
 import { geocode, getRoute, type Place } from '@/services/routing';
 import { planTrip, type TripPlan } from '@/services/tripPlanner';
-import { colors, radius, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, spacing, typography, useColors } from '@/theme';
 import { formatEnergy, formatMinutes, formatPrice } from '@/utils/format';
 import { haptics } from '@/utils/haptics';
 import { useTabBarInset } from '@/utils/tabBar';
@@ -37,6 +36,8 @@ import { useTabBarInset } from '@/utils/tabBar';
 const RESERVE_PERCENT = 10;
 
 export default function RouteScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   // iOS sekme cubugu icerigin uzerine biniyor (bkz. utils/tabBar).
   const tabBarInset = useTabBarInset();
@@ -189,6 +190,8 @@ function PlanResult({
   driveMinutes: number;
   route: MapRoute;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const stopStations = useMemo(() => trip.stops.map((stop) => stop.station), [trip]);
 
   // Expo Router ziyaret edilen sekmeyi mount edilmis birakiyor; onizleme de tam
@@ -295,6 +298,7 @@ function PlanResult({
 }
 
 function Summary({ label, value }: { label: string; value: string }) {
+  const styles = useStyles();
   return (
     <View style={styles.summaryItem}>
       <Text style={styles.summaryLabel}>{label}</Text>
@@ -313,6 +317,8 @@ function PlaceSearch({
   value?: Place;
   onSelect: (place: Place) => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Place[]>([]);
   const [searching, setSearching] = useState(false);
@@ -380,7 +386,7 @@ function PlaceSearch({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   header: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
@@ -479,4 +485,4 @@ const styles = StyleSheet.create({
   stopCost: { color: colors.text, fontWeight: '700' },
 
   disclaimer: { ...typography.caption, color: colors.textTertiary, marginTop: spacing.xl },
-});
+}));

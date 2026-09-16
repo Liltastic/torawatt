@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { AnimatedPressable } from '@/components/AnimatedPressable';
-import { colors, radius, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, spacing, typography, useColors } from '@/theme';
 import { currentTypeOf, stationAvailability, type Station } from '@/types/domain';
 import { formatDistance, formatPrice } from '@/utils/format';
 
@@ -21,6 +21,8 @@ export function StationCard({
   selected?: boolean;
   onPress?: () => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const available = station.connectors.filter((c) => c.status === 'AVAILABLE').length;
   const total = station.connectors.length;
 
@@ -81,7 +83,7 @@ export function StationCard({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -100,4 +102,4 @@ const styles = StyleSheet.create({
   price: { ...typography.bodyStrong, color: colors.text },
   priceUnit: { ...typography.caption, color: colors.textSecondary, fontWeight: '400' },
   priceCaption: { ...typography.caption, color: colors.textTertiary, marginBottom: spacing.xs },
-});
+}));

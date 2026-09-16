@@ -1,13 +1,16 @@
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { colors, radius, spacing, typography } from '@/theme';
 import {
-  statusColors,
-  statusLabels,
-  statusSoftColors,
-  statusTextColors,
   type BadgeStatus,
-} from '@/theme/colors';
+  createThemedStyles,
+  radius,
+  spacing,
+  statusLabels,
+  typography,
+  useColors,
+  useTheme,
+  type Palette,
+} from '@/theme';
 import { connectorLabels, type ConnectorType, type CurrentType } from '@/types/domain';
 
 /** Soket / istasyon musaitlik rozeti (spec bolum 7). */
@@ -20,6 +23,8 @@ export function AvailabilityBadge({
   label?: string;
   style?: StyleProp<ViewStyle>;
 }) {
+  const { statusColors, statusSoftColors, statusTextColors } = useTheme();
+  const styles = useStyles();
   return (
     <View style={[styles.badge, { backgroundColor: statusSoftColors[status] }, style]}>
       <View style={[styles.dot, { backgroundColor: statusColors[status] }]} />
@@ -31,11 +36,13 @@ export function AvailabilityBadge({
   );
 }
 
-const currentTypeColors: Record<CurrentType, { bg: string; fg: string }> = {
-  AC: { bg: colors.neutralSoft, fg: colors.textSecondary },
-  DC: { bg: colors.primarySoft, fg: colors.primaryText },
-  HPC: { bg: colors.primaryStrong, fg: colors.white },
-};
+function currentTypeColorsFor(colors: Palette): Record<CurrentType, { bg: string; fg: string }> {
+  return {
+    AC: { bg: colors.neutralSoft, fg: colors.textSecondary },
+    DC: { bg: colors.primarySoft, fg: colors.primaryText },
+    HPC: { bg: colors.primaryStrong, fg: colors.white },
+  };
+}
 
 /** AC / DC / HPC + kW rozeti (spec bolum 5). */
 export function PowerBadge({
@@ -47,7 +54,9 @@ export function PowerBadge({
   powerKw?: number;
   style?: StyleProp<ViewStyle>;
 }) {
-  const tone = currentTypeColors[currentType];
+  const colors = useColors();
+  const styles = useStyles();
+  const tone = currentTypeColorsFor(colors)[currentType];
   return (
     <View style={[styles.badge, { backgroundColor: tone.bg }, style]}>
       <Text style={[styles.badgeText, { color: tone.fg }]}>
@@ -65,6 +74,8 @@ export function ConnectorBadge({
   type: ConnectorType;
   style?: StyleProp<ViewStyle>;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={[styles.badge, styles.connector, style]}>
       <Text style={[styles.badgeText, { color: colors.textSecondary }]}>
@@ -74,7 +85,7 @@ export function ConnectorBadge({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -95,4 +106,4 @@ const styles = StyleSheet.create({
     marginRight: spacing.sm - 2,
   },
   badgeText: { ...typography.captionStrong },
-});
+}));

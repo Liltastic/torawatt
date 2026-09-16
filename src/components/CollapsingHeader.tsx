@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, typography } from '@/theme';
+import { createThemedStyles, typography } from '@/theme';
 
 /** Kompakt ust cubugun yuksekligi. */
 const COMPACT_HEIGHT = 48;
@@ -43,6 +43,7 @@ export function useCollapsingTitle() {
  * durum cubugunun hemen altina yerlestiriliyor.
  */
 export function CompactHeader({ title, scrollY }: { title: string; scrollY: SharedValue<number> }) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
 
   const barStyle = useAnimatedStyle(() => ({
@@ -67,7 +68,7 @@ export function CompactHeader({ title, scrollY }: { title: string; scrollY: Shar
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   bar: {
     position: 'absolute',
     left: 0,
@@ -80,4 +81,4 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   title: { ...typography.bodyStrong, color: colors.text },
-});
+}));

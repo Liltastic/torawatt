@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { AnimatedPressable } from '@/components/AnimatedPressable';
-import { colors, radius, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, spacing, typography, useColors } from '@/theme';
 import { connectorLabels, currentTypeOf, type Connector } from '@/types/domain';
 import { formatPrice } from '@/utils/format';
 
@@ -18,6 +18,8 @@ interface ConnectorCardProps {
 
 /** Istasyon detayindaki soket karti (spec bolum 7). */
 export function ConnectorCard({ connector, index, selected = false, onPress }: ConnectorCardProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const selectable = connector.status === 'AVAILABLE';
 
   return (
@@ -69,7 +71,7 @@ export function ConnectorCard({ connector, index, selected = false, onPress }: C
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.card,
@@ -108,4 +110,4 @@ const styles = StyleSheet.create({
   footer: { marginTop: spacing.md },
   price: { ...typography.bodyStrong, color: colors.text },
   priceUnit: { ...typography.caption, color: colors.textSecondary, fontWeight: '400' },
-});
+}));

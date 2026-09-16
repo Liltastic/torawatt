@@ -1,6 +1,6 @@
-import { StyleSheet, View, type StyleProp, type ViewProps, type ViewStyle } from 'react-native';
+import { View, type StyleProp, type ViewProps, type ViewStyle } from 'react-native';
 
-import { colors, radius, shadows, spacing } from '@/theme';
+import { createThemedStyles, radius, shadows, spacing } from '@/theme';
 
 interface CardProps extends ViewProps {
   /** Golgesiz, yalnizca kenarlikli varyant. */
@@ -10,6 +10,7 @@ interface CardProps extends ViewProps {
 }
 
 export function Card({ flat = false, padded = true, style, children, ...rest }: CardProps) {
+  const styles = useStyles();
   return (
     <View
       style={[styles.card, padded && styles.padded, !flat && shadows.card, style]}
@@ -19,7 +20,7 @@ export function Card({ flat = false, padded = true, style, children, ...rest }: 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.card,
@@ -27,4 +28,4 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   padded: { padding: spacing.xl },
-});
+}));

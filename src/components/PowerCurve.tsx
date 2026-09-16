@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from 'react-native-svg';
 
-import { colors, spacing, typography } from '@/theme';
+import { createThemedStyles, spacing, typography, useColors } from '@/theme';
 
 interface PowerCurveProps {
   /** Ornek sirasiyla kW degerleri. */
@@ -29,6 +29,8 @@ const PAD_X = 10;
  * SVG yolu her tikta yeniden uretilse de maliyeti ihmal edilebilir.
  */
 export function PowerCurve({ values, ratedKw, height = 132 }: PowerCurveProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const [width, setWidth] = useState(0);
 
   const samples = values.filter((v) => v > 0);
@@ -131,7 +133,7 @@ export function PowerCurve({ values, ratedKw, height = 132 }: PowerCurveProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   waiting: {
     position: 'absolute',
     top: 0,
@@ -142,4 +144,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   waitingText: { ...typography.caption, color: colors.textTertiary, marginTop: spacing.sm },
-});
+}));

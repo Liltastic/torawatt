@@ -1,13 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card, DetailSkeleton, EmptyState } from '@/components';
 import { useChargingHistoryEntry } from '@/queries/history';
 import { shareInvoice } from '@/services/invoice';
-import { colors, fontFamilies, radius, spacing, typography } from '@/theme';
+import { createThemedStyles, fontFamilies, radius, spacing, typography, useColors } from '@/theme';
 import {
   formatDate,
   formatEnergy,
@@ -18,6 +18,8 @@ import {
 
 /** Sarj gecmisi detayi / makbuz (spec bolum 13). */
 export default function HistoryDetailScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { data: item, isLoading } = useChargingHistoryEntry(id);
@@ -111,6 +113,8 @@ export default function HistoryDetailScreen() {
 }
 
 function Header({ onBack }: { onBack: () => void }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.header}>
       <Pressable
@@ -136,6 +140,7 @@ function Row({
   emphasis?: boolean;
   last?: boolean;
 }) {
+  const styles = useStyles();
   return (
     <View style={[styles.row, !last && styles.rowDivider]}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -144,7 +149,7 @@ function Row({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background },
   loadingWrap: { flex: 1, justifyContent: 'center' },
 
@@ -184,4 +189,4 @@ const styles = StyleSheet.create({
   noticeText: { ...typography.caption, color: colors.textSecondary, flex: 1, marginLeft: spacing.sm },
 
   invoice: { marginTop: spacing.lg },
-});
+}));

@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { type ImageContentPosition, type ImageSource } from 'expo-image';
 import { useEffect } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnimatedPressable } from '@/components/AnimatedPressable';
 import { AuthBackdrop } from '@/components/AuthBackdrop';
 import { Logo } from '@/components/Logo';
-import { colors, radius, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, spacing, typography, useColors } from '@/theme';
 
 const TOP_ROW_H = 40;
 const LINE_W = 56;
@@ -48,6 +48,8 @@ export function AuthLayout({
   onBack,
   children,
 }: AuthLayoutProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
 
@@ -130,7 +132,7 @@ export function AuthLayout({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.heroDark },
   flex: { flex: 1 },
 
@@ -180,4 +182,4 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     maxWidth: 340,
   },
-});
+}));

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
@@ -18,12 +18,14 @@ import {
 import { useDefaultPaymentMethod } from '@/queries/paymentMethods';
 import { useStation } from '@/queries/stations';
 import { useSessionStore } from '@/store/session';
-import { colors, radius, shadows, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, shadows, spacing, typography, useColors } from '@/theme';
 import { currentTypeOf } from '@/types/domain';
 import { formatPrice } from '@/utils/format';
 
 /** Sarj baslatma ozeti (spec bolum 8, ekran 9): baslatmadan once fiyat gorunur olmali. */
 export default function ChargeSummaryScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const { connectorId, stationId } = useLocalSearchParams<{
     connectorId: string;
     stationId: string;
@@ -160,6 +162,8 @@ export default function ChargeSummaryScreen() {
 }
 
 function Header({ onClose }: { onClose: () => void }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.header}>
       <AnimatedPressable
@@ -176,6 +180,7 @@ function Header({ onClose }: { onClose: () => void }) {
 }
 
 function PriceRow({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
+  const styles = useStyles();
   return (
     <View style={[styles.priceRow, !last && styles.priceRowDivider]}>
       <Text style={styles.priceLabel}>{label}</Text>
@@ -184,7 +189,7 @@ function PriceRow({ label, value, last = false }: { label: string; value: string
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background },
   loadingWrap: { flex: 1, justifyContent: 'center' },
 
@@ -240,4 +245,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
   },
-});
+}));

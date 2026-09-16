@@ -30,7 +30,15 @@ import {
 import { useCreateHistoryEntry } from '@/queries/history';
 import { useActiveVehicle } from '@/queries/vehicles';
 import { estimateChargeMinutes, useSessionStore } from '@/store/session';
-import { colors, fontFamilies, radius, spacing, typography } from '@/theme';
+import {
+  createThemedStyles,
+  fontFamilies,
+  radius,
+  spacing,
+  typography,
+  useColors,
+  withAlpha,
+} from '@/theme';
 import { currentTypeOf } from '@/types/domain';
 import { formatDuration, formatEnergy, formatPower, formatPrice } from '@/utils/format';
 import { haptics } from '@/utils/haptics';
@@ -73,6 +81,8 @@ const formatRangeGain = (km: number) => `+${Math.round(km)}`;
 const formatCost = (value: number) => formatPrice(value);
 
 export default function ChargingScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   // iOS sekme cubugu icerigin uzerine biniyor (bkz. utils/tabBar).
   const tabBarInset = useTabBarInset();
@@ -365,7 +375,7 @@ export default function ChargingScreen() {
       <View style={[styles.actions, { paddingBottom: spacing.md + tabBarInset }]}>
         <LinearGradient
           pointerEvents="none"
-          colors={['rgba(242, 251, 246, 0)', colors.background]}
+          colors={[withAlpha(colors.background, 0), colors.background]}
           style={styles.actionsFade}
         />
         {isFinished ? (
@@ -398,6 +408,8 @@ export default function ChargingScreen() {
 
 /** Basliktaki canli gosterge: sarj surerken yayilan bir halka. */
 function LiveDot({ mode }: { mode: ChargeRingMode }) {
+  const colors = useColors();
+  const styles = useStyles();
   const reduceMotion = useReducedMotion();
   const wave = useSharedValue(0);
   const pulsing = mode === 'charging' && !reduceMotion;
@@ -427,6 +439,8 @@ function LiveDot({ mode }: { mode: ChargeRingMode }) {
 }
 
 function HeroStatus({ mode }: { mode: ChargeRingMode }) {
+  const colors = useColors();
+  const styles = useStyles();
   const config = {
     starting: { icon: 'sync-outline' as const, label: 'Bağlanıyor', tone: colors.warningOnDark },
     charging: { icon: 'flash' as const, label: 'Şarj oluyor', tone: colors.primaryOnDark },
@@ -442,6 +456,7 @@ function HeroStatus({ mode }: { mode: ChargeRingMode }) {
 }
 
 function HeroStat({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
+  const styles = useStyles();
   return (
     <View style={styles.heroStat}>
       <Text style={styles.heroStatLabel}>{label}</Text>
@@ -467,6 +482,8 @@ function Metric({
   unit?: string;
   accent?: boolean;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.metric}>
       <View style={[styles.metricIcon, accent && styles.metricIconAccent]}>
@@ -497,6 +514,7 @@ function DetailRow({
   hint?: string;
   last?: boolean;
 }) {
+  const styles = useStyles();
   return (
     <View style={[styles.detailRow, !last && styles.detailRowDivider]}>
       <Text style={styles.detailLabel}>{label}</Text>
@@ -510,6 +528,8 @@ function DetailRow({
 
 /** Oturum yokken: esmerkezli halkalar ve ortada simsek, altinda tek eylem. */
 function IdleState({ onFindStation, bottomInset }: { onFindStation: () => void; bottomInset: number }) {
+  const colors = useColors();
+  const styles = useStyles();
   // Bekleme cizimi canli dursun: kesikli halka cok yavas doner, simsek hafifce
   // suzulur. Yalnizca sekme odaktayken ve "hareketi azalt" kapaliyken.
   const isFocused = useIsFocused();
@@ -585,7 +605,7 @@ function IdleState({ onFindStation, bottomInset }: { onFindStation: () => void; 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background },
   content: { paddingTop: spacing.sm },
 
@@ -793,4 +813,4 @@ const styles = StyleSheet.create({
     maxWidth: 320,
   },
   idleAction: { marginTop: spacing.xxl, alignSelf: 'stretch' },
-});
+}));

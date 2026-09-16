@@ -2,13 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Redirect, Tabs } from 'expo-router';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { useEffect } from 'react';
-import {
-  Platform,
-  Pressable,
-  StyleSheet,
-  type GestureResponderEvent,
-  type PressableProps,
-} from 'react-native';
+import { Platform, Pressable, type GestureResponderEvent, type PressableProps } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -17,7 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useAuthStore } from '@/store/auth';
-import { colors, spacing, typography } from '@/theme';
+import { createThemedStyles, spacing, typography, useColors } from '@/theme';
 import { haptics } from '@/utils/haptics';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -133,6 +127,8 @@ function HapticTabButton({
 
 /** Android: uygulamanin kendi tasarladigi cubuk (Ionicons + marka renkleri). */
 function StyledTabs() {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <Tabs
       screenOptions={{
@@ -175,6 +171,7 @@ function StyledTabs() {
  * tarafin senkron icon/selectedIcon beklentisi arasinda bir yaris durumu).
  */
 function LiquidGlassTabs() {
+  const colors = useColors();
   return (
     <NativeTabs tintColor={colors.primaryText} screenListeners={{ tabPress: () => haptics.selection() }}>
       {TABS.map(({ name, title, sf, sfSelected, md }) => (
@@ -201,7 +198,7 @@ export default function TabsLayout() {
   return Platform.OS === 'ios' ? <LiquidGlassTabs /> : <StyledTabs />;
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   tabBar: {
     backgroundColor: colors.surface,
     borderTopColor: colors.border,
@@ -211,4 +208,4 @@ const styles = StyleSheet.create({
   },
   tabItem: { paddingVertical: spacing.xs },
   tabLabel: { ...typography.caption, fontWeight: '600' },
-});
+}));

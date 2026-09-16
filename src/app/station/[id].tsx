@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
@@ -17,11 +17,13 @@ import {
 } from '@/components';
 import { useIsFavorite, useToggleFavorite } from '@/queries/favorites';
 import { useStation } from '@/queries/stations';
-import { colors, radius, shadows, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, shadows, spacing, typography, useColors } from '@/theme';
 import { stationAvailability } from '@/types/domain';
 import { formatPrice } from '@/utils/format';
 
 export default function StationDetailScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [selectedConnectorId, setSelectedConnectorId] = useState<string>();
@@ -200,6 +202,8 @@ export default function StationDetailScreen() {
 }
 
 function ScreenHeader({ stationId, onBack }: { stationId?: string; onBack: () => void }) {
+  const colors = useColors();
+  const styles = useStyles();
   const isFavorite = useIsFavorite(stationId);
   const toggleFavorite = useToggleFavorite();
 
@@ -235,6 +239,7 @@ function ScreenHeader({ stationId, onBack }: { stationId?: string; onBack: () =>
 }
 
 function InfoRow({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
+  const styles = useStyles();
   return (
     <View style={[styles.infoRow, !last && styles.infoRowDivider]}>
       <Text style={styles.infoLabel}>{label}</Text>
@@ -243,7 +248,7 @@ function InfoRow({ label, value, last = false }: { label: string; value: string;
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background },
   loadingWrap: { flex: 1, justifyContent: 'center' },
 
@@ -305,4 +310,4 @@ const styles = StyleSheet.create({
   },
   directionsPressed: { backgroundColor: colors.primarySoftPressed },
   primaryAction: { flex: 1 },
-});
+}));

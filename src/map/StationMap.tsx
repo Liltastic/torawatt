@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   AppState,
   Pressable,
-  StyleSheet,
   Text,
   View,
   type StyleProp,
@@ -14,7 +13,14 @@ import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
 import { logError } from '@/services/errorLog';
 import { useMapStyleStore } from '@/store/mapStyle';
-import { colors, radius, spacing, typography } from '@/theme';
+import {
+  createThemedStyles,
+  radius,
+  spacing,
+  typography,
+  useColors,
+  useColorSchemeName,
+} from '@/theme';
 import {
   currentTypeOf,
   stationAvailability,
@@ -115,6 +121,8 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
   },
   ref,
 ) {
+  const colors = useColors();
+  const styles = useStyles();
   const webViewRef = useRef<WebView>(null);
   const [ready, setReady] = useState(false);
   // showError icinde guncel deger lazim; state'i bagimlilik yapinca her
@@ -127,6 +135,8 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
   // Harita kendi kamerasini her hareket sonunda bildiriyor; yeni harita
   // Istanbul'a sicramak yerine kullanicinin baktigi yerden acilsin diye.
   const basemap = useMapStyleStore((s) => s.basemap);
+  // Tema degisince de ayni yol: harita stili ve renkleri HTML'e gomulu.
+  const colorScheme = useColorSchemeName();
   const cameraRef = useRef(DEFAULT_CENTER);
 
   // WebView'in icerik sureci (iOS'ta WKWebView, Android'de render process)
@@ -146,12 +156,12 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
   useEffect(() => clearCrashResetTimer, [clearCrashResetTimer]);
 
   const html = useMemo(
-    () => buildMapHtml({ ...cameraRef.current, basemap }),
+    () => buildMapHtml({ ...cameraRef.current, basemap, colorScheme }),
     // nonce sart: yoksa yeniden kurulan harita eski HTML ile, yani kullanicinin
     // baktigi yer yerine DEFAULT_CENTER ile acilir. Lint bunu "gereksiz"
     // sayiyor cunku govdedeki tek degisken okumasi bir ref.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [basemap, reload.nonce],
+    [basemap, colorScheme, reload.nonce],
   );
 
   // Karo/glif hatalari geciciydi ama afis bir daha hic temizlenmiyordu: tek bir
@@ -171,14 +181,17 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
       // Afis birkac saniye sonra kapaniyor ve yalnizca o an bakan gorebiliyor;
       // kalici iz hata kaydinda kalsin (betik hatasi, WebView ve HTTP hatalari
       // hepsi buradan geciyor).
-      logError(message, { source: 'map', context: { basemap, opened: readyRef.current } });
+      logError(message, {
+        source: 'map',
+        context: { basemap, colorScheme, opened: readyRef.current },
+      });
       setError(message);
       clearErrorTimer();
       if (readyRef.current) {
         errorTimer.current = setTimeout(() => setError(null), ERROR_BANNER_TIMEOUT_MS);
       }
     },
-    [basemap, clearErrorTimer],
+    [basemap, colorScheme, clearErrorTimer],
   );
 
   useEffect(() => clearErrorTimer, [clearErrorTimer]);
@@ -187,7 +200,7 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
     setReady(false);
     setError(null);
     clearErrorTimer();
-  }, [basemap, reload.nonce, clearErrorTimer]);
+  }, [basemap, colorScheme, reload.nonce, clearErrorTimer]);
 
   const handleCrash = useCallback(() => {
     // Sessizce yeniden yukleniyor; kayit olmasa kullanici bunu hic fark etmez,
@@ -380,8 +393,9 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
   return (
     <View style={[styles.container, style]} pointerEvents={interactive ? 'auto' : 'none'}>
       <WebView
-        // Katman degisiminde eski GL kutuphanesi bellekte kalmasin diye tam remount.
-        key={`${basemap}:${reload.nonce}`}
+        // Katman degisiminde eski GL kutuphanesi bellekte kalmasin diye tam
+        // remount; tema degisiminde de yeni HTML ancak boyle yukleniyor.
+        key={`${basemap}:${colorScheme}:${reload.nonce}`}
         ref={webViewRef}
         // baseUrl olmadan Android WebView'in origin'i null kalir ve uzak
         // kaynaklara yapilan istekler CORS'a takilir.
@@ -454,7 +468,7 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
   );
 });
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   container: { flex: 1, overflow: 'hidden', backgroundColor: colors.background },
   webView: { flex: 1, backgroundColor: colors.background },
   webViewContainer: { flex: 1, backgroundColor: colors.background },
@@ -495,4 +509,4 @@ const styles = StyleSheet.create({
     borderColor: colors.danger,
   },
   errorText: { ...typography.caption, color: colors.dangerText },
-});
+}));

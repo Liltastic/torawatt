@@ -14,7 +14,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, Defs, LinearGradient, RadialGradient, Stop } from 'react-native-svg';
 
-import { colors } from '@/theme';
+import { createThemedStyles, useColors } from '@/theme';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -49,6 +49,8 @@ const FINISH_WAVE_SCALE = 0.45;
  * tanimlari) ilerlemeye bagli olmadigi icin her tikta yeniden hesaplanmiyor.
  */
 export function ChargeRing({ progress, mode, size = 248, strokeWidth = 16, children }: ChargeRingProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const reduceMotion = useReducedMotion();
   const center = size / 2;
   const radius = (size - strokeWidth) / 2 - 6;
@@ -241,7 +243,7 @@ export function ChargeRing({ progress, mode, size = 248, strokeWidth = 16, child
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   wave: {
     position: 'absolute',
     top: 0,
@@ -260,4 +262,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

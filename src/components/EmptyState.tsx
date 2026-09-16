@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useIsFocused } from 'expo-router';
 import { useEffect } from 'react';
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -12,7 +12,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { colors, radius, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, spacing, typography, useColors } from '@/theme';
 
 interface EmptyStateProps {
   icon?: React.ComponentProps<typeof Ionicons>['name'];
@@ -36,6 +36,8 @@ const HALO_MS = 2600;
  * donmez; hepsi transform ve opacity.
  */
 export function EmptyState({ icon = 'sparkles-outline', title, description, action, style }: EmptyStateProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const isFocused = useIsFocused();
   const reduceMotion = useReducedMotion();
   const animate = isFocused && !reduceMotion;
@@ -78,7 +80,7 @@ export function EmptyState({ icon = 'sparkles-outline', title, description, acti
 
 const ICON_SIZE = 56;
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -115,4 +117,4 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   action: { marginTop: spacing.xl, alignSelf: 'stretch' },
-});
+}));

@@ -1,11 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  StyleSheet,
-  View,
-  type LayoutChangeEvent,
-  type StyleProp,
-  type ViewStyle,
-} from 'react-native';
+import { View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   Easing,
   interpolateColor,
@@ -16,7 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { AnimatedPressable } from '@/components/AnimatedPressable';
-import { colors, radius, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, spacing, typography, useColors } from '@/theme';
 
 interface SegmentedControlProps<T extends string> {
   options: { value: T; label: string }[];
@@ -31,7 +25,7 @@ const SLIDE = { duration: 260, easing: Easing.out(Easing.cubic) } as const;
 /**
  * Istasyon detayindaki sekme benzeri bolum secici (spec disi, referans tasarimdan).
  *
- * Secili beyaz zemin tek bir parca: secim degisince eskisinden yenisine
+ * Secili zemin tek bir parca: secim degisince eskisinden yenisine
  * altindan kayar, yazi renkleri de ona gore gecis yapar. Onceden zemin her
  * segmentin kendi stiliydi ve bir kareden digerine zipliyordu. Yalnizca
  * transform ve renk canlaniyor; genislik olculene kadar (ilk kare) zemin
@@ -43,6 +37,7 @@ export function SegmentedControl<T extends string>({
   onChange,
   style,
 }: SegmentedControlProps<T>) {
+  const styles = useStyles();
   const selectedIndex = Math.max(
     0,
     options.findIndex((option) => option.value === value),
@@ -102,6 +97,8 @@ function SegmentLabel({
   index: number;
   position: SharedValue<number>;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const labelStyle = useAnimatedStyle(() => {
     const closeness = 1 - Math.min(1, Math.abs(position.value - index));
     return { color: interpolateColor(closeness, [0, 1], [colors.textSecondary, colors.text]) };
@@ -110,7 +107,7 @@ function SegmentLabel({
   return <Animated.Text style={[styles.label, labelStyle]}>{label}</Animated.Text>;
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   track: {
     flexDirection: 'row',
     backgroundColor: colors.surfaceMuted,
@@ -125,7 +122,7 @@ const styles = StyleSheet.create({
     bottom: TRACK_PADDING,
     left: TRACK_PADDING,
     borderRadius: radius.button - TRACK_PADDING,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceRaised,
     shadowColor: '#0F172A',
     shadowOpacity: 0.08,
     shadowRadius: 4,
@@ -139,7 +136,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   segmentSelected: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceRaised,
     shadowColor: '#0F172A',
     shadowOpacity: 0.08,
     shadowRadius: 4,
@@ -147,4 +144,4 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   label: { ...typography.caption, fontWeight: '600', color: colors.textSecondary },
-});
+}));

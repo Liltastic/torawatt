@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
@@ -17,7 +17,7 @@ import {
 import { useChargingHistory } from '@/queries/history';
 import { useActiveVehicle } from '@/queries/vehicles';
 import { useAuthStore } from '@/store/auth';
-import { colors, radius, spacing, typography } from '@/theme';
+import { createThemedStyles, radius, spacing, typography, useColors } from '@/theme';
 import { connectorLabels } from '@/types/domain';
 import { getRunningUpdateLabel } from '@/utils/buildInfo';
 import { formatEnergy, formatPrice } from '@/utils/format';
@@ -36,6 +36,8 @@ const MENU: { icon: IoniconName; label: string; href?: string; tag?: string }[] 
 ];
 
 export default function ProfileScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const activeVehicle = useActiveVehicle();
   const { data: history } = useChargingHistory();
@@ -187,6 +189,7 @@ export default function ProfileScreen() {
 }
 
 function Stat({ value, label }: { value: string; label: string }) {
+  const styles = useStyles();
   return (
     <View style={styles.stat}>
       <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
@@ -197,7 +200,7 @@ function Stat({ value, label }: { value: string; label: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background },
   statsCard: { marginTop: spacing.md },
   statsRow: { flexDirection: 'row', marginTop: spacing.md },
@@ -274,4 +277,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.xxl,
   },
-});
+}));

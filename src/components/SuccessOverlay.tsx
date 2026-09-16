@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -10,7 +10,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { colors, spacing, typography } from '@/theme';
+import { createThemedStyles, spacing, typography, useColors, withAlpha } from '@/theme';
 import { haptics } from '@/utils/haptics';
 
 /** Onay ekraninin toplam sure. Sonunda onDone cagrilir. */
@@ -33,6 +33,8 @@ interface SuccessOverlayProps {
  * cikmasin diye olculer sabit.
  */
 export function SuccessOverlay({ label, onDone }: SuccessOverlayProps) {
+  const colors = useColors();
+  const styles = useStyles();
   const reduceMotion = useReducedMotion();
   const pop = useSharedValue(reduceMotion ? 1 : 0);
 
@@ -71,7 +73,7 @@ export function SuccessOverlay({ label, onDone }: SuccessOverlayProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: {
     position: 'absolute',
     top: 0,
@@ -80,7 +82,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(242, 251, 246, 0.97)',
+    backgroundColor: withAlpha(colors.background, 0.97),
   },
   circle: {
     width: CIRCLE,
@@ -93,4 +95,4 @@ const styles = StyleSheet.create({
   label: { ...typography.h3, color: colors.text, marginTop: spacing.xl, textAlign: 'center' },
   // Optik denge: daire + yazi blogu ekranin tam ortasindan biraz yukarida dursun.
   spacer: { height: spacing.huge },
-});
+}));

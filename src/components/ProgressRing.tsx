@@ -8,7 +8,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 
-import { colors } from '@/theme';
+import { useColors } from '@/theme';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -17,7 +17,9 @@ interface ProgressRingProps {
   progress: number;
   size?: number;
   strokeWidth?: number;
+  /** Verilmezse temanin ana rengi. */
   color?: string;
+  /** Verilmezse temanin kenarlik rengi: iz belli belirsiz gorunmeli. */
   trackColor?: string;
   /** Halkanin ortasinda gosterilecek icerik. */
   children?: React.ReactNode;
@@ -29,12 +31,12 @@ export function ProgressRing({
   progress,
   size = 220,
   strokeWidth = 14,
-  color = colors.primary,
-  // primarySoft arka planla neredeyse ayni tonda kaliyordu; iz belli belirsiz gorunmeli.
-  trackColor = '#DCE3F9',
+  color,
+  trackColor,
   children,
   style,
 }: ProgressRingProps) {
+  const colors = useColors();
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
 
@@ -58,7 +60,7 @@ export function ProgressRing({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={trackColor}
+          stroke={trackColor ?? colors.border}
           strokeWidth={strokeWidth}
           fill="none"
         />
@@ -66,7 +68,7 @@ export function ProgressRing({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={color}
+          stroke={color ?? colors.primary}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           fill="none"
