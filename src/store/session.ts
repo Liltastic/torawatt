@@ -83,11 +83,44 @@ function capacityFor(vehicle: Vehicle | null): number {
   return capacity > 0 ? capacity : DEFAULT_BATTERY_KWH;
 }
 
+/**
+ * Batarya yuzdesine gore tepe gucun ne kadari kullaniliyor. Tek tablo: hem
+ * simulasyon hem kalan sure tahmini buradan okuyor, ikisi birbirinden sapamaz.
+ */
+const POWER_BANDS: readonly { from: number; to: number; factor: number }[] = [
+  { from: 0, to: 60, factor: 1 },
+  { from: 60, to: 80, factor: 0.75 },
+  { from: 80, to: 95, factor: 0.35 },
+  { from: 95, to: 100, factor: 0.08 },
+];
+
 function powerAtBattery(ratedKw: number, batteryPercent: number): number {
-  if (batteryPercent >= 95) return ratedKw * 0.08;
-  if (batteryPercent >= 80) return ratedKw * 0.35;
-  if (batteryPercent >= 60) return ratedKw * 0.75;
-  return ratedKw;
+  const band =
+    POWER_BANDS.find((b) => batteryPercent >= b.from && batteryPercent < b.to) ??
+    POWER_BANDS[POWER_BANDS.length - 1];
+  return ratedKw * band.factor;
+}
+
+/**
+ * from% -> to% arasi kac (simule) dakika surer. Anlik gucu sabit sayan eski
+ * tahmin %80 sonrasindaki yavaslamayi gormuyordu ve kalan sureyi hep kisa
+ * gosteriyordu; bu, her bantta o bandin gucuyle ayri ayri hesapliyor.
+ */
+export function estimateChargeMinutes(
+  fromPercent: number,
+  toPercent: number,
+  ratedKw: number,
+  capacityKwh: number,
+): number {
+  if (toPercent <= fromPercent || ratedKw <= 0 || capacityKwh <= 0) return 0;
+  let hours = 0;
+  for (const band of POWER_BANDS) {
+    const start = Math.max(fromPercent, band.from);
+    const end = Math.min(toPercent, band.to);
+    if (end <= start) continue;
+    hours += (((end - start) / 100) * capacityKwh) / (ratedKw * band.factor);
+  }
+  return Math.max(1, Math.round(hours * 60));
 }
 
 /**

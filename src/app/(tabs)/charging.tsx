@@ -1,29 +1,62 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
+  cancelAnimation,
   Easing,
   FadeInDown,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
-  withSequence,
   withTiming,
 } from 'react-native-reanimated';
+import Svg, { Circle } from 'react-native-svg';
 
-import { Button, Card, EmptyState, ProgressRing } from '@/components';
+import {
+  AnimatedPressable,
+  Button,
+  Card,
+  ChargeRing,
+  ConnectorBadge,
+  PowerBadge,
+  PowerCurve,
+  type ChargeRingMode,
+} from '@/components';
 import { useCreateHistoryEntry } from '@/queries/history';
 import { useActiveVehicle } from '@/queries/vehicles';
-import { useTabBarInset } from '@/utils/tabBar';
-import { useSessionStore } from '@/store/session';
+import { estimateChargeMinutes, useSessionStore } from '@/store/session';
 import { colors, radius, spacing, typography } from '@/theme';
+import { currentTypeOf } from '@/types/domain';
 import { formatDuration, formatEnergy, formatPower, formatPrice } from '@/utils/format';
 import { haptics } from '@/utils/haptics';
+import { useTabBarInset } from '@/utils/tabBar';
 
 /** Grafikte tutulan en fazla ornek sayisi. */
 const HISTORY_LIMIT = 40;
+
+/** Sayilar her saniye degisiyor: esit genislikli rakamlar yazinin titremesini onler. */
+const TABULAR = { fontVariant: ['tabular-nums' as const] };
+
+const ON_DARK_MUTED = 'rgba(255, 255, 255, 0.62)';
+
+/** 7 -> "7 dk", 75 -> "1 sa 15 dk" */
+function formatEta(minutes: number): string {
+  if (minutes < 60) return `${minutes} dk`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${hours} sa` : `${hours} sa ${rest} dk`;
+}
+
+/** Sayi ve birimi ayri basmak icin: "20,5" + "kWh" */
+function splitUnit(formatted: string): { value: string; unit: string } {
+  const i = formatted.lastIndexOf(' ');
+  if (i === -1) return { value: formatted, unit: '' };
+  return { value: formatted.slice(0, i), unit: formatted.slice(i + 1) };
+}
 
 export default function ChargingScreen() {
   const router = useRouter();
@@ -45,7 +78,6 @@ export default function ChargingScreen() {
 
   const battery = Math.round(session?.batteryPercent ?? 0);
   const isFinished = session?.status === 'COMPLETED';
-  const isCharging = session?.status === 'CHARGING';
 
   // Simulasyon store'u React Query'ye erisemiyor: kapasite ve aracin guc
   // tavani buradan besleniyor, yoksa her arac 60 kWh'lik varsayimla dolardi.
@@ -53,23 +85,6 @@ export default function ChargingScreen() {
     if (!activeVehicle) return;
     setSessionVehicle(activeVehicle);
   }, [activeVehicle, setSessionVehicle]);
-
-  const pulse = useSharedValue(1);
-
-  useEffect(() => {
-    if (isCharging) {
-      pulse.value = withRepeat(
-        withSequence(
-          withTiming(0.4, { duration: 700, easing: Easing.inOut(Easing.ease) }),
-          withTiming(1, { duration: 700, easing: Easing.inOut(Easing.ease) }),
-        ),
-        -1,
-        true,
-      );
-    } else {
-      pulse.value = withTiming(1, { duration: 200 });
-    }
-  }, [isCharging, pulse]);
 
   // Sarj tam bu render'da bitmisse (ve daha once bildirmediysek) basari titresimi ver.
   useEffect(() => {
@@ -81,14 +96,15 @@ export default function ChargingScreen() {
     }
   }, [isFinished]);
 
-  const pulseStyle = useAnimatedStyle(() => ({ opacity: pulse.value }));
-
   // Ornekler oturum kimligiyle birlikte saklaniyor. Sarj sekmesi oturumlar
   // arasinda mount kaliyor ve clearSession() yalnizca store'u temizliyor;
-  // kimlik tutulmazsa ikinci oturum birincisinin cubuklariyla acilip yeni
-  // soketin tepe gucune gore yanlis olceklenmis bir egri gosteriyor.
+  // kimlik tutulmazsa ikinci oturum birincisinin orneklerini gosterirdi.
+  //
+  // 0 kW ornek alinmiyor: el sikismadan sarja gecilen ilk tikta durum CHARGING
+  // olmus ama guc henuz hesaplanmamis oluyor. O ornek grafigin basina gercekte
+  // yasanmamis bir cukur ciziyordu.
   useEffect(() => {
-    if (!session || session.status !== 'CHARGING') return;
+    if (!session || session.status !== 'CHARGING' || session.powerKw <= 0) return;
     const last = lastSampleRef.current;
     if (last?.sessionId === session.id && last.energyKwh === session.energyKwh) return;
 
@@ -122,210 +138,577 @@ export default function ChargingScreen() {
   }, [session, meta]);
 
   if (!session || !meta) {
-    return (
-      <SafeAreaView edges={['top']} style={styles.root}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Şarj</Text>
-        </View>
-        <View style={styles.emptyWrap}>
-          <EmptyState
-            icon="flash-outline"
-            title="Aktif şarj oturumu yok"
-            description="Haritadan bir istasyon seç, soketi belirle ve şarjı başlat. Anlık güç, enerji ve tutar burada canlı görünecek."
-            action={<Button label="İstasyon bul" onPress={() => router.replace('/map')} />}
-          />
-        </View>
-      </SafeAreaView>
-    );
+    return <IdleState onFindStation={() => router.replace('/map')} bottomInset={tabBarInset} />;
   }
 
-  const isStarting = session.status === 'STARTING';
+  const mode: ChargeRingMode =
+    session.status === 'STARTING' ? 'starting' : isFinished ? 'completed' : 'charging';
 
-  const remainingKwh = ((100 - battery) / 100) * meta.batteryCapacityKwh;
-  const remainingMinutes =
-    session.powerKw > 0 ? Math.round((remainingKwh / session.powerKw) * 60) : null;
+  const confirmStop = () => {
+    Alert.alert(
+      'Şarjı durdur',
+      'Oturum kapanacak. Şu ana kadar aktarılan enerji için ücretlendirileceksin.',
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Durdur', style: 'destructive', onPress: stopSession },
+      ],
+    );
+  };
+
+  const consumption = activeVehicle?.averageConsumptionKwhPer100Km ?? 0;
+  const rangeKm = consumption > 0 ? Math.round((session.energyKwh / consumption) * 100) : null;
+
+  const energy = splitUnit(formatEnergy(session.energyKwh));
+  const power = splitUnit(formatPower(session.powerKw));
+
+  const eyebrow =
+    mode === 'completed' ? 'ŞARJ TAMAMLANDI' : mode === 'starting' ? 'BAĞLANIYOR' : 'AKTİF ŞARJ';
+
+  const minutesTo = (target: number) =>
+    formatEta(estimateChargeMinutes(battery, target, meta.ratedPowerKw, meta.batteryCapacityKwh));
+  const eta80 = mode === 'starting' ? '—' : battery >= 80 ? 'Ulaşıldı' : minutesTo(80);
+  const etaFull = mode === 'starting' ? '—' : minutesTo(100);
+
+  // Tamamlaninca enerji ve tutar zaten metrik kartinda; hero'da onlari tekrar
+  // etmek yerine oturumun ozetini veriyoruz.
+  const hours = elapsedSeconds / 3600;
+  const averagePower = hours > 0 ? formatPower(session.energyKwh / hours) : '—';
+  const totalDuration = formatEta(Math.max(1, Math.round(elapsedSeconds / 60)));
 
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: spacing.xxl + tabBarInset }]}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <View style={styles.headerTitleRow}>
-            <Text style={styles.headerTitle}>{isFinished ? 'Şarj tamamlandı' : 'Aktif şarj'}</Text>
-            {isCharging && (
-              <Animated.View style={pulseStyle}>
-                <Ionicons name="flash" size={18} color={colors.primary} />
-              </Animated.View>
-            )}
+        {/* Ust bilgi: istasyon ve soket */}
+        <Animated.View entering={FadeInDown.duration(320)} style={styles.header}>
+          <View style={styles.headerTop}>
+            <View style={styles.eyebrowRow}>
+              <LiveDot mode={mode} />
+              <Text style={styles.eyebrow}>{eyebrow}</Text>
+            </View>
+            <View style={styles.elapsedPill}>
+              <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
+              <Text style={[styles.elapsedText, TABULAR]}>{formatDuration(elapsedSeconds)}</Text>
+            </View>
           </View>
-          <Text style={styles.headerSubtitle} numberOfLines={1}>
-            {meta.stationName} · {meta.connectorLabel}
+          <Text style={styles.stationName} numberOfLines={1}>
+            {meta.stationName}
           </Text>
-        </View>
+          <View style={styles.badges}>
+            <ConnectorBadge type={meta.connector.type} />
+            <PowerBadge
+              currentType={currentTypeOf(meta.connector)}
+              powerKw={meta.connector.powerKw}
+              style={styles.badgeGap}
+            />
+          </View>
+        </Animated.View>
 
-        <View style={styles.hero}>
-          <ProgressRing progress={battery} color={isFinished ? colors.success : colors.primary}>
-            <Text style={styles.battery}>{battery}%</Text>
-            <Text style={styles.batteryLabel}>batarya</Text>
-          </ProgressRing>
+        {/* Hero: canli sarj karti */}
+        <Animated.View entering={FadeInDown.delay(80).duration(380)} style={styles.heroShadow}>
+          <View style={styles.hero}>
+            <LinearGradient
+              colors={['#115247', '#0B3B35', '#062420']}
+              locations={[0, 0.5, 1]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
 
-          {isStarting ? (
-            <Text style={styles.statusLine}>İstasyonla el sıkışılıyor…</Text>
-          ) : isFinished ? (
-            <Text style={styles.statusLine}>Oturum kapandı</Text>
-          ) : remainingMinutes != null ? (
-            <Text style={styles.statusLine}>Tahmini kalan {remainingMinutes} dk</Text>
-          ) : null}
-        </View>
+            <View style={styles.heroTop}>
+              <HeroStatus mode={mode} />
+              {mode === 'charging' && (
+                <View style={styles.heroPower}>
+                  <Ionicons name="flash" size={14} color={colors.primaryOnDark} />
+                  <Text style={[styles.heroPowerValue, TABULAR]}>{power.value}</Text>
+                  <Text style={styles.heroPowerUnit}>{power.unit}</Text>
+                </View>
+              )}
+            </View>
 
-        <View style={styles.metrics}>
-          <Metric index={0} label="Anlık güç" value={formatPower(session.powerKw)} />
-          <Metric index={1} label="Alınan enerji" value={formatEnergy(session.energyKwh)} />
-          <Metric index={2} label="Geçen süre" value={formatDuration(elapsedSeconds)} />
-          <Metric index={3} label="Tahmini tutar" value={formatPrice(session.cost)} highlight />
-        </View>
+            <View style={styles.ringWrap}>
+              <ChargeRing progress={battery} mode={mode}>
+                {mode === 'starting' ? (
+                  <>
+                    <Ionicons name="flash" size={34} color={colors.primaryOnDark} />
+                    <Text style={styles.ringCaption}>EL SIKIŞILIYOR</Text>
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.percentRow}>
+                      <Text style={[styles.percent, TABULAR]}>{battery}</Text>
+                      <Text style={styles.percentSign}>%</Text>
+                    </View>
+                    <Text style={styles.ringCaption}>{mode === 'completed' ? 'DOLDU' : 'BATARYA'}</Text>
+                  </>
+                )}
+              </ChargeRing>
+            </View>
 
-        {powerHistory.length > 1 && (
-          <Animated.View entering={FadeInDown.duration(300)}>
-            <Card style={styles.chartCard}>
-              <Text style={styles.chartTitle}>Güç eğrisi</Text>
-              <PowerChart values={powerHistory} peak={meta.ratedPowerKw} />
-              <Text style={styles.chartCaption}>
-                Batarya doldukça güç düşer; bu normaldir.
-              </Text>
-            </Card>
-          </Animated.View>
-        )}
+            <View style={styles.heroStats}>
+              {mode === 'completed' ? (
+                <>
+                  <HeroStat label="Ortalama güç" value={averagePower} />
+                  <View style={styles.heroDivider} />
+                  <HeroStat label="Süre" value={totalDuration} accent />
+                </>
+              ) : (
+                <>
+                  <HeroStat label="%80'e" value={eta80} />
+                  <View style={styles.heroDivider} />
+                  <HeroStat label="Tam dolum" value={etaFull} />
+                </>
+              )}
+            </View>
+          </View>
+        </Animated.View>
 
-        <View style={styles.notice}>
-          <Ionicons name="flask-outline" size={16} color={colors.warning} />
-          <Text style={styles.noticeText}>
-            Simüle veri. Gerçekte bu değerler WebSocket üzerinden istasyondan gelecek.
+        {/* Canli metrikler */}
+        <Animated.View entering={FadeInDown.delay(160).duration(380)}>
+          <Card padded={false} style={styles.metricsCard}>
+            <Metric icon="battery-charging-outline" label="Enerji" value={energy.value} unit={energy.unit} />
+            <View style={styles.metricDivider} />
+            <Metric icon="wallet-outline" label="Tutar" value={formatPrice(session.cost)} accent />
+            <View style={styles.metricDivider} />
+            {rangeKm != null ? (
+              <Metric icon="navigate-outline" label="Menzil" value={`+${rangeKm}`} unit="km" />
+            ) : (
+              <Metric icon="speedometer-outline" label="Güç" value={power.value} unit={power.unit} />
+            )}
+          </Card>
+        </Animated.View>
+
+        {/* Guc egrisi */}
+        <Animated.View entering={FadeInDown.delay(220).duration(380)}>
+          <Card style={styles.sectionCard}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Güç eğrisi</Text>
+              <Text style={[styles.cardMeta, TABULAR]}>Tepe {formatPower(meta.ratedPowerKw)}</Text>
+            </View>
+            <PowerCurve values={powerHistory} ratedKw={meta.ratedPowerKw} />
+            <Text style={styles.cardCaption}>
+              {"Batarya %80'i geçince güç kademeli olarak düşer. Bu, bataryayı korumak içindir."}
+            </Text>
+          </Card>
+        </Animated.View>
+
+        {/* Oturum ayrintilari */}
+        <Animated.View entering={FadeInDown.delay(280).duration(380)}>
+          <Card style={styles.sectionCard}>
+            <Text style={styles.cardTitle}>Oturum</Text>
+            <DetailRow label="Birim fiyat" value={`${formatPrice(meta.pricePerKwh)} / kWh`} />
+            <DetailRow
+              label="Araç"
+              value={activeVehicle ? `${activeVehicle.make} ${activeVehicle.model}` : 'Tanımlı değil'}
+            />
+            <DetailRow label="Batarya kapasitesi" value={formatEnergy(meta.batteryCapacityKwh)} />
+            <DetailRow
+              label="Tepe güç"
+              value={formatPower(meta.ratedPowerKw)}
+              hint={meta.ratedPowerKw < meta.connector.powerKw ? 'Aracın sınırı' : undefined}
+              last
+            />
+          </Card>
+        </Animated.View>
+
+        <View style={styles.simNote}>
+          <Ionicons name="flask-outline" size={13} color={colors.textTertiary} />
+          <Text style={styles.simNoteText}>
+            Simüle veri · Canlı istasyon bağlantısı backend ile gelecek
           </Text>
         </View>
       </ScrollView>
 
+      {/* Alt eylem cubugu */}
       <View style={[styles.actions, { paddingBottom: spacing.md + tabBarInset }]}>
+        <LinearGradient
+          pointerEvents="none"
+          colors={['rgba(242, 251, 246, 0)', colors.background]}
+          style={styles.actionsFade}
+        />
         {isFinished ? (
-          <Button label="Yolculuğa dön" onPress={() => { clearSession(); router.replace('/map'); }} />
+          <Button
+            label="Yolculuğa dön"
+            onPress={() => {
+              clearSession();
+              router.replace('/map');
+            }}
+            trailingIcon={<Ionicons name="arrow-forward" size={18} color={colors.white} />}
+          />
         ) : (
-          <Button label="Şarjı Durdur" variant="danger" onPress={stopSession} />
+          <AnimatedPressable
+            accessibilityRole="button"
+            accessibilityLabel="Şarjı durdur"
+            haptic="warning"
+            scaleTo={0.97}
+            onPress={confirmStop}
+            style={styles.stopButton}>
+            <View style={styles.stopIcon}>
+              <View style={styles.stopSquare} />
+            </View>
+            <Text style={styles.stopLabel}>Şarjı durdur</Text>
+          </AnimatedPressable>
         )}
       </View>
     </SafeAreaView>
   );
 }
 
-function Metric({
-  label,
-  value,
-  index,
-  highlight = false,
-}: {
-  label: string;
-  value: string;
-  index: number;
-  highlight?: boolean;
-}) {
+/** Basliktaki canli gosterge: sarj surerken yayilan bir halka. */
+function LiveDot({ mode }: { mode: ChargeRingMode }) {
+  const reduceMotion = useReducedMotion();
+  const wave = useSharedValue(0);
+  const pulsing = mode === 'charging' && !reduceMotion;
+
+  useEffect(() => {
+    if (pulsing) {
+      wave.set(withRepeat(withTiming(1, { duration: 1600, easing: Easing.out(Easing.quad) }), -1, false));
+    } else {
+      cancelAnimation(wave);
+      wave.set(0);
+    }
+  }, [pulsing, wave]);
+
+  const waveStyle = useAnimatedStyle(() => ({
+    opacity: pulsing ? 0.55 * (1 - wave.value) : 0,
+    transform: [{ scale: 1 + wave.value * 1.6 }],
+  }));
+
+  const tone = mode === 'completed' ? colors.success : mode === 'starting' ? colors.warning : colors.success;
+
   return (
-    <Animated.View
-      style={styles.metricTile}
-      entering={FadeInDown.delay(index * 60)
-        .duration(280)}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={[styles.metricValue, highlight && styles.metricValueHighlight]}>{value}</Text>
-    </Animated.View>
+    <View style={styles.liveDot}>
+      <Animated.View style={[styles.liveWave, { backgroundColor: tone }, waveStyle]} />
+      <View style={[styles.liveCore, { backgroundColor: tone }]} />
+    </View>
   );
 }
 
-/** Bagimlilik eklemeden basit bir sutun grafigi. */
-function PowerChart({ values, peak }: { values: number[]; peak: number }) {
-  const max = Math.max(peak, ...values) || 1;
+function HeroStatus({ mode }: { mode: ChargeRingMode }) {
+  const config = {
+    starting: { icon: 'sync-outline' as const, label: 'Bağlanıyor', tone: '#FFC58F' },
+    charging: { icon: 'flash' as const, label: 'Şarj oluyor', tone: colors.primaryOnDark },
+    completed: { icon: 'checkmark-circle' as const, label: 'Tamamlandı', tone: '#7BF0B8' },
+  }[mode];
 
   return (
-    <View style={styles.chart} accessibilityRole="image" accessibilityLabel="Güç eğrisi grafiği">
-      {values.map((value, index) => (
-        <View
-          key={index}
-          style={[styles.chartBar, { height: `${Math.max(4, (value / max) * 100)}%` }]}
-        />
-      ))}
+    <View style={styles.statusPill}>
+      <Ionicons name={config.icon} size={14} color={config.tone} />
+      <Text style={[styles.statusText, { color: config.tone }]}>{config.label}</Text>
     </View>
+  );
+}
+
+function HeroStat({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <View style={styles.heroStat}>
+      <Text style={styles.heroStatLabel}>{label}</Text>
+      <Text style={[styles.heroStatValue, accent && styles.heroStatValueAccent, TABULAR]} numberOfLines={1}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function Metric({
+  icon,
+  label,
+  value,
+  unit,
+  accent = false,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  value: string;
+  unit?: string;
+  accent?: boolean;
+}) {
+  return (
+    <View style={styles.metric}>
+      <View style={[styles.metricIcon, accent && styles.metricIconAccent]}>
+        <Ionicons name={icon} size={15} color={accent ? colors.white : colors.primaryDark} />
+      </View>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <View style={styles.metricValueRow}>
+        <Text style={[styles.metricValue, accent && styles.metricValueAccent, TABULAR]} numberOfLines={1}>
+          {value}
+        </Text>
+        {!!unit && <Text style={styles.metricUnit}>{unit}</Text>}
+      </View>
+    </View>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+  hint,
+  last = false,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  last?: boolean;
+}) {
+  return (
+    <View style={[styles.detailRow, !last && styles.detailRowDivider]}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <View style={styles.detailValueWrap}>
+        <Text style={[styles.detailValue, TABULAR]}>{value}</Text>
+        {!!hint && <Text style={styles.detailHint}>{hint}</Text>}
+      </View>
+    </View>
+  );
+}
+
+/** Oturum yokken: esmerkezli halkalar ve ortada simsek, altinda tek eylem. */
+function IdleState({ onFindStation, bottomInset }: { onFindStation: () => void; bottomInset: number }) {
+  return (
+    <SafeAreaView edges={['top']} style={styles.root}>
+      <View style={styles.header}>
+        <Text style={styles.idleTitle}>Şarj</Text>
+      </View>
+
+      <View style={[styles.idleBody, { paddingBottom: bottomInset }]}>
+        <Animated.View entering={FadeInDown.duration(420)} style={styles.idleArt}>
+          <Svg width={196} height={196}>
+            <Circle cx={98} cy={98} r={96} fill={colors.primarySoft} fillOpacity={0.45} />
+            <Circle cx={98} cy={98} r={72} fill={colors.primarySoft} fillOpacity={0.8} />
+            <Circle
+              cx={98}
+              cy={98}
+              r={84}
+              stroke={colors.primary}
+              strokeOpacity={0.25}
+              strokeWidth={1.5}
+              strokeDasharray="2 6"
+              fill="none"
+            />
+          </Svg>
+          <View style={styles.idleBolt}>
+            <Ionicons name="flash" size={34} color={colors.white} />
+          </View>
+        </Animated.View>
+
+        <Animated.Text entering={FadeInDown.delay(100).duration(420)} style={styles.idleHeadline}>
+          Şarj bekleniyor
+        </Animated.Text>
+        <Animated.Text entering={FadeInDown.delay(160).duration(420)} style={styles.idleText}>
+          Haritadan bir istasyon seç ve şarjı başlat. Anlık güç, enerji ve tutar burada canlı akacak.
+        </Animated.Text>
+
+        <Animated.View entering={FadeInDown.delay(220).duration(420)} style={styles.idleAction}>
+          <Button
+            label="İstasyon bul"
+            onPress={onFindStation}
+            trailingIcon={<Ionicons name="arrow-forward" size={18} color={colors.white} />}
+          />
+        </Animated.View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  content: { paddingBottom: spacing.xxl },
+  content: { paddingTop: spacing.sm },
 
+  // --- Baslik
   header: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
-  headerTitleRow: { flexDirection: 'row', alignItems: 'center' },
-  headerTitle: { ...typography.h2, color: colors.text, marginRight: spacing.sm },
-  headerSubtitle: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-
-  emptyWrap: { flex: 1, justifyContent: 'center' },
-
-  hero: { alignItems: 'center', paddingHorizontal: spacing.xl, marginTop: spacing.xl },
-  battery: { fontSize: 52, lineHeight: 58, fontWeight: '800', color: colors.text },
-  batteryLabel: {
+  headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  eyebrowRow: { flexDirection: 'row', alignItems: 'center' },
+  eyebrow: {
     ...typography.captionStrong,
     color: colors.textSecondary,
+    letterSpacing: 1.4,
+    marginLeft: spacing.sm,
+  },
+  elapsedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.chip,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  elapsedText: { ...typography.captionStrong, color: colors.text, marginLeft: 6 },
+  stationName: { ...typography.h2, fontSize: 26, lineHeight: 32, color: colors.text, marginTop: spacing.md },
+  badges: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md },
+  badgeGap: { marginLeft: spacing.sm },
+
+  liveDot: { width: 10, height: 10, alignItems: 'center', justifyContent: 'center' },
+  liveWave: { position: 'absolute', width: 10, height: 10, borderRadius: 5 },
+  liveCore: { width: 8, height: 8, borderRadius: 4 },
+
+  // --- Hero karti
+  heroShadow: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.xl,
+    borderRadius: 28,
+    backgroundColor: '#0B3B35',
+    shadowColor: '#062420',
+    shadowOpacity: 0.28,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 10,
+  },
+  hero: { borderRadius: 28, overflow: 'hidden', padding: spacing.xl },
+  heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.chip,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  statusText: { ...typography.captionStrong, marginLeft: 6 },
+  heroPower: { flexDirection: 'row', alignItems: 'baseline' },
+  heroPowerValue: { ...typography.h3, color: colors.white, marginLeft: 4 },
+  heroPowerUnit: { ...typography.caption, color: ON_DARK_MUTED, marginLeft: 3 },
+
+  ringWrap: { alignItems: 'center', marginTop: spacing.lg, marginBottom: spacing.md },
+  percentRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  percent: { fontSize: 68, lineHeight: 74, fontWeight: '800', color: colors.white, letterSpacing: -2 },
+  percentSign: {
+    fontSize: 26,
+    lineHeight: 34,
+    fontWeight: '700',
+    color: ON_DARK_MUTED,
+    marginTop: 10,
+    marginLeft: 2,
+  },
+  ringCaption: {
+    ...typography.captionStrong,
+    color: ON_DARK_MUTED,
     letterSpacing: 2,
-    textTransform: 'uppercase',
     marginTop: spacing.xs,
   },
-  statusLine: { ...typography.body, color: colors.textSecondary, marginTop: spacing.lg },
 
-  metrics: {
+  heroStats: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: spacing.xl,
-    marginTop: spacing.xl,
+    alignItems: 'stretch',
+    marginTop: spacing.md,
+    paddingTop: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.10)',
   },
-  metricTile: {
-    width: '50%',
+  heroStat: { flex: 1, alignItems: 'center' },
+  heroDivider: { width: 1, backgroundColor: 'rgba(255, 255, 255, 0.10)' },
+  heroStatLabel: { ...typography.caption, color: ON_DARK_MUTED },
+  heroStatValue: { ...typography.h3, fontSize: 20, lineHeight: 26, color: colors.white, marginTop: 4 },
+  heroStatValueAccent: { color: '#7BF0B8' },
+
+  // --- Metrikler
+  metricsCard: {
+    flexDirection: 'row',
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    paddingVertical: spacing.lg,
+  },
+  metric: { flex: 1, alignItems: 'center', paddingHorizontal: spacing.xs },
+  metricDivider: { width: 1, backgroundColor: colors.border, marginVertical: spacing.xs },
+  metricIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  metricIconAccent: { backgroundColor: colors.primary },
+  metricLabel: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm },
+  metricValueRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 2 },
+  metricValue: { ...typography.h3, fontSize: 19, lineHeight: 24, color: colors.text },
+  metricValueAccent: { color: colors.primaryText },
+  metricUnit: { ...typography.caption, color: colors.textSecondary, marginLeft: 3 },
+
+  // --- Kartlar
+  sectionCard: { marginHorizontal: spacing.lg, marginTop: spacing.lg },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  cardTitle: { ...typography.bodyStrong, color: colors.text },
+  cardMeta: { ...typography.caption, color: colors.textSecondary },
+  cardCaption: { ...typography.caption, color: colors.textTertiary, marginTop: spacing.md, lineHeight: 17 },
+
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: spacing.md,
   },
-  metricLabel: { ...typography.caption, color: colors.textSecondary },
-  metricValue: { ...typography.h3, color: colors.text, marginTop: 2 },
-  metricValueHighlight: { color: colors.primaryDark },
+  detailRowDivider: { borderBottomWidth: 1, borderBottomColor: colors.border },
+  detailLabel: { ...typography.body, color: colors.textSecondary },
+  detailValueWrap: { alignItems: 'flex-end' },
+  detailValue: { ...typography.bodyStrong, color: colors.text },
+  detailHint: { ...typography.caption, color: colors.textTertiary, marginTop: 1 },
 
-  chartCard: { marginHorizontal: spacing.xl, marginTop: spacing.lg },
-  chartTitle: { ...typography.captionStrong, color: colors.textSecondary },
-  chart: {
+  simNote: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'flex-start',
-    height: 90,
-    marginTop: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.xl,
   },
-  chartBar: {
-    flex: 1,
-    // Az ornekle cubuklar devasa gorunmesin.
-    maxWidth: 8,
-    marginHorizontal: 1,
-    borderRadius: 2,
-    backgroundColor: colors.primary,
-    opacity: 0.75,
-  },
-  chartCaption: { ...typography.caption, color: colors.textTertiary, marginTop: spacing.md },
+  simNoteText: { ...typography.caption, color: colors.textTertiary, marginLeft: 6 },
 
-  notice: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginHorizontal: spacing.xl,
-    marginTop: spacing.lg,
-    padding: spacing.md,
-    borderRadius: radius.badge,
-    backgroundColor: colors.warningSoft,
-  },
-  noticeText: { ...typography.caption, color: colors.text, flex: 1, marginLeft: spacing.sm },
-
+  // --- Alt cubuk
   actions: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
-    paddingBottom: spacing.md,
     backgroundColor: colors.background,
   },
+  actionsFade: { position: 'absolute', left: 0, right: 0, top: -24, height: 24 },
+  stopButton: {
+    height: 56,
+    borderRadius: radius.button,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.dangerSoft,
+  },
+  stopIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.dangerSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stopSquare: { width: 9, height: 9, borderRadius: 2, backgroundColor: colors.danger },
+  stopLabel: { ...typography.bodyStrong, color: colors.danger, marginLeft: spacing.sm },
+
+  // --- Bos durum
+  idleTitle: { ...typography.h2, color: colors.text },
+  idleBody: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xxl },
+  idleArt: { width: 196, height: 196, alignItems: 'center', justifyContent: 'center' },
+  idleBolt: {
+    position: 'absolute',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  idleHeadline: { ...typography.h2, color: colors.text, marginTop: spacing.xxl, textAlign: 'center' },
+  idleText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+    maxWidth: 320,
+  },
+  idleAction: { marginTop: spacing.xxl, alignSelf: 'stretch' },
 });

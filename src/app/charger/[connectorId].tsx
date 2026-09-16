@@ -147,7 +147,10 @@ export default function ChargeSummaryScreen() {
         <SuccessOverlay
           label="Şarj başlıyor"
           onDone={() => {
-            router.dismissAll();
+            // Soket ekrani bir modal yiginin ustunde degilse (ornegin bir
+            // baglantiyla dogrudan acildiysa) kapatilacak bir sey yok;
+            // kosulsuz dismissAll "POP_TO_TOP islenmedi" hatasi veriyordu.
+            if (router.canDismiss()) router.dismissAll();
             router.replace('/charging');
           }}
         />
