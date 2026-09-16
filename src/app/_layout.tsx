@@ -3,10 +3,11 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
+import { AppState, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { BOOT_SCREEN_MS, BootScreen } from '@/components';
 import { warmUpServer } from '@/services/api';
 import { setQueryClientForAuth, useAuthStore } from '@/store/auth';
 import { useSessionStore } from '@/store/session';
@@ -58,6 +59,14 @@ export default function RootLayout() {
     setQueryClientForAuth(queryClient);
   }, [queryClient]);
 
+  // Marka acilis ekrani en az BOOT_SCREEN_MS gorunsun: oturum onbellekten
+  // aninda kurulunca (bkz. store/auth hydrate) ekran bir kare gorunup kayboluyordu.
+  const [bootDelayDone, setBootDelayDone] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setBootDelayDone(true), BOOT_SCREEN_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
   const authStatus = useAuthStore((s) => s.status);
   const hydrateAuth = useAuthStore((s) => s.hydrate);
   useEffect(() => {
@@ -87,12 +96,8 @@ export default function RootLayout() {
   // chunk'lari henuz kayitli olmadan gelen bu gecikmis navigasyon
   // "onUnhandledAction" ile sessizce basarisiz olup (auth) grubunun rastgele
   // bulunan bir cocugunda (login/register) kalinmasina yol aciyordu.
-  if (authStatus === 'hydrating') {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
+  if (authStatus === 'hydrating' || !bootDelayDone) {
+    return <BootScreen />;
   }
 
   return (
@@ -116,5 +121,4 @@ export default function RootLayout() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
 });

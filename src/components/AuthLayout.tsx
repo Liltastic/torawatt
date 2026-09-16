@@ -1,7 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Image, type ImageContentPosition, type ImageSource } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar } from 'expo-status-bar';
+import { type ImageContentPosition, type ImageSource } from 'expo-image';
 import { useEffect } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, {
@@ -17,31 +16,15 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedPressable } from '@/components/AnimatedPressable';
+import { AuthBackdrop } from '@/components/AuthBackdrop';
 import { Logo } from '@/components/Logo';
 import { colors, radius, spacing, typography } from '@/theme';
 
 const TOP_ROW_H = 40;
 const LINE_W = 56;
 
-/**
- * Tam ekran fotografin uzerindeki perde. Ust ucta durum cubugu simgeleri ve
- * beyaz logo icin, alt ucta formun tamami icin kontrast uretir; ortada
- * fotografin nefes almasina izin verir ve hafif turkuaza caler.
- *
- * Tek bir gradyan: ayri tonlama/perde katmanlari gorsel olarak ayni sonucu
- * verip her karede bir tam ekran beste daha ekliyordu.
- */
-const SCRIM_COLORS = [
-  'rgba(6, 34, 29, 0.62)',
-  'rgba(10, 70, 63, 0.34)',
-  'rgba(8, 44, 39, 0.86)',
-  'rgba(6, 28, 24, 0.97)',
-] as const;
-const SCRIM_LOCATIONS = [0, 0.24, 0.56, 1] as const;
-
 interface AuthLayoutProps {
   source: ImageSource | number;
-  /** Fotografin gorunur kalan bolgesi (bkz. assets/images/auth/CREDITS.md). */
   contentPosition?: ImageContentPosition;
   /** Buyuk harfle, Turkce noktali I ile YAZILMIS metin; toUpperCase kullanma. */
   eyebrow: string;
@@ -53,16 +36,12 @@ interface AuthLayoutProps {
 }
 
 /**
- * Giris ve kayit ekranlarinin ortak kabugu: tam ekran fotograf, perde,
- * ust satir (geri + logo) ve baslik blogu. Form cocuk olarak geliyor.
- *
- * Fotograf ve perde kaydirma alaninin DISINDA, sabit duruyor: klavye acilinca
- * yalnizca icerik kayiyor. Hero'nun eski yukseklik animasyonu boylece tamamen
- * kalkti - kare basina yerlesim hesabi yok.
+ * Giris ve kayit ekranlarinin ortak kabugu: tam ekran fotograf, ust satir
+ * (geri + logo) ve baslik blogu. Form cocuk olarak geliyor.
  */
 export function AuthLayout({
   source,
-  contentPosition = 'center',
+  contentPosition,
   eyebrow,
   title,
   subtitle,
@@ -86,25 +65,7 @@ export function AuthLayout({
 
   return (
     <View style={styles.root}>
-      {/* Fotograf saydam durum cubugunun altina cizilir; simgeler acik renk olmali. */}
-      <StatusBar style="light" />
-
-      <Image
-        source={source}
-        contentFit="cover"
-        contentPosition={contentPosition}
-        transition={{ duration: 300, effect: 'cross-dissolve' }}
-        priority="high"
-        cachePolicy="memory-disk"
-        accessible={false}
-        style={StyleSheet.absoluteFill}
-      />
-      <LinearGradient
-        pointerEvents="none"
-        colors={SCRIM_COLORS}
-        locations={SCRIM_LOCATIONS}
-        style={StyleSheet.absoluteFill}
-      />
+      <AuthBackdrop source={source} contentPosition={contentPosition} />
 
       {/* KeyboardAvoidingView BILEREK yok: iOS'ta alt dolgusunu JavaScript
           tarafinda animasyonluyor, yani klavye her acilip kapandiginda kare

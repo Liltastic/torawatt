@@ -1,9 +1,9 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, Logo } from '@/components';
+import { AuthBackdrop, Button, Logo } from '@/components';
 import { colors, spacing, typography } from '@/theme';
 import { getRunningUpdateLabel } from '@/utils/buildInfo';
 
@@ -12,22 +12,31 @@ export default function WelcomeScreen() {
 
   return (
     <View style={styles.root}>
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.hero}>
-          <Animated.View entering={FadeInDown.duration(500)} style={styles.logoBlock}>
-            <Logo width={220} />
-          </Animated.View>
+      <AuthBackdrop
+        source={require('../../../assets/images/auth/welcome-hero.jpg')}
+        contentPosition="center"
+      />
 
-          <Animated.Text entering={FadeInDown.delay(140).duration(450)} style={styles.tagline}>
+      {/* Icerik alt yariya toplaniyor: fotografin ust yarisi (sarj eden kisi)
+          acik kaliyor, metin ise perdenin en koyu bolgesine oturuyor. */}
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.spacer} />
+
+        <Animated.View entering={FadeInDown.delay(120).duration(460)}>
+          <View accessibilityRole="image" accessibilityLabel="TORA WATT">
+            <Logo width={208} color={colors.white} accentColor={colors.primary} />
+          </View>
+
+          <Text style={styles.tagline} maxFontSizeMultiplier={1.3}>
             Enerjine bağlan.
-          </Animated.Text>
-          <Animated.Text entering={FadeInDown.delay(240).duration(450)} style={styles.subtitle}>
+          </Text>
+          <Text style={styles.subtitle} maxFontSizeMultiplier={1.3}>
             Bul. Bağlan. Devam et. Elektrikli aracın için en yakın şarj noktası birkaç dokunuş
             uzağında.
-          </Animated.Text>
-        </View>
+          </Text>
+        </Animated.View>
 
-        <Animated.View entering={FadeInUp.delay(360).duration(450)} style={styles.actions}>
+        <Animated.View entering={FadeInUp.delay(320).duration(420)} style={styles.actions}>
           <Button label="Hadi başlayalım" onPress={() => router.push('/register')} />
           <Button
             label="Zaten hesabım var"
@@ -43,25 +52,24 @@ export default function WelcomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: colors.heroDark },
   safeArea: {
     flex: 1,
     paddingHorizontal: spacing.xxl,
-    justifyContent: 'space-between',
     maxWidth: 520,
     width: '100%',
     alignSelf: 'center',
   },
-  hero: { flex: 1, justifyContent: 'center' },
-  logoBlock: { marginBottom: spacing.xxl + spacing.xs },
-  tagline: { ...typography.h2, color: colors.text, marginBottom: spacing.md - 2 },
-  subtitle: { ...typography.body, color: colors.textSecondary },
+  spacer: { flex: 1 },
 
-  actions: { paddingBottom: spacing.lg },
+  tagline: { ...typography.h1, color: colors.white, marginTop: spacing.xxl },
+  subtitle: { ...typography.body, color: 'rgba(255, 255, 255, 0.84)', marginTop: spacing.md },
+
+  actions: { paddingTop: spacing.xxxl, paddingBottom: spacing.lg },
   secondaryAction: { marginTop: spacing.md },
   footer: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.62)',
     textAlign: 'center',
     marginTop: spacing.lg,
   },

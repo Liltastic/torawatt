@@ -13,4 +13,6 @@ export { SegmentedControl } from './SegmentedControl';
 export { Skeleton, StationCardSkeleton } from './Skeleton';
 export { ConnectorCard } from './ConnectorCard';
 export { TextField } from './TextField';
+export { AuthBackdrop } from './AuthBackdrop';
 export { AuthLayout } from './AuthLayout';
+export { BOOT_SCREEN_MS, BootScreen } from './BootScreen';
