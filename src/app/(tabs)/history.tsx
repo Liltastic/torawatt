@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Link } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 
@@ -47,6 +47,7 @@ const RANGES = [
 ] as const;
 
 export default function HistoryScreen() {
+  const router = useRouter();
   const styles = useStyles();
   const tabBarInset = useTabBarInset();
   const miniBarInset = useChargingMiniBarInset();
@@ -141,7 +142,12 @@ export default function HistoryScreen() {
               <HistorySummary energy={totals.energy} cost={totals.cost} />
             </>
           }
-          renderItem={({ item }) => <HistoryRow item={item} />}
+          renderItem={({ item }) => (
+            <HistoryRow
+              item={item}
+              onPress={() => router.push({ pathname: '/history/[id]', params: { id: item.id } })}
+            />
+          )}
           contentContainerStyle={[
             styles.list,
             { paddingBottom: spacing.xxl + tabBarInset + miniBarInset },
@@ -176,53 +182,41 @@ function HistorySummary({ energy, cost }: { energy: number; cost: number }) {
   );
 }
 
-function HistoryRow({ item }: { item: ChargingHistoryDetail }) {
+function HistoryRow({ item, onPress }: { item: ChargingHistoryDetail; onPress: () => void }) {
   const colors = useColors();
   const styles = useStyles();
-  // Basili zemin karti cizen ic gorunumde; dokunmayi Link disaridaki
-  // basilabilir alana veriyor, o yuzden durum burada tutuluyor.
-  const [pressed, setPressed] = useState(false);
 
   return (
     // layout kaliyor: filtre cipleri satirlari gercekten yer degistiriyor.
     // entering ise kaldirildi - geri donusturulen satirlarda kaydirirken her
     // geri girisde yeniden oynayip yanip sonme uretiyordu.
+    //
+    // iOS 18 zoom gecisi (Link.AppleZoom) burada denendi ve geri alindi: kaynak
+    // isaretleyici karti display:contents olan yerel bir gorunume sariyor ve
+    // Expo Go'da iPhone'da kartlar hic gorunmedi. Duz dokunma + router.push.
     <Animated.View layout={LinearTransition.duration(220)}>
-      {/* iOS 18+: kart, dokununca detay ekranina buyuyerek donusuyor (Apple zoom
-          gecisi, expo-router Link.AppleZoom). Yapi belgedeki gibi: Link asChild
-          dokunmayi basilabilir alana veriyor, AppleZoom kartin kendisini kaynak
-          isaretliyor. Diger platformlarda ve eski iOS'ta AppleZoom yalnizca
-          cocugunu ciziyor, gecis normal. `push`: onceki router.push ile ayni. */}
-      <Link href={{ pathname: '/history/[id]', params: { id: item.id } }} push asChild>
-        <AnimatedPressable
-          accessibilityRole="button"
-          accessibilityLabel={`${item.stationName}, ${formatDate(item.startedAt)}`}
-          haptic="tap"
-          scaleTo={0.98}
-          onPressIn={() => setPressed(true)}
-          onPressOut={() => setPressed(false)}>
-          <Link.AppleZoom>
-            {/* Duz nesne: AppleZoom cocugunu expo-router'in Slot'undan geciriyor
-                ve Slot dizi stil kabul etmiyor (gelistirmede hata firlatiyor). */}
-            <View style={StyleSheet.flatten([styles.row, pressed && styles.rowPressed])}>
-              <View style={styles.rowMain}>
-                <Text style={styles.station} numberOfLines={1}>
-                  {item.stationName}
-                </Text>
-                <Text style={styles.meta}>
-                  {formatDate(item.startedAt)} · {formatMinutes(item.durationMinutes)}
-                </Text>
-                <Text style={styles.energy}>{formatEnergy(item.energyKwh)}</Text>
-              </View>
+      <AnimatedPressable
+        accessibilityRole="button"
+        accessibilityLabel={`${item.stationName}, ${formatDate(item.startedAt)}`}
+        haptic="tap"
+        scaleTo={0.98}
+        onPress={onPress}
+        style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+        <View style={styles.rowMain}>
+          <Text style={styles.station} numberOfLines={1}>
+            {item.stationName}
+          </Text>
+          <Text style={styles.meta}>
+            {formatDate(item.startedAt)} · {formatMinutes(item.durationMinutes)}
+          </Text>
+          <Text style={styles.energy}>{formatEnergy(item.energyKwh)}</Text>
+        </View>
 
-              <View style={styles.rowTrailing}>
-                <Text style={styles.cost}>{formatPrice(item.cost)}</Text>
-                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-              </View>
-            </View>
-          </Link.AppleZoom>
-        </AnimatedPressable>
-      </Link>
+        <View style={styles.rowTrailing}>
+          <Text style={styles.cost}>{formatPrice(item.cost)}</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+        </View>
+      </AnimatedPressable>
     </Animated.View>
   );
 }
