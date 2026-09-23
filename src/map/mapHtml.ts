@@ -857,8 +857,14 @@ ${variant.onLoadScript}
         // point_count_abbreviated KULLANILMIYOR: 1000'in altinda SAYI, ustunde
         // "1.2k" string'i donuyor; pay gercek sayi iken paydanin kisaltilmasi
         // orani bozar.
-        'text-field': ['concat',
-          ['to-string', ['get', 'free']], '/', ['to-string', ['get', 'point_count']]],
+        //
+        // Kumedeki istasyonlarin HICBIRININ durumu bilinmiyorsa (ulusal
+        // katalog kayitlari, bkz. services/evcs.ts) pay 0 cikiyor ve "0/16"
+        // "hicbiri musait degil" gibi okunuyordu; o durumda yalnizca sayi.
+        'text-field': ['case',
+          ['==', ['get', 'known'], 0],
+          ['to-string', ['get', 'point_count']],
+          ['concat', ['to-string', ['get', 'free']], '/', ['to-string', ['get', 'point_count']]]],
         'text-font': ['${boldFont}'],
         'text-size': ['step', ['get', 'point_count'], 12, 25, 13],
         'text-allow-overlap': true,

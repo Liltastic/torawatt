@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import BottomSheet, {
+  BottomSheetFlatList,
   BottomSheetFooter,
   BottomSheetScrollView,
   useBottomSheet,
@@ -22,7 +23,6 @@ import Animated, {
   Extrapolation,
   FadeInDown,
   FadeOutUp,
-  LinearTransition,
   interpolate,
   runOnJS,
   useAnimatedReaction,
@@ -49,7 +49,7 @@ import {
 import { BASEMAPS, StationMap, type StationMapHandle } from '@/map';
 import { useIsFavorite, useToggleFavorite } from '@/queries/favorites';
 import { useActiveReservation } from '@/queries/reservations';
-import { useStations } from '@/queries/stations';
+import { useStation, useStations } from '@/queries/stations';
 import { useActiveVehicle } from '@/queries/vehicles';
 import { haversineKm } from '@/services/routing';
 import { useLocationStore } from '@/store/location';
@@ -59,6 +59,7 @@ import { createThemedStyles, radius, shadows, spacing, typography, useColors } f
 import {
   effectiveReservationStatus,
   reservationStatusLabels,
+  isExternalStation,
   stationAvailability,
   type Station,
   type Vehicle,
@@ -293,9 +294,13 @@ export default function MapScreen() {
       .sort((a, b) => a.distanceKm - b.distanceKm);
   }, [allStations, query, activeFilters, filters, userLocation]);
 
+  // Katalog istasyonlarinin soketleri yalnizca detay ucunda; listedeki kayitta
+  // sayilardan uretilmis tahmin duruyor (bkz. services/evcs.ts). Detay gelene
+  // kadar listedeki kayit gosteriliyor, geldiginde gercek soketlerle degisiyor.
+  const { data: selectedStationDetail } = useStation(selectedId);
   const selectedStation = useMemo(
-    () => stations.find((s) => s.id === selectedId),
-    [stations, selectedId],
+    () => selectedStationDetail ?? stations.find((s) => s.id === selectedId),
+    [selectedStationDetail, stations, selectedId],
   );
 
   const openStation = useCallback(
@@ -381,9 +386,24 @@ export default function MapScreen() {
     Linking.openURL(url).catch(() => Linking.openURL(webFallback));
   }, []);
 
+  // Giris animasyonu yalnizca ilk ekranda: asagidaki satirlar kaydirirken
+  // kuruldugu icin hepsine verilirse liste boyunca yanip sonerdi.
+  const renderStationRow = useCallback(
+    ({ item, index }: { item: Station; index: number }) => (
+      <Animated.View
+        entering={index < 8 ? FadeInDown.delay(index * 45).duration(320) : undefined}>
+        <StationCard station={item} onPress={() => openStation(item)} />
+      </Animated.View>
+    ),
+    [openStation],
+  );
+
   const renderFooter = useCallback(
     (footerProps: BottomSheetFooterProps) => {
       if (!selectedStation) return null;
+      // Katalog istasyonunda uygulamadan sarj/rezervasyon yapilamiyor (bkz.
+      // services/evcs.ts); calismayacak buton gostermek yerine cubuk hic cizilmiyor.
+      if (isExternalStation(selectedStation)) return null;
       const connector = selectedStation.connectors.find((c) => c.id === selectedConnectorId);
 
       // Sheet ekranin dibine kadar iniyor; iOS'ta cam cubuk yer kaplamayip
@@ -639,18 +659,17 @@ export default function MapScreen() {
                 />
               </View>
             ) : (
-              <BottomSheetScrollView
+              // Liste artik ulusal katalogla besleniyor: Istanbul'da 200 kayit
+              // geliyor. Hepsini birden cizmek (onceki ScrollView + satir basina
+              // giris/yerlesim animasyonu) sheet'i hic acilamaz hale getirdi;
+              // sanallastirilmis liste yalnizca gorunen satirlari kuruyor.
+              <BottomSheetFlatList
+                data={stations}
+                keyExtractor={(station: Station) => station.id}
+                renderItem={renderStationRow}
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={listContentStyle}>
-                {stations.map((station, index) => (
-                  <Animated.View
-                    key={station.id}
-                    entering={FadeInDown.delay(Math.min(index, 8) * 45).duration(320)}
-                    layout={LinearTransition.duration(220)}>
-                    <StationCard station={station} onPress={() => openStation(station)} />
-                  </Animated.View>
-                ))}
-              </BottomSheetScrollView>
+                contentContainerStyle={listContentStyle}
+              />
             )}
           </>
         )}
@@ -697,6 +716,13 @@ function StationDetail({
   const availability = stationAvailability(station);
   const availableCount = station.connectors.filter((c) => c.status === 'AVAILABLE').length;
   const selectedConnector = station.connectors.find((c) => c.id === selectedConnectorId);
+  // Katalog istasyonu: doluluk ve fiyat verisi yok, favori de eklenemiyor
+  // (favoriler kendi backend'imizde, bu kayitlar orada yok).
+  const external = isExternalStation(station);
+  const socketSummary =
+    availability === 'UNKNOWN'
+      ? `${station.connectors.length} soket`
+      : `${availableCount}/${station.connectors.length} müsait`;
   const isFavorite = useIsFavorite(station.id);
   const toggleFavorite = useToggleFavorite();
 
@@ -719,23 +745,23 @@ function StationDetail({
           </Text>
           <View style={styles.detailStatusRow}>
             <AvailabilityBadge status={availability} />
-            <Text style={styles.detailStatusText}>
-              {availableCount}/{station.connectors.length} müsait
-            </Text>
+            <Text style={styles.detailStatusText}>{socketSummary}</Text>
           </View>
         </View>
 
-        <AnimatedPressable
-          accessibilityRole="button"
-          accessibilityLabel={isFavorite ? 'Favorilerden çıkar' : 'Favorilere ekle'}
-          accessibilityState={{ selected: isFavorite }}
-          hitSlop={10}
-          haptic={isFavorite ? 'tap' : 'success'}
-          scaleTo={0.85}
-          onPress={() => toggleFavorite.mutate({ stationId: station.id, favorite: !isFavorite })}
-          style={styles.favoriteIconButton}>
-          <FavoriteHeart active={isFavorite} size={19} />
-        </AnimatedPressable>
+        {!external && (
+          <AnimatedPressable
+            accessibilityRole="button"
+            accessibilityLabel={isFavorite ? 'Favorilerden çıkar' : 'Favorilere ekle'}
+            accessibilityState={{ selected: isFavorite }}
+            hitSlop={10}
+            haptic={isFavorite ? 'tap' : 'success'}
+            scaleTo={0.85}
+            onPress={() => toggleFavorite.mutate({ stationId: station.id, favorite: !isFavorite })}
+            style={styles.favoriteIconButton}>
+            <FavoriteHeart active={isFavorite} size={19} />
+          </AnimatedPressable>
+        )}
 
         <AnimatedPressable
           accessibilityRole="button"
@@ -756,7 +782,11 @@ function StationDetail({
         contentContainerStyle={detailContentStyle}>
         {tab === 'station' ? (
           <>
-            <Text style={styles.detailSectionHint}>Şarj başlatmak için bir soket seç.</Text>
+            <Text style={styles.detailSectionHint}>
+              {external
+                ? 'Bu istasyon TORA WATT ağında değil. Soket bilgisi ulusal katalogdan geliyor; anlık doluluk ve fiyat yok.'
+                : 'Şarj başlatmak için bir soket seç.'}
+            </Text>
             {station.connectors.map((connector, index) => (
               <ConnectorCard
                 key={connector.id}
@@ -767,26 +797,31 @@ function StationDetail({
               />
             ))}
 
-            <Text style={styles.detailSectionTitle}>Ücretlendirme</Text>
-            <View style={styles.detailInfoCard}>
-              <InfoRow
-                label="Enerji"
-                value={
-                  selectedConnector?.pricePerKwh != null
-                    ? `${formatPrice(selectedConnector.pricePerKwh)} / kWh`
-                    : 'Soket seçince görünür'
-                }
-              />
-              <InfoRow
-                label="Bekleme ücreti"
-                value={
-                  selectedConnector?.idleFeePerMin != null
-                    ? `${formatPrice(selectedConnector.idleFeePerMin)} / dk`
-                    : 'Yok'
-                }
-                last
-              />
-            </View>
+            {/* Katalogda fiyat yok; bos bir kart yerine bolum hic cizilmiyor. */}
+            {!external && (
+              <>
+                <Text style={styles.detailSectionTitle}>Ücretlendirme</Text>
+                <View style={styles.detailInfoCard}>
+                  <InfoRow
+                    label="Enerji"
+                    value={
+                      selectedConnector?.pricePerKwh != null
+                        ? `${formatPrice(selectedConnector.pricePerKwh)} / kWh`
+                        : 'Soket seçince görünür'
+                    }
+                  />
+                  <InfoRow
+                    label="Bekleme ücreti"
+                    value={
+                      selectedConnector?.idleFeePerMin != null
+                        ? `${formatPrice(selectedConnector.idleFeePerMin)} / dk`
+                        : 'Yok'
+                    }
+                    last
+                  />
+                </View>
+              </>
+            )}
           </>
         ) : (
           <View style={styles.detailInfoCard}>

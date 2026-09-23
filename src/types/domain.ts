@@ -24,6 +24,16 @@ export interface Connector {
   idleFeePerMin?: number;
 }
 
+/**
+ * Istasyon verisinin nereden geldigi.
+ *  'own'  - kendi backend'imiz: canli musaitlik, fiyat, rezervasyon ve sarj var.
+ *  'epdk' - EVCS mobil API'sindeki ulusal katalog (bkz. services/evcs.ts):
+ *           konum, adres, isletmeci ve soket bilgisi var; musaitlik ve fiyat
+ *           YOK, uygulamadan sarj/rezervasyon yapilamaz.
+ * Alan bos ise kayit kendi backend'imizden gelmistir.
+ */
+export type StationSource = 'own' | 'epdk';
+
 export interface Station {
   id: string;
   name: string;
@@ -36,6 +46,12 @@ export interface Station {
   connectors: Connector[];
   /** Kullanicinin konumuna gore hesaplanir; backend veya istemci doldurur. */
   distanceKm?: number;
+  source?: StationSource;
+}
+
+/** Yalnizca bilgi amacli katalog istasyonu mu (sarj/rezervasyon/favori yok). */
+export function isExternalStation(station: Pick<Station, 'source'>): boolean {
+  return station.source === 'epdk';
 }
 
 export type ChargingSessionStatus = 'STARTING' | 'CHARGING' | 'COMPLETED' | 'STOPPING' | 'ERROR';

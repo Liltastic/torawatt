@@ -18,7 +18,7 @@ import {
 import { useIsFavorite, useToggleFavorite } from '@/queries/favorites';
 import { useStation } from '@/queries/stations';
 import { createThemedStyles, radius, shadows, spacing, typography, useColors } from '@/theme';
-import { stationAvailability } from '@/types/domain';
+import { isExternalStation, stationAvailability } from '@/types/domain';
 import { formatPrice } from '@/utils/format';
 
 export default function StationDetailScreen() {
@@ -66,6 +66,10 @@ export default function StationDetailScreen() {
   const availability = stationAvailability(station);
   const availableCount = station.connectors.filter((c) => c.status === 'AVAILABLE').length;
   const selectedConnector = station.connectors.find((c) => c.id === selectedConnectorId);
+  // Ulusal katalogdan gelen istasyon: doluluk/fiyat verisi yok, uygulamadan
+  // sarj veya rezervasyon yapilamiyor, favorilere de eklenemiyor (bkz.
+  // services/evcs.ts).
+  const external = isExternalStation(station);
 
   const openDirections = () => {
     const { latitude: lat, longitude: lng, name } = station;
@@ -85,7 +89,7 @@ export default function StationDetailScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']}>
-        <ScreenHeader stationId={station.id} onBack={() => router.back()} />
+        <ScreenHeader stationId={external ? undefined : station.id} onBack={() => router.back()} />
       </SafeAreaView>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -99,12 +103,18 @@ export default function StationDetailScreen() {
         <View style={styles.statusRow}>
           <AvailabilityBadge status={availability} />
           <Text style={styles.statusText}>
-            {station.connectors.length} soketten {availableCount} tanesi müsait
+            {availability === 'UNKNOWN'
+              ? `${station.connectors.length} soket`
+              : `${station.connectors.length} soketten ${availableCount} tanesi müsait`}
           </Text>
         </View>
 
         <Text style={styles.sectionTitle}>Soketler</Text>
-        <Text style={styles.sectionHint}>Şarj başlatmak için bir soket seç.</Text>
+        <Text style={styles.sectionHint}>
+          {external
+            ? 'Bu istasyon TORA WATT ağında değil. Soket bilgisi ulusal katalogdan geliyor; anlık doluluk ve fiyat yok.'
+            : 'Şarj başlatmak için bir soket seç.'}
+        </Text>
 
         {station.connectors.map((connector, index) => (
           <Animated.View
@@ -119,28 +129,33 @@ export default function StationDetailScreen() {
           </Animated.View>
         ))}
 
-        <Text style={styles.sectionTitle}>Ücretlendirme</Text>
-        <Animated.View entering={FadeInDown.duration(280)}>
-          <Card style={styles.infoCard}>
-            <InfoRow
-              label="Enerji"
-              value={
-                selectedConnector?.pricePerKwh != null
-                  ? `${formatPrice(selectedConnector.pricePerKwh)} / kWh`
-                  : 'Soket seçince görünür'
-              }
-            />
-            <InfoRow
-              label="Bekleme ücreti"
-              value={
-                selectedConnector?.idleFeePerMin != null
-                  ? `${formatPrice(selectedConnector.idleFeePerMin)} / dk`
-                  : 'Yok'
-              }
-            />
-            <InfoRow label="Başlatma ücreti" value="Yok" last />
-          </Card>
-        </Animated.View>
+        {/* Katalogda fiyat verisi yok; bos bir kart yerine bolum hic cizilmiyor. */}
+        {!external && (
+          <>
+            <Text style={styles.sectionTitle}>Ücretlendirme</Text>
+            <Animated.View entering={FadeInDown.duration(280)}>
+              <Card style={styles.infoCard}>
+                <InfoRow
+                  label="Enerji"
+                  value={
+                    selectedConnector?.pricePerKwh != null
+                      ? `${formatPrice(selectedConnector.pricePerKwh)} / kWh`
+                      : 'Soket seçince görünür'
+                  }
+                />
+                <InfoRow
+                  label="Bekleme ücreti"
+                  value={
+                    selectedConnector?.idleFeePerMin != null
+                      ? `${formatPrice(selectedConnector.idleFeePerMin)} / dk`
+                      : 'Yok'
+                  }
+                />
+                <InfoRow label="Başlatma ücreti" value="Yok" last />
+              </Card>
+            </Animated.View>
+          </>
+        )}
 
         <Text style={styles.sectionTitle}>Konum ve olanaklar</Text>
         <Animated.View entering={FadeInDown.duration(280)}>
@@ -156,46 +171,57 @@ export default function StationDetailScreen() {
       </ScrollView>
 
       <SafeAreaView edges={['bottom']} style={[styles.actions, shadows.sheet]}>
-        {/* Spec bolum 7: birincil sarj, ikincil rezervasyon, ucuncul yol tarifi. */}
-        <Button
-          label="Rezerve Et"
-          variant="secondary"
-          disabled={!selectedConnector}
-          style={styles.secondaryAction}
-          onPress={() => {
-            if (!selectedConnector) return;
-            router.push({
-              pathname: '/booking/new',
-              params: { stationId: station.id, connectorId: selectedConnector.id },
-            });
-          }}
-        />
+        {external ? (
+          // Katalog istasyonunda uygulamadan yapilabilecek tek sey yol tarifi:
+          // sarj ve rezervasyon kendi agimizdaki istasyonlara ozel.
+          <Button label="Yol tarifi" onPress={openDirections} />
+        ) : (
+          <>
+            {/* Spec bolum 7: birincil sarj, ikincil rezervasyon, ucuncul yol tarifi. */}
+            <Button
+              label="Rezerve Et"
+              variant="secondary"
+              disabled={!selectedConnector}
+              style={styles.secondaryAction}
+              onPress={() => {
+                if (!selectedConnector) return;
+                router.push({
+                  pathname: '/booking/new',
+                  params: { stationId: station.id, connectorId: selectedConnector.id },
+                });
+              }}
+            />
 
-        <View style={styles.actionRow}>
-          <AnimatedPressable
-            accessibilityRole="button"
-            accessibilityLabel="Yol tarifi"
-            haptic="tap"
-            onPress={openDirections}
-            style={({ pressed }) => [styles.directionsButton, pressed && styles.directionsPressed]}>
-            <Ionicons name="navigate" size={20} color={colors.primaryText} />
-          </AnimatedPressable>
+            <View style={styles.actionRow}>
+              <AnimatedPressable
+                accessibilityRole="button"
+                accessibilityLabel="Yol tarifi"
+                haptic="tap"
+                onPress={openDirections}
+                style={({ pressed }) => [
+                  styles.directionsButton,
+                  pressed && styles.directionsPressed,
+                ]}>
+                <Ionicons name="navigate" size={20} color={colors.primaryText} />
+              </AnimatedPressable>
 
-          <Button
-            label={selectedConnector ? 'Şarj Başlat' : 'Önce soket seç'}
-            disabled={!selectedConnector}
-            onPress={() => {
-              // Non-null assertion kullanmiyoruz: React Compiler nesne literalini
-              // render sirasinda degerlendirip henuz secim yokken patliyor.
-              if (!selectedConnector) return;
-              router.push({
-                pathname: '/charger/[connectorId]',
-                params: { connectorId: selectedConnector.id, stationId: station.id },
-              });
-            }}
-            style={styles.primaryAction}
-          />
-        </View>
+              <Button
+                label={selectedConnector ? 'Şarj Başlat' : 'Önce soket seç'}
+                disabled={!selectedConnector}
+                onPress={() => {
+                  // Non-null assertion kullanmiyoruz: React Compiler nesne literalini
+                  // render sirasinda degerlendirip henuz secim yokken patliyor.
+                  if (!selectedConnector) return;
+                  router.push({
+                    pathname: '/charger/[connectorId]',
+                    params: { connectorId: selectedConnector.id, stationId: station.id },
+                  });
+                }}
+                style={styles.primaryAction}
+              />
+            </View>
+          </>
+        )}
       </SafeAreaView>
     </View>
   );

@@ -38,11 +38,15 @@ export function StationCard({
   );
 
   const availability = stationAvailability(station);
+  // Katalog istasyonlarinda canli doluluk yok (bkz. services/evcs.ts): "0/2
+  // musait" yazmak "hepsi dolu" demek olurdu, oysa bilmiyoruz.
+  const socketSummary =
+    availability === 'UNKNOWN' ? `${total} soket` : `${available}/${total} müsait`;
 
   return (
     <AnimatedPressable
       accessibilityRole="button"
-      accessibilityLabel={`${station.name}, ${total} soketten ${available} tanesi müsait`}
+      accessibilityLabel={`${station.name}, ${socketSummary}`}
       haptic="tap"
       scaleTo={0.98}
       onPress={onPress}
@@ -55,7 +59,7 @@ export function StationCard({
         <Text style={styles.meta}>
           {station.distanceKm != null ? formatDistance(station.distanceKm) : station.operator}
           {' · '}
-          {available}/{total} müsait
+          {socketSummary}
         </Text>
 
         <View style={styles.badges}>

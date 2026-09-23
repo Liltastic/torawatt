@@ -8,6 +8,14 @@
  */
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
 
+/**
+ * Grubun kendi sarj platformunun mobil API'si; TORA WATT buradan yalnizca
+ * istasyon verisi okuyor (bkz. services/evcs.ts). Kullandigimiz uclar token
+ * istemiyor, o yuzden adresten baska bir sey gerekmiyor.
+ */
+export const EVCS_API_URL =
+  process.env.EXPO_PUBLIC_EVCS_API_URL ?? 'https://testmobileapi2.torasarj.net';
+
 if (__DEV__ && !process.env.EXPO_PUBLIC_API_URL) {
   console.warn(
     'EXPO_PUBLIC_API_URL tanımlı değil, http://localhost:4000 varsayılıyor. ' +
