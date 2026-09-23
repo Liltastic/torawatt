@@ -3,7 +3,7 @@ import { useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { stationsApi } from '@/services/api';
 import {
   fetchExternalStation,
-  fetchNearbyExternalStations,
+  fetchNearbyToraStations,
   isExternalStationId,
 } from '@/services/evcs';
 import { useLocationStore } from '@/store/location';
@@ -18,12 +18,14 @@ export const stationKeys = {
 };
 
 /**
- * Katalogdan cevredeki istasyonlar. Istanbul'da 5 km yaricapta 300'un uzerinde
- * kayit var; liste mesafeye gore sirali geldigi icin ilk 200'u almak "en yakin"
- * gorunumu icin fazlasiyla yetiyor ve harita zaten kumeliyor.
+ * Cevrede taranacak alan ve sayfa tavani (bkz. fetchNearbyToraStations).
+ * Katalogda isletmeci filtresi olmadigi icin kayitlar sayfalanip istemcide
+ * suzuluyor; 10 sayfa = en yakin 2000 kayit, Istanbul'da ~15 km'lik bir
+ * cember demek ve o cemberdeki TORA istasyonlarinin hepsini yakaliyor.
+ * Seyrek bolgelerde tek sayfa zaten 50 km'yi kapsiyor.
  */
-const EXTERNAL_RADIUS_KM = 25;
-const EXTERNAL_SIZE = 200;
+const EXTERNAL_RADIUS_KM = 50;
+const EXTERNAL_MAX_PAGES = 10;
 
 /** Sunucu sonucu 10 dk onbellekliyor; istemcide daha sik sormanin anlami yok. */
 const EXTERNAL_STALE_MS = 10 * 60_000;
@@ -49,16 +51,15 @@ function useExternalStations() {
   return useQuery({
     queryKey: stationKeys.external(latitude, longitude),
     queryFn: () =>
-      fetchNearbyExternalStations({ latitude, longitude }, EXTERNAL_RADIUS_KM, EXTERNAL_SIZE),
+      fetchNearbyToraStations({ latitude, longitude }, EXTERNAL_RADIUS_KM, EXTERNAL_MAX_PAGES),
     staleTime: EXTERNAL_STALE_MS,
   });
 }
 
 /**
- * Haritadaki ve listedeki istasyonlarin TEK kaynagi EVCS katalogu
- * (bkz. services/evcs.ts). Kendi backend'imizdeki demo istasyonlar bilerek
- * listelenmiyor: kullanici gercek istasyonlari gormek istiyor, ikisi bir arada
- * "hangisi gercek" sorusunu doguruyordu. stationsApi.get hala duruyor - eski
+ * Haritadaki ve listedeki istasyonlarin TEK kaynagi EVCS katalogundaki TORA
+ * istasyonlari (bkz. services/evcs.ts). Kendi backend'imizdeki demo
+ * istasyonlar bilerek listelenmiyor; stationsApi.get hala duruyor - eski
  * rezervasyon ve sarj kayitlari kendi istasyon kimliklerine isaret ediyor ve o
  * ekranlar acildiginda istasyonu tek tek cozebilmeli.
  *

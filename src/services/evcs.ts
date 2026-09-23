@@ -15,15 +15,18 @@ import { EVCS_API_URL } from './config';
 /**
  * EVCS Mobile API (testmobileapi2.torasarj.net) - grubun kendi sarj
  * platformunun mobil API'si. TORA WATT buradan YALNIZCA istasyon verisi
- * okuyor: konum, adres, isletmeci ve soket bilgisi.
+ * okuyor: konum, adres, isletmeci ve soket bilgisi. Listeye yalnizca TORA'nin
+ * kendi istasyonlari giriyor (bkz. fetchNearbyToraStations).
  *
  * Kullanilan uclar herkese acik (token istemiyor, yalnizca X-App-* basliklari
  * zorunlu - baslik olmadan 400 donuyor):
  *   GET /api/v1/stations/external          kutu ya da lat/lng+yaricap ile liste
  *   GET /api/v1/stations/external/{id}     detay + soket listesi
  *
- * `/api/v1/stations/nearby` BILEREK kullanilmiyor: orasi platformun kendi
- * istasyonlari ve token istiyor; test ortaminda da bos donuyor.
+ * `/api/v1/stations/nearby` (platformun kendi istasyon tablosu) kullanilmiyor:
+ * token istemeden cevap veriyor ama test ortaminda 0 kayit donuyor. Canli
+ * ortamda TORA'nin istasyonlari orada durursa asil kaynak o olmali - model
+ * daha zengin ve muhtemelen soket durumunu da tasiyor.
  *
  * ONEMLI - veride olmayan seyler: anlik soket doluluğu, fiyat, calisma saati
  * ve olanaklar. Uc bunlari hic dondurmuyor (3 sehirde 600 kayitta dogrulandi),
@@ -250,23 +253,57 @@ function toStation(station: CatalogStationDetail): Station {
 }
 
 /**
- * Verilen noktanin cevresindeki istasyonlar, mesafeye gore sirali.
- * Uc yaricapi en fazla 100 km kabul ediyor ve sonucu 10 dk sunucuda onbellekliyor.
+ * TORA'nin kendi istasyonlari katalogda marka "TORA", isletmeci "TORA TEKNİK
+ * HİZMETLER İŞLETME ANONİM ŞİRKETİ" olarak geciyor (tarandi: ulke genelinde 68
+ * kayit, 17 il). Kelime siniri sart - "MOTORA" gibi markalar eslesmesin.
  */
-export async function fetchNearbyExternalStations(
+const TORA_PATTERN = /\btora\b/i;
+
+const isToraStation = (station: CatalogStation): boolean =>
+  TORA_PATTERN.test(station.brand ?? '') || TORA_PATTERN.test(station.operator ?? '');
+
+/** Sayfa basina kayit; ucun ust siniri 200. */
+const PAGE_SIZE = 200;
+
+/**
+ * Cevredeki TORA istasyonlari, mesafeye gore sirali.
+ *
+ * Ucta isletmeci/marka filtresi YOK (operator, brand, q, isOwn parametreleri
+ * denendi, hepsi yok sayiliyor), bu yuzden katalog sayfalanip istemcide
+ * suzuluyor. Kayitlar mesafeye gore sirali geldigi icin ilk sayfalar en yakin
+ * cevreyi kapsiyor; olculdu: emulator konumunun 50 km cevresinde 4330 kayit
+ * var ve TORA istasyonlari 67. siradan baslayip listeye dagiliyor, yani
+ * yakindakileri yakalamak icin birkac sayfa gerekiyor.
+ *
+ * maxPages bilincli bir tavan: yogun sehirde tum katalogu indirmek yerine
+ * (Istanbul'da 50 km icinde 22 sayfa) en yakin birkac bin kaydi tarayip
+ * durur. Uzaktaki TORA istasyonlari bu yuzden listede olmayabilir - tam ag
+ * icin ucta operator filtresi ya da sunucu tarafinda onbellek gerekir.
+ */
+export async function fetchNearbyToraStations(
   center: Coordinate,
   radiusKm: number,
-  size: number,
+  maxPages: number,
 ): Promise<Station[]> {
-  const query = new URLSearchParams({
-    lat: String(center.latitude),
-    lng: String(center.longitude),
-    radius: String(radiusKm),
-    size: String(size),
-  });
+  const found: Station[] = [];
 
-  const page = await request<Page<CatalogStation>>(`/api/v1/stations/external?${query}`);
-  return page.items.map(toStation);
+  for (let page = 1; page <= maxPages; page++) {
+    const query = new URLSearchParams({
+      lat: String(center.latitude),
+      lng: String(center.longitude),
+      radius: String(radiusKm),
+      page: String(page),
+      size: String(PAGE_SIZE),
+    });
+
+    const result = await request<Page<CatalogStation>>(`/api/v1/stations/external?${query}`);
+    for (const station of result.items) {
+      if (isToraStation(station)) found.push(toStation(station));
+    }
+    if (!result.hasNext) break;
+  }
+
+  return found;
 }
 
 /** Tek istasyonun detayi: gercek soket listesiyle birlikte. */
