@@ -280,6 +280,83 @@ const PAGE_SIZE = 200;
  * durur. Uzaktaki TORA istasyonlari bu yuzden listede olmayabilir - tam ag
  * icin ucta operator filtresi ya da sunucu tarafinda onbellek gerekir.
  */
+/**
+ * Ulke taramasinin kutulari. Uc en fazla 3 derecelik sinir kutusu kabul
+ * ediyor; asagidaki 3x7 izgara Turkiye'yi (35.5-44.5 K, 25.5-46.5 D) tamamen
+ * kapsiyor. Bos kutular tek istekle gecilir.
+ */
+const SCAN_BOXES = (() => {
+  const boxes: { south: number; north: number; west: number; east: number }[] = [];
+  for (let south = 35.5; south < 44.5; south += 3) {
+    for (let west = 25.5; west < 46.5; west += 3) {
+      boxes.push({ south, north: south + 3, west, east: west + 3 });
+    }
+  }
+  return boxes;
+})();
+
+/** Aynı anda kac kutu taransin; telefonun aginda makul, sunucuyu da zorlamayan bir deger. */
+const SCAN_CONCURRENCY = 4;
+
+/** En yogun kutuda 3676 kayit (19 sayfa) olculdu; tavan bolgesel buyumeye yer birakiyor. */
+const SCAN_MAX_PAGES_PER_BOX = 40;
+
+/**
+ * Turkiye'deki TUM TORA istasyonlari.
+ *
+ * Katalogda isletmeci filtresi olmadigi icin tek yol izgarayi gezip her kaydi
+ * gormek: olculdu, ulke geneli 16.745 kayit ve ~100 istek. Bu yuzden sonuc
+ * cihaza yaziliyor ve gunde bir kez yenileniyor (bkz. toraStationStore);
+ * uygulama acilirken once yakindakiler gosteriliyor, tam liste arkadan geliyor.
+ *
+ * Tek tek kutu hatalari yutuluyor - bir bolge dusse bile elde kalanlar
+ * gosterilebilir; ama kutularin cogu duserse cagiran taramanin basarisiz
+ * oldugunu bilmeli, yoksa eksik liste "ag bu kadar" gibi gorunur.
+ */
+export async function fetchAllToraStations(): Promise<Station[]> {
+  const found = new Map<number, Station>();
+  let failedBoxes = 0;
+  let nextBox = 0;
+
+  async function scanBoxes(): Promise<void> {
+    for (;;) {
+      const box = SCAN_BOXES[nextBox++];
+      if (!box) return;
+
+      try {
+        for (let page = 1; page <= SCAN_MAX_PAGES_PER_BOX; page++) {
+          const query = new URLSearchParams({
+            north: String(box.north),
+            south: String(box.south),
+            east: String(box.east),
+            west: String(box.west),
+            page: String(page),
+            size: String(PAGE_SIZE),
+          });
+
+          const result = await request<Page<CatalogStation>>(
+            `/api/v1/stations/external?${query}`,
+          );
+          for (const station of result.items) {
+            if (isToraStation(station)) found.set(station.id, toStation(station));
+          }
+          if (!result.hasNext) break;
+        }
+      } catch {
+        failedBoxes++;
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: SCAN_CONCURRENCY }, scanBoxes));
+
+  if (failedBoxes > SCAN_BOXES.length / 2) {
+    throw new Error('İstasyon listesi alınamadı');
+  }
+
+  return [...found.values()];
+}
+
 export async function fetchNearbyToraStations(
   center: Coordinate,
   radiusKm: number,
