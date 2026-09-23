@@ -1,5 +1,4 @@
 import { useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
-import { useCallback, useMemo } from 'react';
 
 import { stationsApi } from '@/services/api';
 import {
@@ -11,7 +10,6 @@ import { useLocationStore } from '@/store/location';
 import type { Coordinate, Station } from '@/types/domain';
 
 export const stationKeys = {
-  all: ['stations'] as const,
   detail: (id: string) => ['stations', id] as const,
   /** Katalog listesi konuma bagli; anahtar da oyle (bkz. useExternalStations). */
   external: (latitude: number, longitude: number) =>
@@ -57,50 +55,18 @@ function useExternalStations() {
 }
 
 /**
- * Musaitlik 15 sn sonra bayat sayilir ama staleTime TEK BASINA refetch
- * tetiklemez: pratikte tazeleme yalnizca yeni bir mount ile oluyor.
- * refetchOnWindowFocus/refetchOnReconnect RN'de islevsiz - React Query'nin
- * focusManager/onlineManager koprusu AppState/NetInfo'ya baglanmadigi surece
- * isFocused()/isOnline() sabit true doner - ve Harita sekmesi oturum boyunca
- * mount kaldigi icin liste orada donuk kalir. Periyodik poll bilerek
- * eklenmedi: sunucudaki musaitlik su an statik seed verisi, degisen bir sey
- * yok. Canli musaitlik geldiginde refetchInterval buraya eklenmeli.
+ * Haritadaki ve listedeki istasyonlarin TEK kaynagi EVCS katalogu
+ * (bkz. services/evcs.ts). Kendi backend'imizdeki demo istasyonlar bilerek
+ * listelenmiyor: kullanici gercek istasyonlari gormek istiyor, ikisi bir arada
+ * "hangisi gercek" sorusunu doguruyordu. stationsApi.get hala duruyor - eski
+ * rezervasyon ve sarj kayitlari kendi istasyon kimliklerine isaret ediyor ve o
+ * ekranlar acildiginda istasyonu tek tek cozebilmeli.
  *
- * Liste iki kaynagin birlesimi: kendi istasyonlarimiz (sarj/rezervasyon
- * yapilabilen) ve EVCS katalogundan cevredeki istasyonlar (yalnizca bilgi,
- * bkz. services/evcs.ts). Katalog istegi basarisiz olursa ekran hata
- * gostermez - kendi istasyonlarimiz yine listelenir.
+ * Konum degisince anahtar degisiyor ve liste yeniden cekiliyor; sunucu da
+ * sonucu 10 dk onbellekledigi icin istemcide daha sik sormanin anlami yok.
  */
 export function useStations() {
-  const own = useQuery({
-    queryKey: stationKeys.all,
-    queryFn: stationsApi.list,
-    staleTime: 15_000,
-  });
-  const external = useExternalStations();
-
-  const data = useMemo(() => {
-    const ownStations = own.data;
-    const externalStations = external.data;
-    if (!ownStations && !externalStations) return undefined;
-
-    // Kendi istasyonlarimiz once: uygulamadan sarj baslatilabilen tek kayitlar onlar.
-    return [...(ownStations ?? []), ...(externalStations ?? [])];
-  }, [own.data, external.data]);
-
-  const refetch = useCallback(async () => {
-    await Promise.all([own.refetch(), external.refetch()]);
-  }, [own, external]);
-
-  return {
-    data,
-    // Hata yalnizca kendi ucumuzdan: katalog dusse de uygulama calismaya devam etmeli.
-    isError: own.isError,
-    error: own.error,
-    isLoading: own.isLoading || external.isLoading,
-    isRefetching: own.isRefetching || external.isRefetching,
-    refetch,
-  };
+  return useExternalStations();
 }
 
 /** Katalog istasyonu daha once listede gorulduyse detay gelene kadar onu goster. */
@@ -126,21 +92,11 @@ export function useStation(id: string | undefined) {
     queryFn: () => (external ? fetchExternalStation(id!) : stationsApi.get(id!)),
     enabled: !!id,
     staleTime: 15_000,
-    // Kendi ucumuzda liste ve detay ayni serializeStation ciktisini (connectors
-    // dahil) donduruyor; istasyon zaten cache'teyken "Sarj Baslat"/"Rezerve Et"
-    // ekranlarinda tam ekran spinner gostermenin anlami yok.
-    // initialDataUpdatedAt olmadan veri sonsuza kadar taze sayilirdi; listenin
-    // gercek yasini verdigimiz icin bayatsa arka planda yine tazeleniyor.
-    initialData: external
-      ? undefined
-      : () => queryClient.getQueryData<Station[]>(stationKeys.all)?.find((s) => s.id === id),
-    initialDataUpdatedAt: external
-      ? undefined
-      : () => queryClient.getQueryState(stationKeys.all)?.dataUpdatedAt,
-    // Katalogda liste ve detay AYNI sey degil: listedeki soketler sayilardan
-    // uretilmis tahmin (bkz. services/evcs.ts). Bu yuzden initialData degil
-    // placeholderData - ekran aninda dolar ama detay yine de cekilir ve
-    // gercek soketler tahminin uzerine yazar.
+    // Listedeki kayit yalnizca yer tutucu: katalogda soketler sayilardan
+    // uretilmis tahmin (bkz. services/evcs.ts). placeholderData oldugu icin
+    // ekran aninda dolar ama detay yine de cekilir ve gercek soketler
+    // tahminin uzerine yazar. (initialData olsaydi React Query tahmini taze
+    // sayip detayi hic istemezdi - once oyle yazilip duzeltildi.)
     placeholderData: external
       ? cachedExternalStation(
           queryClient.getQueriesData<Station[]>({ queryKey: stationKeys.externalRoot }),

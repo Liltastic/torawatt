@@ -20,6 +20,7 @@ import { useStation } from '@/queries/stations';
 import { createThemedStyles, radius, shadows, spacing, typography, useColors } from '@/theme';
 import { isExternalStation, stationAvailability } from '@/types/domain';
 import { formatPrice } from '@/utils/format';
+import { catalogInfoRows } from '@/utils/station';
 
 export default function StationDetailScreen() {
   const colors = useColors();
@@ -70,6 +71,7 @@ export default function StationDetailScreen() {
   // sarj veya rezervasyon yapilamiyor, favorilere de eklenemiyor (bkz.
   // services/evcs.ts).
   const external = isExternalStation(station);
+  const catalogRows = catalogInfoRows(station);
 
   const openDirections = () => {
     const { latitude: lat, longitude: lng, name } = station;
@@ -161,11 +163,24 @@ export default function StationDetailScreen() {
         <Animated.View entering={FadeInDown.duration(280)}>
           <Card style={styles.infoCard}>
             <InfoRow label="Adres" value={station.address} />
-            <InfoRow
-              label="Olanaklar"
-              value={station.amenities.length > 0 ? station.amenities.join(', ') : 'Belirtilmemiş'}
-              last
-            />
+            {external ? (
+              // Katalog kunyesi (bkz. utils/station): il, sicil/lisans numarasi,
+              // dagitim sirketi, erisim ve yesil enerji bilgisi.
+              catalogRows.map((row, index) => (
+                <InfoRow
+                  key={row.label}
+                  label={row.label}
+                  value={row.value}
+                  last={index === catalogRows.length - 1}
+                />
+              ))
+            ) : (
+              <InfoRow
+                label="Olanaklar"
+                value={station.amenities.length > 0 ? station.amenities.join(', ') : 'Belirtilmemiş'}
+                last
+              />
+            )}
           </Card>
         </Animated.View>
       </ScrollView>

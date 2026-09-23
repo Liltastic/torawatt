@@ -22,6 +22,12 @@ export interface Connector {
   status: ChargerStatus;
   pricePerKwh?: number;
   idleFeePerMin?: number;
+  /**
+   * Kullaniciya gosterilecek soket numarasi. Kendi istasyonlarimizda id'nin
+   * kendisi okunabilir ("C1"); katalogda EPDK soket numarasi ("SKT/22202")
+   * id'nin icinde kayboldugu icin ayrica tasiniyor.
+   */
+  label?: string;
 }
 
 /**
@@ -33,6 +39,27 @@ export interface Connector {
  * Alan bos ise kayit kendi backend'imizden gelmistir.
  */
 export type StationSource = 'own' | 'epdk';
+
+/**
+ * Ulusal katalogdaki (EPDK) kayit bilgileri. Kendi istasyonlarimizda
+ * bulunmaz; katalog istasyonlarinin detayinda oldugu gibi gosterilir.
+ */
+export interface StationCatalogInfo {
+  /** Sarj istasyonu sicil numarasi (ornek: ŞRJ/10332). */
+  stationNo?: string;
+  /** Isletmecinin ticari unvani; marka adi Station.operator alaninda. */
+  operatorLegalName?: string;
+  /** Sarj ag isletmeci lisans numarasi. */
+  licenseNo?: string;
+  province?: string;
+  distributionCompany?: string;
+  /** Herkese acik mi, yoksa site/kurum ici mi. */
+  publicAccess?: boolean;
+  /** Yenilenebilir kaynakli elektrik. */
+  greenEnergy?: boolean;
+  /** Kaydin katalogda en son dogrulandigi an. */
+  lastSeenAt?: string;
+}
 
 export interface Station {
   id: string;
@@ -47,6 +74,8 @@ export interface Station {
   /** Kullanicinin konumuna gore hesaplanir; backend veya istemci doldurur. */
   distanceKm?: number;
   source?: StationSource;
+  /** Yalnizca katalog istasyonlarinda dolu (bkz. services/evcs.ts). */
+  catalog?: StationCatalogInfo;
 }
 
 /** Yalnizca bilgi amacli katalog istasyonu mu (sarj/rezervasyon/favori yok). */

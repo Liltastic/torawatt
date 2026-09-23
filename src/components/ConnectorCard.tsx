@@ -45,7 +45,7 @@ export function ConnectorCard({ connector, index, selected = false, onPress }: C
         <View style={styles.headerText}>
           <Text style={styles.type}>{connectorLabels[connector.type]}</Text>
           <Text style={styles.id} numberOfLines={1}>
-            {connector.id.toUpperCase()}
+            {(connector.label ?? connector.id).toUpperCase()}
           </Text>
         </View>
 

@@ -65,6 +65,7 @@ import {
   type Vehicle,
 } from '@/types/domain';
 import { formatPrice, formatTime } from '@/utils/format';
+import { catalogInfoRows } from '@/utils/station';
 import { GLASS_ENABLED } from '@/utils/glass';
 import { haptics } from '@/utils/haptics';
 import { useTabBarInset } from '@/utils/tabBar';
@@ -171,18 +172,23 @@ function DetailFooter({
 }
 
 /**
- * "Aracima uygun" yalnizca aktif arac varken listelenir; arac yokken
- * hicbir seyi filtrelemeyen bir cip gostermek yaniltici olurdu.
+ * Cipler veriye gore kuruluyor: "Aracima uygun" yalnizca aktif arac varken,
+ * "Musait" ve "24 saat" ise o bilgiyi tasiyan istasyon varken listeleniyor.
+ * Ulusal katalogda canli doluluk ve calisma saati YOK (bkz. services/evcs.ts);
+ * o cipler her zaman bos sonuc veren olu dugmelere donusuyordu.
  */
-function buildFilters(vehicle?: Vehicle): MapFilter[] {
-  const filters: MapFilter[] = [
-    {
+function buildFilters(vehicle: Vehicle | undefined, stations: Station[]): MapFilter[] {
+  const filters: MapFilter[] = [];
+
+  if (stations.some((s) => s.connectors.some((c) => c.status === 'AVAILABLE'))) {
+    filters.push({
       id: 'available',
       label: 'Müsait',
       test: (s) => s.connectors.some((c) => c.status === 'AVAILABLE'),
-    },
-    { id: 'fast', label: 'Hızlı', test: (s) => s.connectors.some((c) => c.powerKw >= 50) },
-  ];
+    });
+  }
+
+  filters.push({ id: 'fast', label: 'Hızlı', test: (s) => s.connectors.some((c) => c.powerKw >= 50) });
 
   if (vehicle) {
     filters.push({
@@ -192,7 +198,10 @@ function buildFilters(vehicle?: Vehicle): MapFilter[] {
     });
   }
 
-  filters.push({ id: 'open24h', label: '24 saat', test: (s) => s.isOpen24h });
+  if (stations.some((s) => s.isOpen24h)) {
+    filters.push({ id: 'open24h', label: '24 saat', test: (s) => s.isOpen24h });
+  }
+
   return filters;
 }
 
@@ -269,7 +278,10 @@ export default function MapScreen() {
   const toggleFilter = (id: string) =>
     setActiveFilters((prev) => (prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]));
 
-  const filters = useMemo(() => buildFilters(activeVehicle), [activeVehicle]);
+  const filters = useMemo(
+    () => buildFilters(activeVehicle, allStations ?? []),
+    [activeVehicle, allStations],
+  );
 
   const stations = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase('tr');
@@ -719,6 +731,7 @@ function StationDetail({
   // Katalog istasyonu: doluluk ve fiyat verisi yok, favori de eklenemiyor
   // (favoriler kendi backend'imizde, bu kayitlar orada yok).
   const external = isExternalStation(station);
+  const catalogRows = catalogInfoRows(station);
   const socketSummary =
     availability === 'UNKNOWN'
       ? `${station.connectors.length} soket`
@@ -827,12 +840,32 @@ function StationDetail({
           <View style={styles.detailInfoCard}>
             <InfoRow label="İşletmeci" value={station.operator} />
             <InfoRow label="Adres" value={station.address} />
-            <InfoRow label="Çalışma saatleri" value={station.isOpen24h ? '7/24 açık' : 'Belirtilmemiş'} />
-            <InfoRow
-              label="Olanaklar"
-              value={station.amenities.length > 0 ? station.amenities.join(', ') : 'Belirtilmemiş'}
-              last
-            />
+            {external ? (
+              // Katalog kunyesi: il, sicil/lisans numarasi, dagitim sirketi,
+              // erisim ve yesil enerji bilgisi (bkz. utils/station).
+              catalogRows.map((row, index) => (
+                <InfoRow
+                  key={row.label}
+                  label={row.label}
+                  value={row.value}
+                  last={index === catalogRows.length - 1}
+                />
+              ))
+            ) : (
+              <>
+                <InfoRow
+                  label="Çalışma saatleri"
+                  value={station.isOpen24h ? '7/24 açık' : 'Belirtilmemiş'}
+                />
+                <InfoRow
+                  label="Olanaklar"
+                  value={
+                    station.amenities.length > 0 ? station.amenities.join(', ') : 'Belirtilmemiş'
+                  }
+                  last
+                />
+              </>
+            )}
           </View>
         )}
       </BottomSheetScrollView>

@@ -2,7 +2,13 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 import { getDeviceId } from '@/lib/deviceId';
-import type { Connector, ConnectorType, Coordinate, Station } from '@/types/domain';
+import type {
+  Connector,
+  ConnectorType,
+  Coordinate,
+  Station,
+  StationCatalogInfo,
+} from '@/types/domain';
 
 import { EVCS_API_URL } from './config';
 
@@ -60,13 +66,19 @@ interface Page<T> {
 /** Liste ucunun dondurdugu istasyon; tek tek soketleri YOK, yalnizca sayilari var. */
 interface CatalogStation {
   id: number;
+  /** Sarj istasyonu sicil numarasi (ŞRJ/...). */
+  srjNo?: string;
   name: string;
+  /** Isletmecinin ticari unvani. */
   operator: string;
+  operatorLicenseNo?: string;
   brand?: string;
   address: string;
   province?: string;
   latitude: number;
   longitude: number;
+  isPublicAccess?: boolean;
+  isGreen?: boolean;
   socketCount: number;
   acSocketCount: number;
   dcSocketCount: number;
@@ -84,6 +96,10 @@ interface CatalogSocket {
 
 interface CatalogStationDetail extends CatalogStation {
   sockets?: CatalogSocket[];
+  /** Yalnizca detayda: bolgenin elektrik dagitim sirketi. */
+  distributionCompany?: string;
+  /** Yalnizca detayda: kaydin katalogda en son dogrulandigi an. */
+  lastSeenAt?: string;
 }
 
 async function requestHeaders(): Promise<Record<string, string>> {
@@ -189,6 +205,19 @@ function estimatedConnectors(station: CatalogStation, stationId: string): Connec
   return connectors;
 }
 
+function catalogInfo(station: CatalogStationDetail): StationCatalogInfo {
+  return {
+    stationNo: station.srjNo?.trim() || undefined,
+    operatorLegalName: station.operator?.trim() || undefined,
+    licenseNo: station.operatorLicenseNo?.trim() || undefined,
+    province: station.province?.trim() || undefined,
+    distributionCompany: station.distributionCompany?.trim() || undefined,
+    publicAccess: station.isPublicAccess,
+    greenEnergy: station.isGreen,
+    lastSeenAt: station.lastSeenAt,
+  };
+}
+
 function toStation(station: CatalogStationDetail): Station {
   const id = toExternalStationId(station.id);
   const sockets = station.sockets ?? [];
@@ -207,6 +236,8 @@ function toStation(station: CatalogStationDetail): Station {
     connectors: sockets.length
       ? sockets.map((socket) => ({
           id: `${id}-${socket.sktNo}`,
+          // Kullaniciya EPDK soket numarasi gosteriliyor; id yalnizca ic anahtar.
+          label: socket.sktNo,
           type: connectorType(socket),
           powerKw: socket.powerKw,
           status: 'UNKNOWN' as const,
@@ -214,6 +245,7 @@ function toStation(station: CatalogStationDetail): Station {
       : estimatedConnectors(station, id),
     distanceKm: station.distanceKm,
     source: 'epdk',
+    catalog: catalogInfo(station),
   };
 }
 
