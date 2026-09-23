@@ -797,7 +797,7 @@ function StationDetail({
           <>
             <Text style={styles.detailSectionHint}>
               {external
-                ? 'Bu istasyon TORA WATT ağında değil. Soket bilgisi ulusal katalogdan geliyor; anlık doluluk ve fiyat yok.'
+                ? 'Soket bilgisi ulusal katalogdan (EPDK) geliyor; anlık doluluk ve fiyat bu kayıtta yok.'
                 : 'Şarj başlatmak için bir soket seç.'}
             </Text>
             {station.connectors.map((connector, index) => (

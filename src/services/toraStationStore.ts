@@ -10,7 +10,12 @@ import type { Station } from '@/types/domain';
  * Bunu her aciliata yapmak anlamsiz - istasyonlar gun icinde degismiyor.
  * Sonuc burada saklanip suresi dolana kadar oldugu gibi kullaniliyor.
  */
-const FILE_NAME = 'tora-stations.json';
+/**
+ * Ad, icerigin surumunu tasiyor: v1 soketleri sayilardan tahmin ediyordu,
+ * v2 gercek soket listesini tutuyor. Ad degisince eski kopya kendiliginden
+ * birakilir ve cihaz yeniden tarar.
+ */
+const FILE_NAME = 'tora-stations-v2.json';
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 interface StoredPayload {

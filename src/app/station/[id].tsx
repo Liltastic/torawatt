@@ -114,7 +114,7 @@ export default function StationDetailScreen() {
         <Text style={styles.sectionTitle}>Soketler</Text>
         <Text style={styles.sectionHint}>
           {external
-            ? 'Bu istasyon TORA WATT ağında değil. Soket bilgisi ulusal katalogdan geliyor; anlık doluluk ve fiyat yok.'
+            ? 'Soket bilgisi ulusal katalogdan (EPDK) geliyor; anlık doluluk ve fiyat bu kayıtta yok.'
             : 'Şarj başlatmak için bir soket seç.'}
         </Text>
 

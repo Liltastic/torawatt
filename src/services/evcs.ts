@@ -169,10 +169,12 @@ function displayName(station: CatalogStation): string {
 const AC_POWER_CEILING_KW = 22;
 
 /**
- * Liste ucu soketleri tek tek vermedigi icin sayilardan uretiliyor: kart ve pin
- * yalnizca soket SAYISINI ve istasyonun en yuksek gucunu gosteriyor. Istasyon
- * acildiginda detay ucu gercek soketlerle bunlarin uzerine yaziyor
- * (bkz. fetchExternalStation).
+ * SON CARE. Liste ucu soketleri tek tek vermiyor, yalnizca AC/DC sayilarini;
+ * gercek soket listesi detay ucunda ve normalde her istasyon icin o cekiliyor
+ * (bkz. withDetails). Yalnizca detay istegi basarisiz olursa bu kayitlar
+ * kullaniliyor: sayilar ve istasyonun en yuksek gucu API'den, soketin TIPI ve
+ * AC gucu ise TAHMIN (AC -> Type 2, DC -> CCS2, AC gucu 22 kW ile sinirli).
+ * Istasyonu hic gostermemektense soket kirilimini yaklasik gostermek.
  */
 function estimatedConnectors(station: CatalogStation, stationId: string): Connector[] {
   const acPower = station.dcSocketCount > 0
@@ -354,7 +356,44 @@ export async function fetchAllToraStations(): Promise<Station[]> {
     throw new Error('İstasyon listesi alınamadı');
   }
 
-  return [...found.values()];
+  // Listede tahmini soket kalmasin: her istasyonun gercek soketleri cekilir.
+  return withDetails([...found.values()]);
+}
+
+/** Detay istekleri de paralel; sayilari kucuk oldugu icin tarama ile ayni havuz. */
+const DETAIL_CONCURRENCY = 4;
+
+/**
+ * Listedeki her istasyonun detayini cekip gercek soketleriyle degistirir.
+ *
+ * Liste ucu soket SAYISINI veriyor ama soketin tipini, gucunu ve numarasini
+ * vermiyor; bunlar yalnizca detayda. Uygulamada tahmini soket gostermemek icin
+ * liste toplandiktan sonra detaylar cekiliyor. Tek tek hatalar yutuluyor:
+ * detayi gelmeyen istasyon, listedeki haliyle (sayilardan uretilmis soketlerle)
+ * kalir - kaybolmasindansa.
+ */
+async function withDetails(stations: Station[]): Promise<Station[]> {
+  const detailed = [...stations];
+  let next = 0;
+
+  async function fetchDetails(): Promise<void> {
+    for (;;) {
+      const index = next++;
+      const station = detailed[index];
+      if (!station) return;
+
+      try {
+        const detail = await fetchExternalStation(station.id);
+        // Mesafe yalnizca liste ucundan geliyor; detay onu bilmiyor.
+        detailed[index] = { ...detail, distanceKm: station.distanceKm };
+      } catch {
+        // Listedeki kayit yerinde kalir.
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: DETAIL_CONCURRENCY }, fetchDetails));
+  return detailed;
 }
 
 export async function fetchNearbyToraStations(
@@ -380,7 +419,7 @@ export async function fetchNearbyToraStations(
     if (!result.hasNext) break;
   }
 
-  return found;
+  return withDetails(found);
 }
 
 /** Tek istasyonun detayi: gercek soket listesiyle birlikte. */
