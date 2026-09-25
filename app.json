@@ -8,13 +8,17 @@
     "scheme": "torawatt",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "bundleIdentifier": "net.torasarj.torawatt",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "net.torasarj.torawatt",
       "adaptiveIcon": {
-        "backgroundColor": "#DCF6EF",
+        "backgroundColor": "#0FB5A3",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
@@ -30,7 +34,7 @@
         {
           "backgroundColor": "#0FB5A3",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 120
         }
       ],
       "expo-sharing",
