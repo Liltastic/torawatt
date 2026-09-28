@@ -65,5 +65,8 @@
     "check:map": "node scripts/check-map-html.mjs",
     "verify": "npm run typecheck && npm run check:map"
   },
-  "private": true
+  "private": true,
+  "overrides": {
+    "typescript": "$typescript"
+  }
 }
