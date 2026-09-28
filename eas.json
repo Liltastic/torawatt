@@ -24,7 +24,8 @@
   "submit": {
     "production": {
       "ios": {
-        "appleTeamId": "F6283R9BSX"
+        "appleTeamId": "F6283R9BSX",
+        "ascAppId": "6816114883"
       },
       "android": {
         "track": "internal"
