@@ -59,9 +59,23 @@ export function setUnauthorizedHandler(handler: (() => void) | undefined) {
  * dokunup uyanmayi kullanici daha formu doldururken baslatiyor.
  */
 const WARM_TIMEOUT_MS = 30_000;
-const COLD_TIMEOUT_MS = 90_000;
+/**
+ * Render kendi belgesinde uyanmayi "yaklasik bir dakika" diye veriyor, ama
+ * olculen en kotu durum 420 saniyeydi (ilk istek 503, ikincisi 149 sn, ucuncusu
+ * 0,2 sn). 90 sn'lik onceki sinir normal bir uyanisa bile pay birakmiyordu ve
+ * giris "Sunucu yanit vermedi" ile dusuyordu. 3 dakika, belgelenen surenin uc
+ * kati: alisilmis uyanislari rahatca kapsiyor, gercekten olu bir sunucuda da
+ * kullaniciyi sonsuza kadar bekletmiyor.
+ */
+const COLD_TIMEOUT_MS = 180_000;
 /** Render bu kadar sure istek almayinca servisi uyutuyor (15 dk); payli tutuyoruz. */
 const ASSUME_ASLEEP_AFTER_MS = 10 * 60_000;
+/**
+ * Uyuyan sunucuya giden istek bu kadar uzarsa ekrana "uyaniyor" notu dusuyor
+ * (bkz. onServerWaking). Donen bir spinner ile uc dakika beklemek ariza gibi
+ * gorunuyor; sebebini yazinca beklenebilir bir sey oluyor.
+ */
+const WAKE_NOTICE_AFTER_MS = 10_000;
 
 let lastResponseAt = 0;
 
@@ -74,6 +88,28 @@ function noteServerResponded(status: number) {
   // "uyandi" sayilmaz.
   if (status >= 502 && status <= 504) return;
   lastResponseAt = Date.now();
+}
+
+type WakeListener = (waking: boolean) => void;
+
+const wakeListeners = new Set<WakeListener>();
+/** Su an "uyaniyor" saydigimiz istek sayisi; sonuncusu bitince not kalkar. */
+let pendingWakeNotices = 0;
+
+/**
+ * Sunucunun uyanmasini bekledigimiz anlari bildirir. Ekranlar bunu dinleyip
+ * kullaniciya neden bekledigini soyluyor (bkz. lib/useServerWaking).
+ * Geriye aboneligi birakan fonksiyon doner.
+ */
+export function onServerWaking(listener: WakeListener): () => void {
+  wakeListeners.add(listener);
+  return () => {
+    wakeListeners.delete(listener);
+  };
+}
+
+function notifyWaking(waking: boolean) {
+  for (const listener of wakeListeners) listener(waking);
 }
 
 /**
@@ -101,8 +137,19 @@ async function request<T>(
   // fetch'i hatayi kendi FetchError'ina sardigi icin error.name 'AbortError'
   // olarak gelmiyor, zaman asimini ancak signal.aborted'dan ayirt edebiliyoruz.
   const controller = new AbortController();
-  const timeoutMs = likelyAsleep() ? COLD_TIMEOUT_MS : WARM_TIMEOUT_MS;
+  const asleep = likelyAsleep();
+  const timeoutMs = asleep ? COLD_TIMEOUT_MS : WARM_TIMEOUT_MS;
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  // Not yalnizca uyuyor saydigimiz sunucu icin: uyanik sunucuda uzayan bir
+  // istegin sebebi baska, "uyaniyor" demek yaniltici olur.
+  let noticeShown = false;
+  const noticeTimer = asleep
+    ? setTimeout(() => {
+        noticeShown = true;
+        if (++pendingWakeNotices === 1) notifyWaking(true);
+      }, WAKE_NOTICE_AFTER_MS)
+    : undefined;
 
   let response: Response;
   let text: string;
@@ -142,6 +189,8 @@ async function request<T>(
     throw new ApiError(`Sunucuya ulaşılamadı${detail}. Bağlantını kontrol et.`, 0);
   } finally {
     clearTimeout(timer);
+    clearTimeout(noticeTimer);
+    if (noticeShown && --pendingWakeNotices === 0) notifyWaking(false);
   }
 
   let json: unknown;

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Keyboard, Pressable, Text, TextInput } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
-import { AuthLayout, Button, TextField } from '@/components';
+import { AuthLayout, Button, ServerWakingNotice, TextField } from '@/components';
 import { ApiError } from '@/services/api';
 import { useAuthStore } from '@/store/auth';
 import { createThemedStyles, spacing, typography, useColors } from '@/theme';
@@ -164,6 +164,8 @@ export default function LoginScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </Animated.View>
       )}
+
+      <ServerWakingNotice />
 
       <Animated.View entering={FadeInUp.delay(300).duration(380)}>
         <Button

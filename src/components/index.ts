@@ -14,6 +14,7 @@ export { SearchBar } from './SearchBar';
 export { StationCard } from './StationCard';
 export { Logo } from './Logo';
 export { PlaceholderScreen } from './PlaceholderScreen';
+export { ServerWakingNotice } from './ServerWakingNotice';
 export { PowerCurve } from './PowerCurve';
 export { ProgressRing } from './ProgressRing';
 export { Refresher } from './Refresher';
