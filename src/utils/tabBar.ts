@@ -20,7 +20,28 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
  * calisiyor ve ilk alt-soy zincirinde bir ScrollView ariyor. Yukleniyor/bos
  * dali ScrollView icermeyen ekranlarda (gecmis, rota, sarj) hic tetiklenmiyor.
  */
+/**
+ * Klasik iOS sekme cubugunun yuksekligi. iOS 26'nin yuzen cam cubugu da bu
+ * civarda; ustune bir de ekranin dibiyle arasindaki bosluk biniyor.
+ */
+const IOS_TAB_BAR_HEIGHT = 49;
+const IOS_FLOATING_TAB_BAR_GAP = 8;
+
 export function useTabBarInset(): number {
   const insets = useSafeAreaInsets();
-  return Platform.OS === 'ios' ? insets.bottom : 0;
+  if (Platform.OS !== 'ios') return 0;
+
+  /**
+   * Yukaridaki 49+34 hesabi yalnizca cubuk olcuye GIRDIGINDE geciyor. iOS 26'da
+   * cubuk yuzuyor ve safeAreaInsets.bottom yalnizca home gostergesini veriyor;
+   * o zaman pay cubugun yarisi kadar bile olmuyor ve icerigin sonu altinda
+   * kaliyor (katalog istasyonunda alt buton cubugu hic cizilmedigi icin -
+   * bkz. (tabs)/map.tsx renderFooter - acigi kapatacak baska pay da yok).
+   *
+   * Iki durumu ayirt etmek icin degerin kendisine bakiyoruz: cubuk iceride
+   * olsaydi tek basina bir cubuk yuksekligini asardi. Asmiyorsa cubugu biz
+   * ekliyoruz. Boylece iki davranista da dogru pay cikiyor.
+   */
+  if (insets.bottom >= IOS_TAB_BAR_HEIGHT) return insets.bottom;
+  return insets.bottom + IOS_TAB_BAR_HEIGHT + IOS_FLOATING_TAB_BAR_GAP;
 }
