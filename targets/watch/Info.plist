@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+		Bu dosya eklenti tarafindan YONETILMIYOR (bkz. @bacons/apple-targets
+		README, "The root Info.plist file in each target directory is not
+		managed"). Xcode, GENERATE_INFOPLIST_FILE ile hedefin
+		INFOPLIST_KEY_* ayarlarini (CFBundleDisplayName,
+		WKCompanionAppBundleIdentifier vb.) buraya birlestiriyor; biz yalnizca
+		onlarda karsiligi olmayan anahtari ekliyoruz.
+	-->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>TORA WATT, sana en yakın şarj istasyonlarını gösterebilmek için konumunu kullanır.</string>
+</dict>
+</plist>
