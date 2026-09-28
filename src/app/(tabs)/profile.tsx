@@ -21,6 +21,7 @@ import { createThemedStyles, radius, spacing, typography, useColors } from '@/th
 import { connectorLabels } from '@/types/domain';
 import { getRunningUpdateLabel } from '@/utils/buildInfo';
 import { formatEnergy, formatPrice } from '@/utils/format';
+import { useTabBarInset } from '@/utils/tabBar';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -44,6 +45,11 @@ export default function ProfileScreen() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const miniBarInset = useChargingMiniBarInset();
+  // iOS'ta sekme cubugu icerigin UZERINDE duruyor (bkz. utils/tabBar).
+  // Diger dort sekme bu payi ekliyordu, profil eklemiyordu: sarj oturumu
+  // yokken miniBarInset 0 oldugu icin "Cikis yap" ve surum satiri cubugun
+  // altinda kaliyordu.
+  const tabBarInset = useTabBarInset();
   const { scrollY, onScroll } = useCollapsingTitle();
 
   const onLogout = async () => {
@@ -68,7 +74,10 @@ export default function ProfileScreen() {
       <Animated.ScrollView
         onScroll={onScroll}
         scrollEventThrottle={16}
-        contentContainerStyle={[styles.content, { paddingBottom: spacing.xxl + miniBarInset }]}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: spacing.xxl + tabBarInset + miniBarInset },
+        ]}
         showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Profil</Text>
         {!!user && (
