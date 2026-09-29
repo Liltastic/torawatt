@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState } from 'react';
-import { Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -115,7 +116,7 @@ export function PickerField({
 
       {!!error && <Text style={styles.error}>{error}</Text>}
 
-      <Modal visible={open} animationType="slide" onRequestClose={close} transparent>
+      <Modal visible={open} animationType="none" onRequestClose={close} transparent>
         {/*
           RN Modal ayri bir native pencerede aciliyor ve SafeAreaView orada
           guvenli alani olcemeyip sifir donduruyor. Kutuphanenin onerdigi
@@ -123,97 +124,108 @@ export function PickerField({
         */}
         <SafeAreaProvider>
           <View style={styles.backdropWrap}>
-            {/* Perdeye dokununca kapanir; alttan acilan sayfanin beklenen davranisi. */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Kapat"
-              onPress={close}
-              style={styles.backdrop}
-            />
+            {/*
+              Perde YERINDE beliriyor, sayfa asagidan kayiyor. Modal'in kendi
+              "slide" animasyonu seffaf modda ikisini birden kaydiriyor ve
+              ekranda yukari cikan koyu bir dikdortgen olusuyordu.
+            */}
+            <Animated.View
+              entering={FadeIn.duration(180)}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="box-none">
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Kapat"
+                onPress={close}
+                style={styles.backdrop}
+              />
+            </Animated.View>
 
-            <SafeAreaView edges={['bottom']} style={styles.sheet}>
-              <View style={styles.toolbar}>
-                <Pressable
-                  accessibilityRole="button"
-                  hitSlop={8}
-                  onPress={close}
-                  style={styles.toolbarButton}>
-                  <Text style={styles.toolbarCancel}>Vazgeç</Text>
-                </Pressable>
-
-                <Text style={styles.toolbarTitle} numberOfLines={1}>
-                  {label}
-                </Text>
-
-                {/*
-                  "Sec" yalnizca tekerlekli tarafta gerekiyor: Android'de
-                  satira dokunmak zaten secim demek.
-                */}
-                {Platform.OS === 'ios' ? (
+            <Animated.View entering={SlideInDown.duration(260)}>
+              <SafeAreaView edges={['bottom']} style={styles.sheet}>
+                <View style={styles.toolbar}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityState={{ disabled: !wheelValue }}
-                    disabled={!wheelValue}
                     hitSlop={8}
-                    onPress={() => choose(wheelValue)}
+                    onPress={close}
                     style={styles.toolbarButton}>
-                    <Text style={[styles.toolbarDone, !wheelValue && styles.toolbarDisabled]}>
-                      Seç
-                    </Text>
+                    <Text style={styles.toolbarCancel}>Vazgeç</Text>
                   </Pressable>
+
+                  <Text style={styles.toolbarTitle} numberOfLines={1}>
+                    {label}
+                  </Text>
+
+                  {/*
+                    "Sec" yalnizca tekerlekli tarafta gerekiyor: Android'de
+                    satira dokunmak zaten secim demek.
+                  */}
+                  {Platform.OS === 'ios' ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ disabled: !wheelValue }}
+                      disabled={!wheelValue}
+                      hitSlop={8}
+                      onPress={() => choose(wheelValue)}
+                      style={styles.toolbarButton}>
+                      <Text style={[styles.toolbarDone, !wheelValue && styles.toolbarDisabled]}>
+                        Seç
+                      </Text>
+                    </Pressable>
+                  ) : (
+                    <View style={styles.toolbarButton} />
+                  )}
+                </View>
+
+                <View style={styles.searchRow}>
+                  <Ionicons name="search" size={18} color={colors.textTertiary} />
+                  <TextInput
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder="Ara"
+                    placeholderTextColor={colors.textTertiary}
+                    autoCorrect={false}
+                    autoCapitalize="none"
+                    style={styles.searchInput}
+                  />
+                </View>
+
+                {filtered.length === 0 ? (
+                  <Text style={styles.empty}>Eşleşen kayıt yok</Text>
+                ) : Platform.OS === 'ios' ? (
+                  <PickerWheel
+                    options={filtered}
+                    value={wheelValue}
+                    onChange={setDraft}
+                    style={styles.wheel}
+                  />
                 ) : (
-                  <View style={styles.toolbarButton} />
+                  <ScrollView
+                    style={styles.list}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}>
+                    {filtered.map((option) => {
+                      const selected = option === value;
+                      return (
+                        <Pressable
+                          key={option}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected }}
+                          onPress={() => choose(option)}
+                          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+                          <Text style={[styles.rowText, selected && styles.rowTextSelected]}>
+                            {option}
+                          </Text>
+                          {selected && (
+                            <Ionicons name="checkmark" size={18} color={colors.primaryText} />
+                          )}
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
                 )}
-              </View>
-
-              <View style={styles.searchRow}>
-                <Ionicons name="search" size={18} color={colors.textTertiary} />
-                <TextInput
-                  value={query}
-                  onChangeText={setQuery}
-                  placeholder="Ara"
-                  placeholderTextColor={colors.textTertiary}
-                  autoCorrect={false}
-                  autoCapitalize="none"
-                  style={styles.searchInput}
-                />
-              </View>
-
-              {filtered.length === 0 ? (
-                <Text style={styles.empty}>Eşleşen kayıt yok</Text>
-              ) : Platform.OS === 'ios' ? (
-                <PickerWheel
-                  options={filtered}
-                  value={wheelValue}
-                  onChange={setDraft}
-                  style={styles.wheel}
-                />
-              ) : (
-                <ScrollView
-                  style={styles.list}
-                  keyboardShouldPersistTaps="handled"
-                  showsVerticalScrollIndicator={false}>
-                  {filtered.map((option) => {
-                    const selected = option === value;
-                    return (
-                      <Pressable
-                        key={option}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected }}
-                        onPress={() => choose(option)}
-                        style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-                        <Text style={[styles.rowText, selected && styles.rowTextSelected]}>
-                          {option}
-                        </Text>
-                        {selected && (
-                          <Ionicons name="checkmark" size={18} color={colors.primaryText} />
-                        )}
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              )}
-            </SafeAreaView>
+              </SafeAreaView>
+            </Animated.View>
           </View>
         </SafeAreaProvider>
       </Modal>
@@ -244,7 +256,14 @@ const useStyles = createThemedStyles((colors) => ({
 
   // Sayfa degismiyor: perde ustte, secim sayfasi altta.
   backdropWrap: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.35)' },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.28)',
+  },
 
   sheet: {
     backgroundColor: colors.surface,
