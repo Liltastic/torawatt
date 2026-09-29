@@ -2,13 +2,14 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Controller, useForm, type Control } from 'react-hook-form';
+import { Controller, useForm, useWatch, type Control } from 'react-hook-form';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { z } from 'zod';
 
-import { Button, FilterChip, TextField } from '@/components';
+import { Button, FilterChip, PickerField, TextField } from '@/components';
+import { carMakes, modelsForMake } from '@/data/carCatalog';
 import { vehicleCatalog, type VehiclePreset } from '@/mocks/vehicleCatalog';
 import { useCreateVehicle } from '@/queries/vehicles';
 import { createThemedStyles, radius, shadows, spacing, typography, useColors } from '@/theme';
@@ -70,6 +71,11 @@ export default function AddVehicleScreen() {
       averageConsumptionKwhPer100Km: '',
     },
   });
+
+  // Model listesi secili markaya bagli. watch() yerine useWatch: watch bir
+  // FONKSIYON donduruyor ve React Compiler bu bileseni memoize etmeyi tamamen
+  // atliyor; useWatch degerin kendisini veriyor.
+  const selectedMake = useWatch({ control, name: 'make' });
 
   const applyPreset = (preset: VehiclePreset) => {
     setValue('make', preset.make, { shouldValidate: true });
@@ -170,8 +176,41 @@ export default function AddVehicleScreen() {
           <Text style={styles.sectionTitle}>Araç bilgileri</Text>
 
           <View style={styles.form}>
-            <FormInput control={control} name="make" label="Marka" placeholder="Örn. Togg" />
-            <FormInput control={control} name="model" label="Model" placeholder="Örn. T10X" />
+            <Controller
+              control={control}
+              name="make"
+              render={({ field, fieldState }) => (
+                <PickerField
+                  label="Marka"
+                  value={field.value}
+                  placeholder="Listeden seç"
+                  options={carMakes}
+                  error={fieldState.error?.message}
+                  onSelect={(make) => {
+                    field.onChange(make);
+                    // Marka degisince onceki model artik gecerli degil.
+                    setValue('model', '');
+                  }}
+                />
+              )}
+            />
+
+            <Controller
+              control={control}
+              name="model"
+              render={({ field, fieldState }) => (
+                <PickerField
+                  label="Model"
+                  value={field.value}
+                  placeholder="Listeden seç"
+                  options={modelsForMake(selectedMake)}
+                  disabled={!selectedMake}
+                  disabledHint="Önce marka seç"
+                  error={fieldState.error?.message}
+                  onSelect={field.onChange}
+                />
+              )}
+            />
             <FormInput
               control={control}
               name="modelYear"

@@ -1,3 +1,5 @@
+import { resolveCatalogModel } from '@/data/carCatalog';
+
 import { CAR_IMAGE_API_KEY } from './config';
 
 /**
@@ -35,7 +37,9 @@ export async function fetchCarImageUrl(query: CarImageQuery): Promise<string | u
   const params = new URLSearchParams({
     api_key: CAR_IMAGE_API_KEY,
     make: query.make,
-    model: query.model,
+    // Kayit donanim seviyesi tasiyabiliyor ("T10X Uzun Menzil"); katalogda
+    // yalnizca govde adi var (bkz. data/carCatalog).
+    model: resolveCatalogModel(query.make, query.model),
     width: String(query.width ?? 600),
   });
   if (query.modelYear) params.set('year', String(query.modelYear));
