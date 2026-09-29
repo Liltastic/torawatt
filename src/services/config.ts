@@ -22,3 +22,10 @@ if (__DEV__ && !process.env.EXPO_PUBLIC_API_URL) {
       'Fiziksel cihaz veya emülatörde bu genelde çalışmaz; proje kökünde .env dosyası oluştur (bkz. .env.example).',
   );
 }
+
+/**
+ * Arac gorselleri icin carimagesapi.com anahtari (bkz. services/carImage).
+ * Tanimli degilse gorseller sessizce gosterilmiyor, ekran calismaya devam
+ * ediyor - anahtar olmadan da uygulama bozulmasin diye.
+ */
+export const CAR_IMAGE_API_KEY = process.env.EXPO_PUBLIC_CAR_IMAGE_API_KEY ?? '';

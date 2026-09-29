@@ -12,6 +12,7 @@ import {
   EmptyState,
   ListCardSkeleton,
   Refresher,
+  VehiclePhoto,
 } from '@/components';
 import { useActivateVehicle, useRemoveVehicle, useVehicles } from '@/queries/vehicles';
 import {
@@ -154,6 +155,8 @@ export default function VehiclesScreen() {
                       <Ionicons name="trash-outline" size={18} color={colors.textTertiary} />
                     </AnimatedPressable>
                   </View>
+
+                  <VehiclePhoto vehicle={vehicle} />
 
                   <View style={styles.specs}>
                     <Spec label="Batarya" value={`${vehicle.batteryCapacityKwh} kWh`} />

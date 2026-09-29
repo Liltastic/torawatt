@@ -15,6 +15,7 @@ export { StationCard } from './StationCard';
 export { Logo } from './Logo';
 export { PlaceholderScreen } from './PlaceholderScreen';
 export { ServerWakingNotice } from './ServerWakingNotice';
+export { VehiclePhoto } from './VehiclePhoto';
 export { PowerCurve } from './PowerCurve';
 export { ProgressRing } from './ProgressRing';
 export { Refresher } from './Refresher';
