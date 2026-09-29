@@ -52,7 +52,8 @@
           "color": "#0FB5A3"
         }
       ],
-      "@bacons/apple-targets"
+      "@bacons/apple-targets",
+      "./plugins/withToraWidget"
     ],
     "experiments": {
       "typedRoutes": true,

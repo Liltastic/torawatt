@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+	Widget duzeni. RemoteViews yalnizca sinirli sayida gorunumu destekliyor
+	(LinearLayout, TextView, ImageView...); ozel bir View ya da Compose burada
+	calismaz, o yuzden duzen bilerek sade.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	android:id="@+id/tora_widget_root"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:orientation="vertical"
+	android:gravity="center_vertical"
+	android:padding="14dp"
+	android:background="@drawable/tora_widget_background">
+
+	<TextView
+		android:id="@+id/tora_widget_label"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="EN YAKIN İSTASYON"
+		android:textColor="#B3FFFFFF"
+		android:textSize="10sp"
+		android:letterSpacing="0.08"
+		android:maxLines="1" />
+
+	<TextView
+		android:id="@+id/tora_widget_distance"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="4dp"
+		android:text="—"
+		android:textColor="#FFFFFFFF"
+		android:textSize="24sp"
+		android:textStyle="bold"
+		android:maxLines="1" />
+
+	<TextView
+		android:id="@+id/tora_widget_name"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="2dp"
+		android:text="Yükleniyor"
+		android:textColor="#E6FFFFFF"
+		android:textSize="12sp"
+		android:maxLines="2"
+		android:ellipsize="end" />
+</LinearLayout>
