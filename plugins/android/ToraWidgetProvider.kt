@@ -8,7 +8,12 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
+import android.os.Build
+import android.util.Log
 import android.widget.RemoteViews
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -90,17 +95,28 @@ class ToraWidgetProvider : AppWidgetProvider() {
     }
 
     /**
-     * Widget surekli konum takibi yapamaz; son bilinen konumu okuyoruz.
-     * Izin ANA uygulamada aliniyor (expo-location); verilmemisse null doner
-     * ve widget "Konum yok" gosterir.
+     * Widget'in konumu.
+     *
+     * Once onbellekteki son bilinen konum; yoksa TAZE bir konum isteniyor.
+     * Ikinci adim sart: cihaz yeni acildiysa ya da uygulama hic calismadiysa
+     * onbellek bos oluyor ve widget kalici olarak "Konum yok" gosteriyor -
+     * emulatorde gorulen tam olarak buydu.
+     *
+     * Izin ANA uygulamada aliniyor (expo-location).
      */
     private fun lastKnownLocation(context: Context): Location? {
         val granted = context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ==
             PackageManager.PERMISSION_GRANTED
-        if (!granted) return null
+        if (!granted) {
+            Log.w(TAG, "konum izni yok")
+            return null
+        }
 
         val manager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-            ?: return null
+        if (manager == null) {
+            Log.w(TAG, "LocationManager alinamadi")
+            return null
+        }
 
         val providers = listOf(
             LocationManager.GPS_PROVIDER,
@@ -110,14 +126,58 @@ class ToraWidgetProvider : AppWidgetProvider() {
         for (provider in providers) {
             try {
                 val location = manager.getLastKnownLocation(provider)
+                Log.i(TAG, "onbellek $provider -> ${location?.let { "${it.latitude},${it.longitude}" } ?: "yok"}")
                 if (location != null) return location
             } catch (error: SecurityException) {
-                // Saglayici kapaliysa ya da izin cekildiyse digerini dene.
+                Log.w(TAG, "$provider izin hatasi: ${error.message}")
             } catch (error: IllegalArgumentException) {
-                // Cihazda o saglayici yok.
+                Log.w(TAG, "$provider cihazda yok")
             }
         }
-        return null
+
+        return currentLocation(context, manager)
+    }
+
+    /**
+     * Onbellek bossa tek seferlik taze konum. getCurrentLocation API 30'dan
+     * itibaren var ve tam bu is icin tasarlanmis; goAsync'in verdigi pencereye
+     * sigsin diye alti saniyeyle sinirliyoruz.
+     */
+    private fun currentLocation(context: Context, manager: LocationManager): Location? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            Log.w(TAG, "taze konum icin API 30 gerekiyor, cihaz ${Build.VERSION.SDK_INT}")
+            return null
+        }
+
+        val provider = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+            .firstOrNull { candidate ->
+                try {
+                    manager.isProviderEnabled(candidate)
+                } catch (error: IllegalArgumentException) {
+                    false
+                }
+            }
+        if (provider == null) {
+            Log.w(TAG, "acik konum saglayicisi yok")
+            return null
+        }
+
+        val latch = CountDownLatch(1)
+        val holder = AtomicReference<Location?>(null)
+        try {
+            manager.getCurrentLocation(provider, null, context.mainExecutor) { location ->
+                holder.set(location)
+                latch.countDown()
+            }
+        } catch (error: SecurityException) {
+            Log.w(TAG, "taze konum izin hatasi: ${error.message}")
+            return null
+        }
+
+        latch.await(CURRENT_LOCATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        val location = holder.get()
+        Log.i(TAG, "taze konum $provider -> ${location?.let { "${it.latitude},${it.longitude}" } ?: "gelmedi"}")
+        return location
     }
 
     private fun fetchNearestTora(context: Context, latitude: Double, longitude: Double): WidgetState? {
@@ -136,19 +196,34 @@ class ToraWidgetProvider : AppWidgetProvider() {
         }
 
         try {
-            if (connection.responseCode !in 200..299) return null
+            val status = connection.responseCode
+            if (status !in 200..299) {
+                Log.w(TAG, "katalog HTTP $status")
+                return null
+            }
 
             val body = connection.inputStream.bufferedReader().use { it.readText() }
             val envelope = JSONObject(body)
-            if (!envelope.optBoolean("success")) return null
+            if (!envelope.optBoolean("success")) {
+                Log.w(TAG, "katalog reddetti: ${envelope.optString("message")}")
+                return null
+            }
 
-            val items = envelope.optJSONObject("data")?.optJSONArray("items") ?: return null
+            val items = envelope.optJSONObject("data")?.optJSONArray("items")
+            if (items == null) {
+                Log.w(TAG, "katalog yaniti items tasimiyor")
+                return null
+            }
+
             // Liste mesafeye gore sirali geliyor; ilk TORA kaydi en yakini.
             for (index in 0 until items.length()) {
                 val item = items.optJSONObject(index) ?: continue
                 if (!isTora(item)) continue
+                Log.i(TAG, "${items.length()} kayittan ${index + 1}. sirada TORA bulundu")
                 return WidgetState(distanceLabel(item), displayName(item))
             }
+
+            Log.w(TAG, "${items.length()} kayit geldi ama TORA yok")
             return null
         } finally {
             connection.disconnect()
@@ -212,5 +287,8 @@ class ToraWidgetProvider : AppWidgetProvider() {
         const val TIMEOUT_MS = 10_000
         const val PREFS_NAME = "tora-watt-widget"
         const val PREFS_DEVICE_ID = "device-id"
+        const val CURRENT_LOCATION_TIMEOUT_SECONDS = 6L
+        /** `adb logcat -s ToraWidget` ile izlenir. */
+        const val TAG = "ToraWidget"
     }
 }
