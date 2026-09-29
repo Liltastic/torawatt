@@ -1,6 +1,7 @@
 import * as Location from 'expo-location';
 import { create } from 'zustand';
 
+import { publishLocationForWidget } from '@/services/widgetLocation';
 import type { Coordinate } from '@/types/domain';
 
 export type LocationStatus = 'idle' | 'requesting' | 'granted' | 'denied' | 'unavailable';
@@ -29,6 +30,16 @@ const toCoordinate = (position: Location.LocationObject): Coordinate => ({
   latitude: position.coords.latitude,
   longitude: position.coords.longitude,
 });
+
+/**
+ * Konumu hem depoya hem Android widget'ina birakir. Widget arka planda
+ * calistigi icin konumu kendisi alamiyor; izni olan tek taraf burasi
+ * (bkz. services/widgetLocation).
+ */
+function remember(coords: Coordinate): Coordinate {
+  publishLocationForWidget(coords);
+  return coords;
+}
 
 async function readPosition(): Promise<Coordinate | undefined> {
   // Once cihazin son bilinen konumu: aninda gelir ve harita hemen kullaniciya gider;
@@ -68,12 +79,12 @@ export const useLocationStore = create<LocationState>((set, get) => ({
     watcher = await Location.watchPositionAsync(
       // 30 m'den kucuk hareketler icin liste yeniden siralanmasin diye esik koyduk.
       { accuracy: Location.Accuracy.High, distanceInterval: 30, timeInterval: 15_000 },
-      (position) => set({ coords: toCoordinate(position), status: 'granted' }),
+      (position) => set({ coords: remember(toCoordinate(position)), status: 'granted' }),
     ).catch(() => null);
 
     const coords = await readPosition();
     if (coords) {
-      set({ coords, status: 'granted' });
+      set({ coords: remember(coords), status: 'granted' });
     } else if (get().status === 'requesting') {
       set({ status: 'unavailable' });
     }
@@ -87,7 +98,7 @@ export const useLocationStore = create<LocationState>((set, get) => ({
     }
 
     const coords = await readPosition();
-    if (coords) set({ coords, status: 'granted' });
+    if (coords) set({ coords: remember(coords), status: 'granted' });
     return coords ?? get().coords;
   },
 }));

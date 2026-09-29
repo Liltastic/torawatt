@@ -15,6 +15,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import org.json.JSONObject
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
@@ -89,9 +90,47 @@ class ToraWidgetProvider : AppWidgetProvider() {
     // MARK: veri
 
     private fun loadNearest(context: Context): WidgetState {
-        val location = lastKnownLocation(context) ?: return WidgetState("—", "Konum yok")
+        // Once uygulamanin biraktigi konum, sonra sistemin kendisi. Sira
+        // bilerek boyle: widget arka planda calisiyor ve Android 10'dan beri
+        // arka plandaki uygulama ACCESS_BACKGROUND_LOCATION olmadan konum
+        // alamiyor, yani ikinci yol cogu cihazda bos donuyor.
+        val location = storedLocation(context) ?: lastKnownLocation(context)
+        if (location == null) {
+            return WidgetState("—", "Uygulamayı bir kez aç")
+        }
         return fetchNearestTora(context, location.latitude, location.longitude)
             ?: WidgetState("—", "Yakında istasyon yok")
+    }
+
+    /**
+     * Uygulamanin on plandayken yazdigi konum
+     * (bkz. src/services/widgetLocation.ts). Ayni uygulamanin veri klasoru
+     * oldugu icin okumak izin gerektirmiyor.
+     */
+    private fun storedLocation(context: Context): Location? {
+        val file = File(context.filesDir, STORED_LOCATION_FILE)
+        if (!file.exists()) {
+            Log.i(TAG, "kayitli konum dosyasi yok")
+            return null
+        }
+
+        return try {
+            val json = JSONObject(file.readText())
+            val latitude = json.optDouble("latitude", Double.NaN)
+            val longitude = json.optDouble("longitude", Double.NaN)
+            if (latitude.isNaN() || longitude.isNaN()) {
+                Log.w(TAG, "kayitli konum eksik")
+                return null
+            }
+            Log.i(TAG, "kayitli konum -> $latitude,$longitude")
+            Location("tora-app").apply {
+                this.latitude = latitude
+                this.longitude = longitude
+            }
+        } catch (error: Exception) {
+            Log.w(TAG, "kayitli konum okunamadi: ${error.message}")
+            null
+        }
     }
 
     /**
@@ -288,6 +327,8 @@ class ToraWidgetProvider : AppWidgetProvider() {
         const val PREFS_NAME = "tora-watt-widget"
         const val PREFS_DEVICE_ID = "device-id"
         const val CURRENT_LOCATION_TIMEOUT_SECONDS = 6L
+        /** Uygulamanin yazdigi konum; bkz. src/services/widgetLocation.ts */
+        const val STORED_LOCATION_FILE = "widget-location.json"
         /** `adb logcat -s ToraWidget` ile izlenir. */
         const val TAG = "ToraWidget"
     }
