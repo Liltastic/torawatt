@@ -1,8 +1,10 @@
+import type { StyleProp, ViewStyle } from 'react-native';
+
 export interface PickerWheelProps {
   options: string[];
   value: string | undefined;
   onChange: (value: string) => void;
-  style?: { height: number; marginBottom: number };
+  style?: StyleProp<ViewStyle>;
 }
 
 /**
