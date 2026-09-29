@@ -1,5 +1,3 @@
-import { Host, Picker, Text as NativeText } from '@expo/ui/swift-ui';
-import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState } from 'react';
 import { FlatList, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
@@ -9,6 +7,7 @@ import { createThemedStyles, MIN_TOUCH_TARGET, radius, spacing, typography, useC
 import { haptics } from '@/utils/haptics';
 
 import { Button } from './Button';
+import { PickerWheel } from './PickerWheel';
 
 interface PickerFieldProps {
   label: string;
@@ -138,18 +137,12 @@ export function PickerField({
             // Arama kutusu tekerlegin icerigini daraltiyor; boylece 199
             // markalik liste de tek elle donerek gezilebiliyor.
             <View style={styles.wheelWrap}>
-              <Host style={styles.wheel}>
-                <Picker
-                  selection={wheelValue}
-                  onSelectionChange={(selected) => setDraft(String(selected))}
-                  modifiers={[pickerStyle('wheel')]}>
-                  {filtered.map((option) => (
-                    <NativeText key={option} modifiers={[tag(option)]}>
-                      {option}
-                    </NativeText>
-                  ))}
-                </Picker>
-              </Host>
+              <PickerWheel
+                options={filtered}
+                value={wheelValue}
+                onChange={setDraft}
+                style={styles.wheel}
+              />
 
               <Button
                 label="Seç"
