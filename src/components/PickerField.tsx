@@ -1,10 +1,14 @@
+import { Host, Picker, Text as NativeText } from '@expo/ui/swift-ui';
+import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState } from 'react';
-import { FlatList, Modal, Pressable, Text, TextInput, View } from 'react-native';
+import { FlatList, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { createThemedStyles, MIN_TOUCH_TARGET, radius, spacing, typography, useColors } from '@/theme';
 import { haptics } from '@/utils/haptics';
+
+import { Button } from './Button';
 
 interface PickerFieldProps {
   label: string;
@@ -39,6 +43,11 @@ export function PickerField({
   const styles = useStyles();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  /**
+   * iOS'ta tekerlek donerken secim aninda degismesin: kullanici listeyi
+   * gezerken form her adimda guncellenirdi. Onaylayinca yaziyoruz.
+   */
+  const [draft, setDraft] = useState<string | undefined>(value);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('tr');
@@ -46,9 +55,25 @@ export function PickerField({
     return options.filter((option) => option.toLocaleLowerCase('tr').includes(needle));
   }, [options, query]);
 
+  // Arama daralinca taslak secim listeden dusebiliyor; tekerlek o zaman hicbir
+  // satiri secili gostermez ve "Sec" eski degeri yazardi.
+  const wheelValue = draft && filtered.includes(draft) ? draft : filtered[0];
+
   const close = () => {
     setOpen(false);
     setQuery('');
+  };
+
+  const openSheet = () => {
+    haptics.selection();
+    setDraft(value ?? options[0]);
+    setOpen(true);
+  };
+
+  const choose = (option: string) => {
+    haptics.selection();
+    onSelect(option);
+    close();
   };
 
   return (
@@ -60,10 +85,7 @@ export function PickerField({
         accessibilityLabel={`${label} seç`}
         accessibilityState={{ disabled }}
         disabled={disabled}
-        onPress={() => {
-          haptics.selection();
-          setOpen(true);
-        }}
+        onPress={openSheet}
         style={({ pressed }) => [
           styles.field,
           !!error && styles.fieldError,
@@ -111,32 +133,54 @@ export function PickerField({
             />
           </View>
 
-          <FlatList
-            data={filtered}
-            keyExtractor={(item) => item}
-            keyboardShouldPersistTaps="handled"
-            // 4600 model var; sanallastirma olmadan liste acilisi takiliyor.
-            initialNumToRender={20}
-            windowSize={10}
-            ListEmptyComponent={<Text style={styles.empty}>Eşleşen kayıt yok</Text>}
-            renderItem={({ item }) => {
-              const selected = item === value;
-              return (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  onPress={() => {
-                    haptics.selection();
-                    onSelect(item);
-                    close();
-                  }}
-                  style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-                  <Text style={[styles.rowText, selected && styles.rowTextSelected]}>{item}</Text>
-                  {selected && <Ionicons name="checkmark" size={18} color={colors.primaryText} />}
-                </Pressable>
-              );
-            }}
-          />
+          {Platform.OS === 'ios' ? (
+            // iPhone'da listeyi iOS'un kendi tekerlek secicisi ciziyor.
+            // Arama kutusu tekerlegin icerigini daraltiyor; boylece 199
+            // markalik liste de tek elle donerek gezilebiliyor.
+            <View style={styles.wheelWrap}>
+              <Host style={styles.wheel}>
+                <Picker
+                  selection={wheelValue}
+                  onSelectionChange={(selected) => setDraft(String(selected))}
+                  modifiers={[pickerStyle('wheel')]}>
+                  {filtered.map((option) => (
+                    <NativeText key={option} modifiers={[tag(option)]}>
+                      {option}
+                    </NativeText>
+                  ))}
+                </Picker>
+              </Host>
+
+              <Button
+                label="Seç"
+                disabled={filtered.length === 0}
+                onPress={() => choose(wheelValue)}
+              />
+            </View>
+          ) : (
+            <FlatList
+              data={filtered}
+              keyExtractor={(item) => item}
+              keyboardShouldPersistTaps="handled"
+              // 4600 model var; sanallastirma olmadan liste acilisi takiliyor.
+              initialNumToRender={20}
+              windowSize={10}
+              ListEmptyComponent={<Text style={styles.empty}>Eşleşen kayıt yok</Text>}
+              renderItem={({ item }) => {
+                const selected = item === value;
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    onPress={() => choose(item)}
+                    style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+                    <Text style={[styles.rowText, selected && styles.rowTextSelected]}>{item}</Text>
+                    {selected && <Ionicons name="checkmark" size={18} color={colors.primaryText} />}
+                  </Pressable>
+                );
+              }}
+            />
+          )}
         </SafeAreaView>
       </Modal>
     </View>
@@ -207,6 +251,10 @@ const useStyles = createThemedStyles((colors) => ({
   rowPressed: { backgroundColor: colors.surfaceMuted },
   rowText: { ...typography.body, color: colors.text, flex: 1 },
   rowTextSelected: { color: colors.primaryText, fontWeight: '600' },
+
+  wheelWrap: { flex: 1, paddingHorizontal: spacing.xl },
+  // iOS tekerleginin alisilmis yuksekligi.
+  wheel: { height: 216, marginBottom: spacing.lg },
 
   empty: {
     ...typography.body,

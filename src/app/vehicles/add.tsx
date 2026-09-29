@@ -173,9 +173,9 @@ export default function AddVehicleScreen() {
             ))}
           </ScrollView>
 
-          <Text style={styles.sectionTitle}>Araç bilgileri</Text>
+          <Text style={styles.sectionTitle}>Araç</Text>
 
-          <View style={styles.form}>
+          <View style={styles.group}>
             <Controller
               control={control}
               name="make"
@@ -217,6 +217,14 @@ export default function AddVehicleScreen() {
               label="Model yılı"
               keyboardType="number-pad"
             />
+          </View>
+
+          <Text style={styles.sectionTitle}>Batarya ve şarj</Text>
+          <Text style={styles.sectionHint}>
+            Değerler rota menzili ve şarj süresi hesaplarında kullanılır.
+          </Text>
+
+          <View style={styles.group}>
             <FormInput
               control={control}
               name="batteryCapacityKwh"
@@ -348,6 +356,18 @@ const useStyles = createThemedStyles((colors) => ({
   sectionTitle: { ...typography.h3, color: colors.text, marginTop: spacing.xxl },
   sectionHint: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
 
+  group: {
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    // Alanlar kendi alt paylarini tasiyor; kart ayrica pay eklemiyor.
+    paddingBottom: 0,
+    borderRadius: radius.card,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+
   presets: { paddingTop: spacing.lg, paddingBottom: spacing.xs },
   preset: {
     width: 132,
@@ -362,8 +382,6 @@ const useStyles = createThemedStyles((colors) => ({
   presetMake: { ...typography.caption, color: colors.textSecondary },
   presetModel: { ...typography.bodyStrong, color: colors.text, marginTop: 2 },
   presetBattery: { ...typography.caption, color: colors.primaryText, marginTop: spacing.sm },
-
-  form: { marginTop: spacing.lg },
 
   connectors: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.lg },
   connectorChip: { marginRight: spacing.sm, marginBottom: spacing.sm },
