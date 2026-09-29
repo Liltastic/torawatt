@@ -218,7 +218,15 @@ export function effectiveReservationStatus(
   const startsAt = new Date(reservation.startsAt).getTime();
   const deadline = startsAt + RESERVATION_GRACE_MINUTES * 60_000;
 
-  if (reservation.status === 'ARRIVED') return 'ARRIVED';
+  // Geldiyse bekleme suresi artik islemez - kullanici zaten orada. Ama rezerve
+  // ETTIGI sure dolunca kayit kapanmali: aksi halde "Geldin" hicbir zaman
+  // bitmiyor ve haritadaki serit kalici hale geliyor. Bunu normalde sarjin
+  // baslamasi kapatirdi, ama o akis henuz kaydi geri yazmiyor.
+  if (reservation.status === 'ARRIVED') {
+    const reservedUntil = startsAt + reservation.durationMinutes * 60_000;
+    return now > reservedUntil ? 'EXPIRED' : 'ARRIVED';
+  }
+
   return now > deadline ? 'EXPIRED' : reservation.status;
 }
 
