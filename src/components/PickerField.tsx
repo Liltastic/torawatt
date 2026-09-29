@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState } from 'react';
 import { FlatList, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { createThemedStyles, MIN_TOUCH_TARGET, radius, spacing, typography, useColors } from '@/theme';
 import { haptics } from '@/utils/haptics';
@@ -106,75 +106,83 @@ export function PickerField({
       {!!error && <Text style={styles.error}>{error}</Text>}
 
       <Modal visible={open} animationType="slide" onRequestClose={close} transparent={false}>
-        <SafeAreaView edges={['top', 'bottom']} style={styles.sheet}>
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>{label}</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Kapat"
-              hitSlop={10}
-              onPress={close}
-              style={styles.closeButton}>
-              <Ionicons name="close" size={22} color={colors.text} />
-            </Pressable>
-          </View>
+        {/*
+          RN Modal ayri bir native pencerede aciliyor ve SafeAreaView orada
+          guvenli alani olcemeyip sifir donduruyor: baslik durum cubugunun
+          altina giriyor, kapatma dugmesi pil/sarj gostergesiyle cakisiyordu.
+          Kutuphanenin onerdigi cozum modal icine kendi saglayicisini koymak.
+        */}
+        <SafeAreaProvider>
+          <SafeAreaView edges={['top', 'bottom']} style={styles.sheet}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>{label}</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Kapat"
+                hitSlop={10}
+                onPress={close}
+                style={styles.closeButton}>
+                <Ionicons name="close" size={22} color={colors.text} />
+              </Pressable>
+            </View>
 
-          <View style={styles.searchRow}>
-            <Ionicons name="search" size={18} color={colors.textTertiary} />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Ara"
-              placeholderTextColor={colors.textTertiary}
-              autoCorrect={false}
-              autoCapitalize="none"
-              style={styles.searchInput}
-            />
-          </View>
-
-          {Platform.OS === 'ios' ? (
-            // iPhone'da listeyi iOS'un kendi tekerlek secicisi ciziyor.
-            // Arama kutusu tekerlegin icerigini daraltiyor; boylece 199
-            // markalik liste de tek elle donerek gezilebiliyor.
-            <View style={styles.wheelWrap}>
-              <PickerWheel
-                options={filtered}
-                value={wheelValue}
-                onChange={setDraft}
-                style={styles.wheel}
-              />
-
-              <Button
-                label="Seç"
-                disabled={filtered.length === 0}
-                onPress={() => choose(wheelValue)}
+            <View style={styles.searchRow}>
+              <Ionicons name="search" size={18} color={colors.textTertiary} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Ara"
+                placeholderTextColor={colors.textTertiary}
+                autoCorrect={false}
+                autoCapitalize="none"
+                style={styles.searchInput}
               />
             </View>
-          ) : (
-            <FlatList
-              data={filtered}
-              keyExtractor={(item) => item}
-              keyboardShouldPersistTaps="handled"
-              // 4600 model var; sanallastirma olmadan liste acilisi takiliyor.
-              initialNumToRender={20}
-              windowSize={10}
-              ListEmptyComponent={<Text style={styles.empty}>Eşleşen kayıt yok</Text>}
-              renderItem={({ item }) => {
-                const selected = item === value;
-                return (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    onPress={() => choose(item)}
-                    style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-                    <Text style={[styles.rowText, selected && styles.rowTextSelected]}>{item}</Text>
-                    {selected && <Ionicons name="checkmark" size={18} color={colors.primaryText} />}
-                  </Pressable>
-                );
-              }}
-            />
-          )}
-        </SafeAreaView>
+
+            {Platform.OS === 'ios' ? (
+              // iPhone'da listeyi iOS'un kendi tekerlek secicisi ciziyor.
+              // Arama kutusu tekerlegin icerigini daraltiyor; boylece 199
+              // markalik liste de tek elle donerek gezilebiliyor.
+              <View style={styles.wheelWrap}>
+                <PickerWheel
+                  options={filtered}
+                  value={wheelValue}
+                  onChange={setDraft}
+                  style={styles.wheel}
+                />
+
+                <Button
+                  label="Seç"
+                  disabled={filtered.length === 0}
+                  onPress={() => choose(wheelValue)}
+                />
+              </View>
+            ) : (
+              <FlatList
+                data={filtered}
+                keyExtractor={(item) => item}
+                keyboardShouldPersistTaps="handled"
+                // 4600 model var; sanallastirma olmadan liste acilisi takiliyor.
+                initialNumToRender={20}
+                windowSize={10}
+                ListEmptyComponent={<Text style={styles.empty}>Eşleşen kayıt yok</Text>}
+                renderItem={({ item }) => {
+                  const selected = item === value;
+                  return (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      onPress={() => choose(item)}
+                      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+                      <Text style={[styles.rowText, selected && styles.rowTextSelected]}>{item}</Text>
+                      {selected && <Ionicons name="checkmark" size={18} color={colors.primaryText} />}
+                    </Pressable>
+                  );
+                }}
+              />
+            )}
+          </SafeAreaView>
+        </SafeAreaProvider>
       </Modal>
     </View>
   );
