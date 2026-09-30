@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Controller, useForm, useWatch, type Control } from 'react-hook-form';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { z } from 'zod';
 
 import { Button, FilterChip, PickerField, TextField } from '@/components';
 import { carMakes, modelsForMake } from '@/data/carCatalog';
+import { variantLabel, variantsFor, type EvVariant } from '@/data/evSpecs';
 import { vehicleCatalog, type VehiclePreset } from '@/mocks/vehicleCatalog';
 import { useCreateVehicle } from '@/queries/vehicles';
 import { createThemedStyles, radius, shadows, spacing, typography, useColors } from '@/theme';
@@ -76,6 +77,24 @@ export default function AddVehicleScreen() {
   // FONKSIYON donduruyor ve React Compiler bu bileseni memoize etmeyi tamamen
   // atliyor; useWatch degerin kendisini veriyor.
   const selectedMake = useWatch({ control, name: 'make' });
+  const selectedModel = useWatch({ control, name: 'model' });
+
+  // Secilen modelin uretici verisiyle bilinen surumleri; yoksa alanlar elle
+  // doldurulmaya devam ediyor (bkz. data/evSpecs).
+  const variants = useMemo(
+    () => variantsFor(selectedMake, selectedModel),
+    [selectedMake, selectedModel],
+  );
+  const [variantLabelValue, setVariantLabelValue] = useState<string>();
+
+  const applyVariant = (variant: EvVariant) => {
+    setVariantLabelValue(variantLabel(variant));
+    setValue('batteryCapacityKwh', String(variant.batteryKwh), { shouldValidate: true });
+    setValue('maxAcKw', String(variant.acKw), { shouldValidate: true });
+    setValue('maxDcKw', String(variant.dcKw), { shouldValidate: true });
+    // Soket BILEREK doldurulmuyor: kaynak bunu bizim pazarimiz icin yanlis
+    // verebiliyor (bkz. data/evSpecs).
+  };
 
   const applyPreset = (preset: VehiclePreset) => {
     setValue('make', preset.make, { shouldValidate: true });
@@ -225,6 +244,19 @@ export default function AddVehicleScreen() {
           </Text>
 
           <View style={styles.group}>
+            {variants.length > 0 && (
+              <PickerField
+                label="Sürüm"
+                value={variantLabelValue}
+                placeholder="Listeden seç"
+                options={variants.map(variantLabel)}
+                onSelect={(label) => {
+                  const variant = variants.find((item: EvVariant) => variantLabel(item) === label);
+                  if (variant) applyVariant(variant);
+                }}
+              />
+            )}
+
             <FormInput
               control={control}
               name="batteryCapacityKwh"
