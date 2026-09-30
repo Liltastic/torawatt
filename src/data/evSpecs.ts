@@ -75,10 +75,27 @@ export function variantsFor(make: string, model: string): EvVariant[] {
   );
 }
 
-/** Secicide gorunen ad: "2024 · Long Range · 75 kWh". */
-export function variantLabel(variant: EvVariant): string {
+/** Secicide gosterilen bir satir. */
+export interface EvVariantOption {
+  label: string;
+  variant: EvVariant;
+}
+
+/** Yil disindaki her sey: iki kayit bunda esitse formu AYNI dolduruyorlar. */
+const specKey = (variant: EvVariant) =>
+  [variant.trim ?? '', variant.batteryKwh, variant.acKw, variant.dcKw].join('|');
+
+/** Etiketin yil bolumu: tek yil "2024", birden fazlasi "2022-2025". */
+const yearRange = (years: number[]): string | null => {
+  if (years.length === 0) return null;
+  const min = Math.min(...years);
+  const max = Math.max(...years);
+  return min === max ? String(min) : `${min}-${max}`;
+};
+
+const baseLabel = (variant: EvVariant, years: string | null): string => {
   const parts: string[] = [];
-  if (variant.year) parts.push(String(variant.year));
+  if (years) parts.push(years);
   // "Base" tek donanimli araclarda otomatik konuyor; kullaniciya bir sey
   // anlatmadigi icin gosterilmiyor.
   if (variant.trim && variant.trim.toLocaleLowerCase('tr') !== 'base') {
@@ -86,4 +103,67 @@ export function variantLabel(variant: EvVariant): string {
   }
   parts.push(`${variant.batteryKwh} kWh`);
   return parts.join(' · ');
+};
+
+/** Etiket -> kac kez gectigi. */
+const tally = (labels: string[]): Map<string, number> => {
+  const counts = new Map<string, number>();
+  for (const label of labels) counts.set(label, (counts.get(label) ?? 0) + 1);
+  return counts;
+};
+
+/**
+ * variantsFor sonucunu secici satirlarina cevirir: "2022-2025 · Long Range · 75 kWh".
+ *
+ * Iki is yapiyor, ikisi de veri setinin bicimi yuzunden gerekli:
+ *
+ * 1. TEKLESTIRME. Set ayni araci her model yili icin ayri kayit olarak
+ *    tutuyor; BMW i4 eDrive40 uc kez, Audi Q4 e-tron on sekiz kez geliyor ve
+ *    cogunun batarya/AC/DC degerleri birebir ayni. Bunlar kullanici icin ayri
+ *    secenek DEGIL - hangisini sececegini bilemedigi, formu ayni dolduran
+ *    satirlar. Sayilari ayni olanlar tek satirda birlesiyor ve yil aralik
+ *    olarak yaziliyor; boylece 1144 surum 443 secenege iniyor ve kullanici
+ *    kendi model yilini araligin icinde goruyor.
+ *
+ * 2. BENZERSIZ ETIKET. Secici yalnizca metinle calisiyor: iki satirin etiketi
+ *    ayni olursa listede ayirt edilemiyorlar, secim her zaman ilkini buluyor ve
+ *    ayni key ile cizilen satirlar React'te uyari uretiyor. Mercedes EQE'nin
+ *    84 kWh'lik iki surumu yalnizca DC gucunde ayriliyor (170 ve 200 kW);
+ *    cakisan etiketlere once DC, gerekirse AC ekleniyor.
+ */
+export function variantOptions(variants: EvVariant[]): EvVariantOption[] {
+  if (variants.length === 0) return [];
+
+  const merged = new Map<string, { variant: EvVariant; years: number[] }>();
+  for (const variant of variants) {
+    const group = merged.get(specKey(variant));
+    if (group) {
+      if (variant.year) group.years.push(variant.year);
+    } else {
+      merged.set(specKey(variant), { variant, years: variant.year ? [variant.year] : [] });
+    }
+  }
+
+  const rows = [...merged.values()].map(({ variant, years }) => ({
+    variant,
+    label: baseLabel(variant, yearRange(years)),
+  }));
+
+  // Yalnizca GERCEKTEN cakisan etiketlere ek yapiliyor; digerleri gereksiz
+  // yere uzamasin.
+  const byLabel = tally(rows.map((row) => row.label));
+  const withDc = rows.map((row) =>
+    (byLabel.get(row.label) ?? 0) > 1
+      ? { ...row, label: `${row.label} · ${row.variant.dcKw} kW DC` }
+      : row,
+  );
+
+  // DC de ayniysa AC ile ayriliyor. Teklestirme trim+batarya+AC+DC uzerinden
+  // yapildigi icin bu noktadan sonra iki satir ayni kalamaz.
+  const byDcLabel = tally(withDc.map((row) => row.label));
+  return withDc.map((row) =>
+    (byDcLabel.get(row.label) ?? 0) > 1
+      ? { ...row, label: `${row.label} · ${row.variant.acKw} kW AC` }
+      : row,
+  );
 }

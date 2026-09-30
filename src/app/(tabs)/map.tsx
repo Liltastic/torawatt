@@ -283,9 +283,19 @@ export default function MapScreen() {
     [activeVehicle, allStations],
   );
 
-  const stations = useMemo(() => {
+  /**
+   * Arama ve filtrelerden gecen istasyonlar - HARITANIN kaynagi.
+   *
+   * Siralama ve mesafe bilerek disinda: pin'lerin ikisine de ihtiyaci yok ve
+   * bu liste konumdan bagimsiz oldugu icin konum guncellendiginde harita
+   * kaynagi hic yeniden yazilmiyor. Tek memo oldugunda her konum tiginda 200
+   * istasyon yeni nesnelere kopyalanip siralaniyor, yeni dizi StationMap'in
+   * geojson'unu tazeliyor ve harita butun kumeleri bastan kuruyordu - hareket
+   * halindeki kullanici bunu periyodik takilma olarak goruyor.
+   */
+  const matching = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase('tr');
-    const matching = (allStations ?? []).filter((station) => {
+    return (allStations ?? []).filter((station) => {
       const matchesQuery =
         !normalized ||
         station.name.toLocaleLowerCase('tr').includes(normalized) ||
@@ -297,14 +307,17 @@ export default function MapScreen() {
 
       return matchesQuery && matchesFilters;
     });
+  }, [allStations, query, activeFilters, filters]);
 
+  /** LISTENIN kaynagi: mesafe eklenmis ve en yakin en ustte olacak sekilde sirali. */
+  const stations = useMemo(() => {
     if (!userLocation) return matching;
 
-    // Mesafe istemcide hesaplanir (backend konum bilmiyor); en yakin en ustte.
+    // Mesafe istemcide hesaplanir (backend konum bilmiyor).
     return matching
       .map((station) => ({ ...station, distanceKm: haversineKm(userLocation, station) }))
       .sort((a, b) => a.distanceKm - b.distanceKm);
-  }, [allStations, query, activeFilters, filters, userLocation]);
+  }, [matching, userLocation]);
 
   // Katalog istasyonlarinin soketleri yalnizca detay ucunda; listedeki kayitta
   // sayilardan uretilmis tahmin duruyor (bkz. services/evcs.ts). Detay gelene
@@ -460,7 +473,7 @@ export default function MapScreen() {
       {/* Harita en altta; arama ve alt sheet uzerine biniyor. */}
       <StationMap
         ref={mapRef}
-        stations={stations}
+        stations={matching}
         selectedId={selectedId}
         userLocation={userLocation}
         onSelectStation={(id) => {

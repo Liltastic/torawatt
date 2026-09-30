@@ -28,6 +28,10 @@ export default function NotificationsScreen() {
   }, []);
 
   useEffect(() => {
+    // refresh() izni ASENKRON okuyor: setState await'ten sonra calisiyor, yani
+    // kuralin uyardigi "cizimi zincirleyen es zamanli setState" durumu burada
+    // olusmuyor.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
     // Kullanici sistem ayarlarindan izin degistirip geri donduginde guncel kalsin.
     const sub = AppState.addEventListener('change', (state) => {

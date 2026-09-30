@@ -1,6 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -16,6 +15,7 @@ import {
 } from '@/types/domain';
 import { formatDate, formatMinutes, formatTime } from '@/utils/format';
 import { haptics } from '@/utils/haptics';
+import { useNow } from '@/utils/clock';
 import { cancelReservationReminders } from '@/utils/notifications';
 
 /** Durum -> rozet tonu. Rozet paleti soket durumlariyla ortak. */
@@ -38,12 +38,10 @@ export default function ReservationDetailScreen() {
   const setStatus = useSetReservationStatus();
   const reservation = reservations?.find((r) => r.id === id);
 
-  // Kalan sure geri saysin diye dakikada bir yeniden ciziyoruz.
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => setTick((t) => t + 1), 30_000);
-    return () => clearInterval(timer);
-  }, []);
+  // Kalan sure geri saysin diye yarim dakikada bir yeniden ciziyoruz. Sayac
+  // bilerek bir state degeri: cizim sirasinda Date.now() okunsa React Compiler
+  // sonucu onbellege alip geri sayimi dondururdu (bkz. utils/clock).
+  const now = useNow(30_000);
 
   if (isLoading) {
     return (
@@ -71,7 +69,7 @@ export default function ReservationDetailScreen() {
   const status = effectiveReservationStatus(reservation);
   const startsAt = new Date(reservation.startsAt);
   const deadline = new Date(startsAt.getTime() + RESERVATION_GRACE_MINUTES * 60_000);
-  const minutesToStart = Math.round((startsAt.getTime() - Date.now()) / 60_000);
+  const minutesToStart = Math.round((startsAt.getTime() - now) / 60_000);
   const isOpen = status === 'PENDING' || status === 'CONFIRMED';
 
   const confirmCancel = () =>

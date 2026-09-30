@@ -397,7 +397,16 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
         showError(message.message);
       }
     },
-    [onSelectStation, onMapPress, pushStations, pushUserLocation, pushRoute, showError, clearErrorTimer],
+    [
+      onSelectStation,
+      onMapPress,
+      pushStations,
+      pushUserLocation,
+      pushRoute,
+      showError,
+      clearErrorTimer,
+      clearCrashResetTimer,
+    ],
   );
 
   return (

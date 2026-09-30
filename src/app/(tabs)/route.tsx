@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useIsFocused, useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -53,6 +53,14 @@ export default function RouteScreen() {
   const [planning, setPlanning] = useState(false);
   const [error, setError] = useState<string>();
   const [plan, setPlan] = useState<{
+    /**
+     * Plan hangi arac icin hesaplandi. Menzil, mola sayisi ve sarj sureleri
+     * aracin batarya kapasitesiyle tuketiminden geliyor; kullanici Araclarim'da
+     * aktif araci degistirip Rota'ya dondugunde ekranda kalan sonuc artik
+     * BASKA bir aracin plani oluyor ve dogru sanip yola cikilabiliyordu.
+     * Kimlik burada duruyor, sonuc da yalnizca hala gecerliyken gosteriliyor.
+     */
+    vehicleId: string;
     trip: TripPlan;
     distanceKm: number;
     driveMinutes: number;
@@ -110,6 +118,7 @@ export default function RouteScreen() {
       });
 
       setPlan({
+        vehicleId: vehicle.id,
         trip,
         distanceKm: route.distanceKm,
         driveMinutes: route.durationMinutes,
@@ -166,9 +175,14 @@ export default function RouteScreen() {
             </Animated.View>
           )}
 
-          {plan && (
+          {plan?.vehicleId === vehicle.id && (
             <Animated.View entering={FadeInDown.duration(320)}>
-              <PlanResult {...plan} />
+              <PlanResult
+                trip={plan.trip}
+                distanceKm={plan.distanceKm}
+                driveMinutes={plan.driveMinutes}
+                route={plan.route}
+              />
             </Animated.View>
           )}
         </ScrollView>
@@ -322,20 +336,21 @@ function PlaceSearch({
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Place[]>([]);
   const [searching, setSearching] = useState(false);
-  const abortRef = useRef<AbortController>(undefined);
+
+  // Iki harf yetmez; secilen adresin kendisi kutuda yaziliyken de aramanin
+  // anlami yok.
+  const shouldSearch = query.trim().length >= 3 && query !== value?.label;
 
   useEffect(() => {
-    if (query.trim().length < 3 || query === value?.label) {
-      setResults([]);
-      return;
-    }
+    if (!shouldSearch) return;
+
+    // Istek iptali artik effect'in TEMIZLIGINDE: onceki AbortController bir
+    // ref'te tutuluyordu ve bilesen sokuldugunde ucusta kalan istek hic iptal
+    // edilmiyordu.
+    const controller = new AbortController();
 
     // Nominatim saniyede bir istek istiyor; her tusa basista sorgu atmiyoruz.
     const timer = setTimeout(async () => {
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-
       setSearching(true);
       try {
         setResults(await geocode(query, controller.signal));
@@ -346,8 +361,16 @@ function PlaceSearch({
       }
     }, 600);
 
-    return () => clearTimeout(timer);
-  }, [query, value?.label]);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [shouldSearch, query]);
+
+  // Liste TUREV: sonuclari ayrica temizlemek gerekmiyor. Eskiden bu is
+  // effect'in icinde setResults([]) ile yapiliyordu ve her tus vurusu fazladan
+  // bir cizim turu daha aciyordu.
+  const visibleResults = shouldSearch ? results : [];
 
   return (
     <View>
@@ -361,9 +384,9 @@ function PlaceSearch({
 
       {searching && <ActivityIndicator style={styles.searching} color={colors.primary} />}
 
-      {results.length > 0 && (
+      {visibleResults.length > 0 && (
         <Animated.View entering={FadeInDown.duration(220)} style={styles.results}>
-          {results.map((place) => (
+          {visibleResults.map((place) => (
             <AnimatedPressable
               key={place.id}
               accessibilityRole="button"

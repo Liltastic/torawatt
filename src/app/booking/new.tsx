@@ -22,6 +22,7 @@ import { createThemedStyles, radius, shadows, spacing, typography, useColors } f
 import { RESERVATION_GRACE_MINUTES, currentTypeOf } from '@/types/domain';
 import { formatTime } from '@/utils/format';
 import { haptics } from '@/utils/haptics';
+import { useNow } from '@/utils/clock';
 import { scheduleReservationReminders } from '@/utils/notifications';
 
 /** Hizli rezervasyon secenekleri (spec bolum 10). */
@@ -34,6 +35,15 @@ const START_OPTIONS = [
 
 const DURATION_OPTIONS = [30, 45, 60, 90];
 
+/**
+ * Secilen gecikmeden gercek baslangic saatini uretir.
+ *
+ * Bilesenin DISINDA duruyor cunku burasi cizim degil dokunus ani: kaydi
+ * olusturan dokunusun kendi saatini okumasi gerekiyor (bkz. utils/clock, ayni
+ * sorunun onizleme tarafi).
+ */
+const startsAtIn = (minutes: number) => new Date(Date.now() + minutes * 60_000);
+
 export default function NewReservationScreen() {
   const colors = useColors();
   const styles = useStyles();
@@ -45,6 +55,8 @@ export default function NewReservationScreen() {
   const createReservation = useCreateReservation();
   const setStatus = useSetReservationStatus();
 
+  // Ekranda beklerken "Baslangic" saati ilerlesin (bkz. utils/clock).
+  const now = useNow(15_000);
   const [startId, setStartId] = useState<string>('in15');
   const [duration, setDuration] = useState(45);
   const [error, setError] = useState<string>();
@@ -77,10 +89,16 @@ export default function NewReservationScreen() {
   }
 
   const option = START_OPTIONS.find((o) => o.id === startId) ?? START_OPTIONS[1];
-  const startsAt = new Date(Date.now() + option.minutes * 60_000);
+  // Yalnizca ONIZLEME. Rezervasyonun gercek baslangici dokunus aninda
+  // hesaplaniyor (bkz. handleReserve): cizim aninda hesaplanan deger React
+  // Compiler'in onbelleginde donup kalabiliyor ve ekranda dakikalar geciren
+  // kullanici icin "+15 dk" GECMIS bir saate dusuyordu.
+  const previewStartsAt = new Date(now + option.minutes * 60_000);
 
   const handleReserve = () => {
     setError(undefined);
+    // Dokunus anindan itibaren: "+15 dk" gercekten simdiden 15 dakika sonrasi.
+    const startsAt = startsAtIn(option.minutes);
     createReservation.mutate(
       {
         stationId: station.id,
@@ -153,7 +171,7 @@ export default function NewReservationScreen() {
             />
           ))}
         </View>
-        <Text style={styles.hint}>Başlangıç: {formatTime(startsAt.toISOString())}</Text>
+        <Text style={styles.hint}>Başlangıç: {formatTime(previewStartsAt.toISOString())}</Text>
 
         <Text style={styles.sectionTitle}>Ne kadar sürecek?</Text>
         <View style={styles.chips}>

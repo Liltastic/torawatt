@@ -10,7 +10,7 @@ import { z } from 'zod';
 
 import { Button, FilterChip, PickerField, TextField } from '@/components';
 import { carMakes, modelsForMake } from '@/data/carCatalog';
-import { variantLabel, variantsFor, type EvVariant } from '@/data/evSpecs';
+import { variantOptions, variantsFor, type EvVariantOption } from '@/data/evSpecs';
 import { vehicleCatalog, type VehiclePreset } from '@/mocks/vehicleCatalog';
 import { useCreateVehicle } from '@/queries/vehicles';
 import { createThemedStyles, radius, shadows, spacing, typography, useColors } from '@/theme';
@@ -18,6 +18,14 @@ import { connectorLabels, type ConnectorType } from '@/types/domain';
 import { haptics } from '@/utils/haptics';
 
 const CONNECTOR_OPTIONS: ConnectorType[] = ['TYPE_2', 'CCS2', 'CHADEMO', 'NACS'];
+
+/** Marka/model degisince temizlenen alanlar (bkz. clearSpecs). */
+const SPEC_FIELDS = [
+  'batteryCapacityKwh',
+  'maxAcKw',
+  'maxDcKw',
+  'averageConsumptionKwhPer100Km',
+] as const;
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -56,7 +64,7 @@ export default function AddVehicleScreen() {
   const [connectorError, setConnectorError] = useState<string>();
   const [submitError, setSubmitError] = useState<string>();
 
-  const { control, handleSubmit, setValue, formState } = useForm<
+  const { clearErrors, control, handleSubmit, setValue, formState } = useForm<
     VehicleFormInput,
     unknown,
     VehicleFormOutput
@@ -79,21 +87,59 @@ export default function AddVehicleScreen() {
   const selectedMake = useWatch({ control, name: 'make' });
   const selectedModel = useWatch({ control, name: 'model' });
 
+  // Her cizimde yeni dizi uretilmesin: PickerField listeyi kendi icinde
+  // filtreliyor ve referans degisince o is bastan yapiliyor.
+  const models = useMemo(() => modelsForMake(selectedMake), [selectedMake]);
+
   // Secilen modelin uretici verisiyle bilinen surumleri; yoksa alanlar elle
   // doldurulmaya devam ediyor (bkz. data/evSpecs).
   const variants = useMemo(
-    () => variantsFor(selectedMake, selectedModel),
+    () => variantOptions(variantsFor(selectedMake, selectedModel)),
     [selectedMake, selectedModel],
   );
-  const [variantLabelValue, setVariantLabelValue] = useState<string>();
+  const [variantLabel, setVariantLabel] = useState<string>();
 
-  const applyVariant = (variant: EvVariant) => {
-    setVariantLabelValue(variantLabel(variant));
-    setValue('batteryCapacityKwh', String(variant.batteryKwh), { shouldValidate: true });
-    setValue('maxAcKw', String(variant.acKw), { shouldValidate: true });
-    setValue('maxDcKw', String(variant.dcKw), { shouldValidate: true });
+  // Secici metin listesi aliyor; her cizimde yeniden uretilmesin.
+  const variantLabels = useMemo(() => variants.map((option) => option.label), [variants]);
+
+  /**
+   * Sayiyi elle degistiren kullanicinin aracinda artik o surum yazili degil;
+   * kutu eski etiketi tasimaya devam etse degerlerle celisirdi.
+   */
+  const unsetVariant = () => setVariantLabel(undefined);
+
+  const applyVariant = (option: EvVariantOption) => {
+    setVariantLabel(option.label);
+    setValue('batteryCapacityKwh', String(option.variant.batteryKwh), { shouldValidate: true });
+    setValue('maxAcKw', String(option.variant.acKw), { shouldValidate: true });
+    setValue('maxDcKw', String(option.variant.dcKw), { shouldValidate: true });
     // Soket BILEREK doldurulmuyor: kaynak bunu bizim pazarimiz icin yanlis
     // verebiliyor (bkz. data/evSpecs).
+  };
+
+  /**
+   * Marka ya da model degisti: batarya ve sarj degerleri artik BASKA bir araca
+   * ait. Temizlenmezse onceki aracin sayilari ekranda kaliyor; dahasi kutular
+   * dolu gorundugu icin kullanici degistirmesi gerektigini anlamiyor ve yanlis
+   * kapasiteyle kaydediyor.
+   *
+   * Dogrulama bilerek calistirilmiyor: kullanici henuz dokunmadigi dort alani
+   * kirmizi gormesin. Varsa eski hata da siliniyor.
+   */
+  const clearSpecs = () => {
+    setVariantLabel(undefined);
+    for (const field of SPEC_FIELDS) setValue(field, '');
+    clearErrors([...SPEC_FIELDS]);
+  };
+
+  /**
+   * Model secildi. Tek surumu bilinen araclarda secilecek bir sey yok, degerler
+   * dogrudan yaziliyor; birden fazlaysa secim kullaniciya kaliyor.
+   */
+  const pickModel = (model: string) => {
+    clearSpecs();
+    const known = variantOptions(variantsFor(selectedMake, model));
+    if (known.length === 1) applyVariant(known[0]);
   };
 
   const applyPreset = (preset: VehiclePreset) => {
@@ -107,6 +153,9 @@ export default function AddVehicleScreen() {
       String(preset.averageConsumptionKwhPer100Km),
       { shouldValidate: true },
     );
+    // Hazir ayar kendi sayilarini getiriyor; "Surum" kutusunda onceki aracin
+    // surumu asili kalmasin.
+    setVariantLabel(undefined);
     setConnectors(preset.connectors);
     setConnectorError(undefined);
   };
@@ -206,9 +255,12 @@ export default function AddVehicleScreen() {
                   options={carMakes}
                   error={fieldState.error?.message}
                   onSelect={(make) => {
+                    if (make === field.value) return;
                     field.onChange(make);
-                    // Marka degisince onceki model artik gecerli degil.
+                    // Marka degisince onceki model artik gecerli degil, onun
+                    // teknik degerleri de.
                     setValue('model', '');
+                    clearSpecs();
                   }}
                 />
               )}
@@ -222,11 +274,15 @@ export default function AddVehicleScreen() {
                   label="Model"
                   value={field.value}
                   placeholder="Listeden seç"
-                  options={modelsForMake(selectedMake)}
+                  options={models}
                   disabled={!selectedMake}
                   disabledHint="Önce marka seç"
                   error={fieldState.error?.message}
-                  onSelect={field.onChange}
+                  onSelect={(model) => {
+                    if (model === field.value) return;
+                    field.onChange(model);
+                    pickModel(model);
+                  }}
                 />
               )}
             />
@@ -247,12 +303,12 @@ export default function AddVehicleScreen() {
             {variants.length > 0 && (
               <PickerField
                 label="Sürüm"
-                value={variantLabelValue}
+                value={variantLabel}
                 placeholder="Listeden seç"
-                options={variants.map(variantLabel)}
+                options={variantLabels}
                 onSelect={(label) => {
-                  const variant = variants.find((item: EvVariant) => variantLabel(item) === label);
-                  if (variant) applyVariant(variant);
+                  const option = variants.find((item) => item.label === label);
+                  if (option) applyVariant(option);
                 }}
               />
             )}
@@ -263,6 +319,7 @@ export default function AddVehicleScreen() {
               label="Batarya kapasitesi"
               suffix="kWh"
               keyboardType="decimal-pad"
+              onEdit={unsetVariant}
             />
             <FormInput
               control={control}
@@ -270,6 +327,7 @@ export default function AddVehicleScreen() {
               label="Maksimum AC gücü"
               suffix="kW"
               keyboardType="decimal-pad"
+              onEdit={unsetVariant}
             />
             <FormInput
               control={control}
@@ -277,6 +335,7 @@ export default function AddVehicleScreen() {
               label="Maksimum DC gücü"
               suffix="kW"
               keyboardType="decimal-pad"
+              onEdit={unsetVariant}
             />
             <FormInput
               control={control}
@@ -332,12 +391,15 @@ function FormInput({
   name,
   label,
   suffix,
+  onEdit,
   ...rest
 }: {
   control: Control<VehicleFormInput, unknown, VehicleFormOutput>;
   name: keyof VehicleFormInput;
   label: string;
   suffix?: string;
+  /** Degeri ELLE degistirdiginde: surum secimi artik gecerli degil. */
+  onEdit?: () => void;
   placeholder?: string;
   keyboardType?: 'number-pad' | 'decimal-pad';
 }) {
@@ -350,7 +412,10 @@ function FormInput({
           label={label}
           suffix={suffix}
           value={value}
-          onChangeText={onChange}
+          onChangeText={(text) => {
+            onEdit?.();
+            onChange(text);
+          }}
           onBlur={onBlur}
           error={fieldState.error?.message}
           {...rest}

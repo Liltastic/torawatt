@@ -1,6 +1,15 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useMemo, useState } from 'react';
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { memo, useMemo, useState } from 'react';
+import {
+  FlatList,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
@@ -15,6 +24,50 @@ import {
 import { haptics } from '@/utils/haptics';
 
 import { PickerWheel } from './PickerWheel';
+
+/** FlatList keyExtractor'i: secenekler zaten benzersiz metinler. */
+const identity = (option: string) => option;
+
+/**
+ * Satirlar esit yukseklikte (bkz. styles.row); FlatList'in olcum icin
+ * beklemesine gerek yok.
+ */
+const ROW_HEIGHT = MIN_TOUCH_TARGET + 1;
+const itemLayout = (_data: unknown, index: number) => ({
+  length: ROW_HEIGHT,
+  offset: ROW_HEIGHT * index,
+  index,
+});
+
+/**
+ * Tek satir. Kendi basina memo: liste yuz satiri asiyor ve secim degistiginde
+ * hepsinin yeniden cizilmesi gereksiz.
+ */
+const PickerRow = memo(function PickerRow({
+  option,
+  selected,
+  onPress,
+}: {
+  option: string;
+  selected: boolean;
+  onPress: (option: string) => void;
+}) {
+  const colors = useColors();
+  const styles = useStyles();
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={() => onPress(option)}
+      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+      <Text style={[styles.rowText, selected && styles.rowTextSelected]} numberOfLines={1}>
+        {option}
+      </Text>
+      {selected && <Ionicons name="checkmark" size={18} color={colors.primaryText} />}
+    </Pressable>
+  );
+});
 
 interface PickerFieldProps {
   label: string;
@@ -69,6 +122,10 @@ export function PickerField({
   // Arama daralinca taslak secim listeden dusebiliyor; tekerlek o zaman hicbir
   // satiri secili gostermez ve "Sec" eski degeri yazardi.
   const wheelValue = draft && filtered.includes(draft) ? draft : filtered[0];
+
+  // Secili kayit listenin ortasinda kaliyorsa sayfa onu gostererek acilsin;
+  // 199 markanin arasinda kullanici kendi secimini aramak zorunda kalmasin.
+  const initialIndex = value ? Math.max(options.indexOf(value), 0) : 0;
 
   const close = () => {
     setOpen(false);
@@ -200,29 +257,30 @@ export function PickerField({
                     style={styles.wheel}
                   />
                 ) : (
-                  <ScrollView
+                  /*
+                    ScrollView degil FlatList: liste 199 markayi ve Toyota gibi
+                    markalarda 179 modeli tasiyor. ScrollView hepsini birden
+                    cizdigi icin sayfa ancak yuzlerce satir yerlestikten sonra
+                    aciliyor ve acilis animasyonu takiliyordu. FlatList yalnizca
+                    gorunen pencereyi ciziyor.
+                  */
+                  <FlatList
+                    data={filtered}
                     style={styles.list}
+                    keyExtractor={identity}
+                    // Satir yuksekligi sabit (bkz. styles.row): olcum
+                    // beklemeden yerlesiyor ve secili satira atlayabiliyoruz.
+                    getItemLayout={itemLayout}
+                    initialScrollIndex={initialIndex}
+                    initialNumToRender={12}
+                    windowSize={9}
+                    removeClippedSubviews
                     keyboardShouldPersistTaps="handled"
-                    showsVerticalScrollIndicator={false}>
-                    {filtered.map((option) => {
-                      const selected = option === value;
-                      return (
-                        <Pressable
-                          key={option}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected }}
-                          onPress={() => choose(option)}
-                          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-                          <Text style={[styles.rowText, selected && styles.rowTextSelected]}>
-                            {option}
-                          </Text>
-                          {selected && (
-                            <Ionicons name="checkmark" size={18} color={colors.primaryText} />
-                          )}
-                        </Pressable>
-                      );
-                    })}
-                  </ScrollView>
+                    showsVerticalScrollIndicator={false}
+                    renderItem={({ item }) => (
+                      <PickerRow option={item} selected={item === value} onPress={choose} />
+                    )}
+                  />
                 )}
               </SafeAreaView>
             </Animated.View>
@@ -308,7 +366,10 @@ const useStyles = createThemedStyles((colors) => ({
   list: { maxHeight: 280, marginTop: spacing.sm },
 
   row: {
-    minHeight: MIN_TOUCH_TARGET,
+    // getItemLayout bu yuksekligi varsayiyor (bkz. ROW_HEIGHT): minHeight
+    // olsaydi uzun bir model adi satiri buyutur ve liste kayarken konumlar
+    // kayardi.
+    height: MIN_TOUCH_TARGET,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
