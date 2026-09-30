@@ -88,10 +88,24 @@ export default function RootLayout() {
       new QueryClient({
         defaultOptions: {
           queries: {
-            retry: 1,
             // Sunucu ayakta degilse (dev'de sik) gereksiz tekrar denemeyle
-            // kullaniciyi bekletmemek icin kisa tut.
-            staleTime: 10_000,
+            // kullaniciyi bekletmemek icin tek deneme.
+            retry: 1,
+            /**
+             * 10 saniyeydi. refetchOnMount acik oldugu icin bu, her sekme
+             * gecisinde araclarin, favorilerin, rezervasyonlarin ve gecmisin
+             * yeniden sorgulanmasi demekti - kullanici az once bakmis olsa bile
+             * ekran yukleniyor durumuna donup agi bekliyordu. Backend Render'in
+             * ucretsiz katmaninda oldugu icin bu bekleme bazen saniyelerle
+             * olculuyor.
+             *
+             * Bir dakika guvenli: kullanicinin kendi degisiklikleri zaten
+             * aninda gorunuyor, cunku butun mutasyonlar kendi onbellegini
+             * gecersiz kiliyor (queries/ altinda on invalidateQueries cagrisi).
+             * Uzayan tek sey, BASKA bir yerden degisen verinin fark edilme
+             * suresi - bu uygulamada tek kullanicinin kendi kayitlari.
+             */
+            staleTime: 60_000,
           },
         },
       }),
