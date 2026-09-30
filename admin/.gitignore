@@ -1,0 +1,14 @@
+# Arayuzun bagimliliklari
+web/node_modules/
+
+# Derlenmis arayuz binary'ye gomuluyor; kaynaktan uretildigi icin depoda
+# durmuyor. Klasorun KENDISI kaliyor - go:embed en az bir dosya istiyor ve
+# dist/ kok .gitignore tarafindan tumden elendigi icin once geri aliniyor.
+!backend/internal/web/dist/
+backend/internal/web/dist/*
+!backend/internal/web/dist/.gitkeep
+
+# Go ciktisi
+backend/toraadmin
+backend/toraadmin.exe
+backend/toraadmin.exe~

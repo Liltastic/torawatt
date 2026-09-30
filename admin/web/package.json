@@ -1,0 +1,40 @@
+{
+  "name": "tora-watt-admin-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit"
+  },
+  "dependencies": {
+    "@react-cupertino-ui/avatar": "^2.0.5",
+    "@react-cupertino-ui/badge": "^2.0.5",
+    "@react-cupertino-ui/button": "^2.0.5",
+    "@react-cupertino-ui/card": "^2.0.5",
+    "@react-cupertino-ui/dialog": "^2.0.5",
+    "@react-cupertino-ui/search-bar": "^2.0.5",
+    "@react-cupertino-ui/segmented-control": "^2.0.5",
+    "@react-cupertino-ui/select": "^2.0.5",
+    "@react-cupertino-ui/shared": "^2.0.5",
+    "@react-cupertino-ui/skeleton": "^2.0.5",
+    "@react-cupertino-ui/switcher": "^2.0.5",
+    "@react-cupertino-ui/text-field": "^2.0.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "sass": "^1.105.1",
+    "typescript": "~5.6.3",
+    "vite": "^5.4.11"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true
+  }
+}
