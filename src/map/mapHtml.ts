@@ -331,12 +331,50 @@ export function buildMapHtml({
   html, body { margin: 0; padding: 0; height: 100%; width: 100%; }
   #map { height: 100%; width: 100%; }
   body { background: ${palette.background}; overflow: hidden; }
+  /*
+    Kullanici konumu nabzi. Eskiden bir harita katmaniydi ve her karede
+    setPaintProperty ile buyutuluyordu; bu, harita DURURKEN bile tum haritayi
+    60 Hz yeniden cizdiriyordu ve surukleme sirasinda onunla yarisiyordu.
+    Artik haritanin ustunde duran bir DOM ogesi: animasyonu CSS suruyor,
+    bosta JS hic calismiyor ve harita yeniden cizilmiyor.
+  */
+  #user-pulse {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 36px;
+    height: 36px;
+    margin: -18px 0 0 -18px;
+    border-radius: 50%;
+    background: ${palette.location};
+    opacity: 0;
+    pointer-events: none;
+    display: none;
+    will-change: transform, opacity;
+  }
+  #user-pulse.on {
+    display: block;
+    animation: tw-pulse 2s ease-out infinite;
+  }
+  @keyframes tw-pulse {
+    0%   { transform: translate(var(--x, 0px), var(--y, 0px)) scale(0.55); opacity: 0.35; }
+    100% { transform: translate(var(--x, 0px), var(--y, 0px)) scale(1.55); opacity: 0; }
+  }
+  /* Hareket azaltma aciksa nabiz atmaz, sabit bir halka olarak kalir. */
+  @media (prefers-reduced-motion: reduce) {
+    #user-pulse.on {
+      animation: none;
+      opacity: 0.22;
+      transform: translate(var(--x, 0px), var(--y, 0px)) scale(1);
+    }
+  }
   ${attributionCss(globalName, colorScheme)}
   ${config.hideLogo ? `.${globalName}-ctrl-bottom-left { display: none; }` : ''}
 </style>
 </head>
 <body>
 <div id="map"></div>
+<div id="user-pulse"></div>
 <script>
 (function () {
   var post = function (msg) {
@@ -675,14 +713,28 @@ ${config.setupScript}
   // allow-overlap ACIK olan ikon katmaninda BUYUK deger uste cizilir;
   // allow-overlap KAPALI olan etiket katmaninda KUCUK deger once yerlestirilir
   // (Style Spec: "features with a lower sort key will have priority during
-  // placement"). Etiket katmani bu yuzden PIN_PLACE_RANK kullaniyor.
+  // placement"). Etiket katmani bu yuzden pinPlaceRank() kullaniyor.
   // Ayni zamanda StationMap'in mesafeye gore sirali geojson'undan gelen
   // "en uzak istasyon en ustte" hatasini da kapatiyor.
-  var PIN_RANK = ['+',
-    ['case', ['==', ['get', 'selected'], true], 1000, 0],
-    ['match', ['get', 'status'], ['AVAILABLE', 'PARTIAL'], 100, 0],
-    ['match', ['get', 'power'], 'HPC', 30, 'DC', 20, 10]];
-  var PIN_PLACE_RANK = ['-', 0, PIN_RANK];
+  // Secim, istasyon verisinin ICINDE tasinmiyor: oyle olunca her secim
+  // degisimi butun kaynagi yeniden yazdiriyor ve harita 68 istasyonu bastan
+  // kumeliyordu (gorunur takilmanin sebebi buydu). Simdi ayri bir degisken;
+  // secim degisince yalnizca su uc sey guncelleniyor - siralama anahtari,
+  // hale ve dalga katmanlarinin filtresi.
+  var selectedId = null;
+  function selectedMatch() {
+    return ['==', ['get', 'id'], selectedId === null ? '' : selectedId];
+  }
+  function pinRank() {
+    return ['+',
+      ['case', selectedMatch(), 1000, 0],
+      ['match', ['get', 'status'], ['AVAILABLE', 'PARTIAL'], 100, 0],
+      ['match', ['get', 'power'], 'HPC', 30, 'DC', 20, 10]];
+  }
+  function pinPlaceRank() { return ['-', 0, pinRank()]; }
+  function selectionFilter() {
+    return ['all', ['!', ['has', 'point_count']], selectedMatch()];
+  }
 
   var PIN_IMAGE = ['concat', PIN_PREFIX,
     ['match', ['get', 'power'], 'HPC', 'HPC', 'DC', 'DC', 'AC'],
@@ -779,7 +831,7 @@ ${variant.onLoadScript}
       id: 'station-halo',
       type: 'circle',
       source: 'stations',
-      filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'selected'], true]],
+      filter: selectionFilter(),
       paint: {
         // Pinin dis kenari r + 4; hale 5 dp disinda duruyor.
         'circle-radius': ['+', PIN_TIER_RADIUS, PIN_BAND + 5],
@@ -798,7 +850,7 @@ ${variant.onLoadScript}
       id: 'station-ripple',
       type: 'circle',
       source: 'stations',
-      filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'selected'], true]],
+      filter: selectionFilter(),
       paint: {
         'circle-radius': ['+', PIN_TIER_RADIUS, PIN_BAND + 5],
         'circle-opacity': 0,
@@ -896,7 +948,7 @@ ${variant.onLoadScript}
           // Harita dondurulse/egilse de pin dik dursun.
           'icon-rotation-alignment': 'viewport',
           'icon-pitch-alignment': 'viewport',
-          'symbol-sort-key': PIN_RANK,
+          'symbol-sort-key': pinRank(),
         },
       });
     } else {
@@ -909,7 +961,7 @@ ${variant.onLoadScript}
         type: 'circle',
         source: 'stations',
         filter: ['!', ['has', 'point_count']],
-        layout: { 'circle-sort-key': PIN_RANK },
+        layout: { 'circle-sort-key': pinRank() },
         paint: {
           'circle-radius': PIN_TIER_RADIUS,
           'circle-color': ['match', ['get', 'status'],
@@ -957,7 +1009,7 @@ ${variant.onLoadScript}
         'text-max-width': 8,
         'text-padding': 3,
         'text-allow-overlap': false,
-        'symbol-sort-key': PIN_PLACE_RANK,
+        'symbol-sort-key': pinPlaceRank(),
       },
       paint: {
         'text-color': '${palette.text}',
@@ -984,16 +1036,6 @@ ${variant.onLoadScript}
     // (paletin location rengi) kasitli olarak istasyon turkuazindan farkli - "ben
     // buradayim" noktasi diger tum turkuaz/renkli pinlerden hemen ayrissin.
     map.addSource('user', { type: 'geojson', data: EMPTY });
-    map.addLayer({
-      id: 'user-pulse',
-      type: 'circle',
-      source: 'user',
-      paint: {
-        'circle-radius': 14,
-        'circle-color': '${palette.location}',
-        'circle-opacity': 0.25,
-      },
-    });
     map.addLayer({
       id: 'user-dot',
       type: 'circle',
@@ -1049,7 +1091,7 @@ ${variant.onLoadScript}
     if (${config.litStyle}) {
       [
         'station-halo', 'station-ripple', 'cluster-edge', 'clusters', 'cluster-count', 'stations',
-        'station-label', 'user-pulse', 'user-dot', 'route-casing', 'route-line', 'endpoints'
+        'station-label', 'user-dot', 'route-casing', 'route-line', 'endpoints'
       ].forEach(function (id) {
         var layer = map.getLayer(id);
         if (!layer) return;
@@ -1066,50 +1108,53 @@ ${variant.onLoadScript}
       });
     }
 
-    // Nabiz dongusu rAF'i BOSA dondurmemeli. Eskiden 'load' aninda baslayip
-    // kullanici konumu hic gelmese bile sonsuza kadar donuyordu (rota
-    // onizlemesinde konum hic verilmiyor); konum geldiginde ise her karede
-    // setPaintProperty cagirip haritanin TAMAMINI 60 Hz yeniden cizdiriyordu -
-    // kullanici alt sheet'te liste okurken veya baska sekmedeyken bile.
-    // Artik yalnizca konum varken VE RN "ekran odakta" derken doner.
-    var pulseStart = null;
-    var hasUser = false;
+    // Nabiz artik bir harita katmani degil, haritanin ustunde duran bir DOM
+    // ogesi (bkz. #user-pulse). Eski hali her karede setPaintProperty cagirip
+    // haritanin TAMAMINI 60 Hz yeniden cizdiriyordu: harita dururken bile
+    // calisiyor, surukleme sirasinda da ayni karede haritayla yarisiyordu.
+    // Simdi animasyonu CSS suruyor; JS yalnizca harita HAREKET ederken
+    // noktanin ekran konumunu guncelliyor.
+    var pulseEl = document.getElementById('user-pulse');
+    var userLngLat = null;
     var pulseOn = true;
-    var pulseRaf = null;
 
-    function pulse(ts) {
-      if (pulseStart === null) pulseStart = ts;
-      var t = ((ts - pulseStart) % 2000) / 2000;
-      map.setPaintProperty('user-pulse', 'circle-radius', 10 + t * 18);
-      map.setPaintProperty('user-pulse', 'circle-opacity', 0.35 * (1 - t));
-      pulseRaf = requestAnimationFrame(pulse);
+    function positionPulse() {
+      if (!pulseEl || !userLngLat) return;
+      var point = map.project(userLngLat);
+      pulseEl.style.setProperty('--x', point.x + 'px');
+      pulseEl.style.setProperty('--y', point.y + 'px');
     }
-    function startPulse() {
-      if (pulseRaf === null && hasUser && pulseOn) pulseRaf = requestAnimationFrame(pulse);
-    }
-    function stopPulse() {
-      if (pulseRaf !== null) {
-        cancelAnimationFrame(pulseRaf);
-        pulseRaf = null;
-        pulseStart = null;
+
+    function refreshPulse() {
+      if (!pulseEl) return;
+      var visible = !!userLngLat && pulseOn;
+      if (visible) {
+        positionPulse();
+        pulseEl.classList.add('on');
+      } else {
+        pulseEl.classList.remove('on');
       }
     }
 
+    // Yalnizca harita hareket ederken; bosta hicbir sey calismiyor.
+    map.on('move', positionPulse);
+
     window.__twSetPulse = function (on) {
       pulseOn = !!on;
-      if (pulseOn) startPulse(); else stopPulse();
+      refreshPulse();
     };
     window.__twSetUser = function (lng, lat) {
-      hasUser = true;
+      userLngLat = [lng, lat];
       map.getSource('user').setData({
         type: 'FeatureCollection',
         features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [lng, lat] }, properties: {} }],
       });
-      startPulse();
+      refreshPulse();
     };
 
-    // Secim dalgasi. Nabiz gibi rAF ile ama tek seferlik: bitince dongu
-    // kendiliginden duruyor, yani bosta haritayi yeniden cizdirmiyor.
+    // Secim dalgasi. Bu rAF ile ama TEK SEFERLIK: bitince dongu kendiliginden
+    // duruyor, yani bosta haritayi yeniden cizdirmiyor (nabzin aksine, o artik
+    // tamamen CSS ile donuyor).
     var RIPPLE_MS = 650;
     var RIPPLE_GROWTH = 22;
     var rippleRaf = null;
@@ -1206,9 +1251,8 @@ ${variant.onLoadScript}
     post({ type: 'ready' });
   });
 
-  // Secim dalgasinin tetiklenmesi icin: son secili istasyon ve haritanin ilk
-  // istasyon yuklemesini alip almadigi.
-  var lastSelectedId = null;
+  // Dalga yalnizca kullanicinin YENI bir secim yapmasinda oynamali; ilk
+  // istasyon yuklemesi ve taban harita degisiminde oynamamali.
   var stationsPushed = false;
 
   // React Native tarafinin cagirdigi kopru.
@@ -1216,21 +1260,35 @@ ${variant.onLoadScript}
     setStations: function (geojson) {
       var src = map.getSource('stations');
       if (src) src.setData(geojson);
+      stationsPushed = true;
+    },
 
-      // Secim degistiyse dalga. Ilk yukleme sayilmaz - taban harita degisince
-      // yeniden kurulan harita secili pini gosterirken dalga oynatmasin,
-      // kullanici yeni bir sey secmedi.
-      var selected = null;
-      var features = (geojson && geojson.features) || [];
-      for (var i = 0; i < features.length; i++) {
-        var props = features[i].properties;
-        if (props && props.selected) { selected = props.id; break; }
+    // Secimi kaynaga DOKUNMADAN uyguluyor: setData cagrilsaydi harita butun
+    // istasyonlari yeniden kumeleyip cizerdi.
+    setSelected: function (id) {
+      var next = id || null;
+      if (next === selectedId) return;
+
+      var previous = selectedId;
+      selectedId = next;
+
+      var pins = map.getLayer('stations');
+      if (pins) {
+        map.setLayoutProperty(
+          'stations',
+          pins.type === 'symbol' ? 'symbol-sort-key' : 'circle-sort-key',
+          pinRank()
+        );
       }
-      if (stationsPushed && selected !== null && selected !== lastSelectedId && window.__twRipple) {
+      if (map.getLayer('station-label')) {
+        map.setLayoutProperty('station-label', 'symbol-sort-key', pinPlaceRank());
+      }
+      if (map.getLayer('station-halo')) map.setFilter('station-halo', selectionFilter());
+      if (map.getLayer('station-ripple')) map.setFilter('station-ripple', selectionFilter());
+
+      if (stationsPushed && selectedId !== null && previous !== selectedId && window.__twRipple) {
         window.__twRipple();
       }
-      lastSelectedId = selected;
-      stationsPushed = true;
     },
     setUserLocation: function (lng, lat) {
       if (window.__twSetUser) window.__twSetUser(lng, lat);

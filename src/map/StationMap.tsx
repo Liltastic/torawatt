@@ -281,17 +281,23 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
             // en yuksek guc" degil - o soruyu rim ve alt etiket cevapliyor.
             power,
             maxKw: Math.round(maxKw),
-            selected: station.id === selectedId,
           },
         };
       }),
     }),
-    [stations, selectedId],
+    // Secim BILEREK burada yok: geojson'a girseydi her secim degisimi butun
+    // kaynagi yeniden yazdirir, harita 68 istasyonu bastan kumelerdi.
+    // Secim ayri ve cok daha ucuz bir cagriyla gidiyor (bkz. pushSelected).
+    [stations],
   );
 
   const pushStations = useCallback(() => {
     inject(`window.__tw.setStations(${JSON.stringify(geojson)})`);
   }, [geojson, inject]);
+
+  const pushSelected = useCallback(() => {
+    inject(`window.__tw.setSelected(${JSON.stringify(selectedId ?? null)})`);
+  }, [selectedId, inject]);
 
   const pushUserLocation = useCallback(() => {
     if (!userLocation) return;
@@ -302,6 +308,10 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
   useEffect(() => {
     if (ready) pushStations();
   }, [ready, pushStations]);
+
+  useEffect(() => {
+    if (ready) pushSelected();
+  }, [ready, pushSelected]);
 
   useEffect(() => {
     if (ready) pushUserLocation();
