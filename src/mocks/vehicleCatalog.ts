@@ -24,7 +24,9 @@ export const vehicleCatalog: VehiclePreset[] = [
     id: 'togg-t10x-long',
     make: 'Togg',
     model: 'T10X Uzun Menzil',
-    batteryCapacityKwh: 88.5,
+    // 88.5 brut kapasiteydi; menzil ve sarj suresi hesaplari KULLANILABILIR
+    // degeri istiyor. Kaynak: ev-database.org/car/3302 (Long Range RWD).
+    batteryCapacityKwh: 85,
     maxAcKw: 22,
     maxDcKw: 180,
     connectors: ['CCS2', 'TYPE_2'],
