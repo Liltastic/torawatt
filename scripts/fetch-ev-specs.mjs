@@ -16,7 +16,8 @@
 //
 // Kirpma: ham dosya 3 MB ve sarj uygulamasinin kullanmadigi alanlarla dolu
 // (motor torku, boyutlar, agirliklar, pazarlar...). Yalnizca formda karsiligi
-// olan alanlar aliniyor.
+// olan alanlar aliniyor - tuketim ise ilan edilen menzilden turetiliyor
+// (bkz. consumptionFor).
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -36,15 +37,55 @@ if (!asset) throw new Error('surumde json dosyasi yok');
 console.log(`${release.tag_name} indiriliyor (${(asset.size / 1024 / 1024).toFixed(1)} MB)...`);
 const dataset = await json(asset.browser_download_url);
 
+/**
+ * Menzil cevrimi tercihi: WLTP bizim pazarin resmi cevrimi. Yoksa EPA (gercege
+ * en yakin ikinci), sonra digerleri. NEDC ve CLTC en iyimserleri, en sona.
+ */
+const CYCLE_ORDER = ['wltp', 'epa', 'other', 'nedc', 'cltc'];
+
+/**
+ * Ortalama tuketim (kWh/100km).
+ *
+ * Set tuketimi DOGRUDAN vermiyor ama her kayitta ilan edilmis menzil var:
+ * kullanilabilir kapasiteyi o menzile bolmek tuketimin tanimi. Uydurma degil,
+ * iki kaynak degerinden turetme - ve uygulama bu alani istiyor (menzil
+ * gostergesi, rota molalari).
+ *
+ * Ilan edilen menzil laboratuvar cevriminden gelir; gercek surus biraz daha
+ * fazla yakar. Rota planlayici varista %10 pay birakiyor (bkz.
+ * app/(tabs)/route.tsx RESERVE_PERCENT).
+ */
+function consumptionFor(vehicle, battery) {
+  const rated = vehicle.range?.rated ?? [];
+  for (const cycle of CYCLE_ORDER) {
+    const match = rated.find((item) => item.cycle === cycle && item.range_km > 0);
+    if (!match) continue;
+
+    const consumption = Math.round((battery / match.range_km) * 1000) / 10;
+
+    // Akla yatkinlik bandi. Bir kayitta menzille batarya AYNI araci
+    // anlatmiyorsa sonuc anlamsiz cikiyor: Chery Exeed Sterra ES 40 kWh ile
+    // 1667 km veriyor, yani 2.4 kWh/100km. Gercek araclar en ucuk cevrimlerde
+    // bile 7-8'in altina inmiyor, en agir pikaplar 28'i asmiyor; bandin
+    // disindaki kaydi doldurmaya calismak yerine listeye hic almiyoruz.
+    if (consumption < 5 || consumption > 40) return null;
+    return consumption;
+  }
+  return null;
+}
+
 const variants = [];
 for (const vehicle of dataset.vehicles ?? []) {
   const battery = vehicle.battery?.pack_capacity_kwh_net ?? vehicle.battery?.pack_capacity_kwh_gross;
   const ac = vehicle.charging?.ac?.max_power_kw;
   const dc = vehicle.charging?.dc?.max_power_kw;
 
-  // Uc degerden biri bile yoksa kayit formu dolduramaz; listeye almiyoruz ki
+  // Bir deger bile eksikse kayit formu dolduramaz; listeye almiyoruz ki
   // kullanici secip yarisi bos bir form ile kalmasin.
   if (battery == null || ac == null || dc == null) continue;
+
+  const consumption = consumptionFor(vehicle, battery);
+  if (consumption == null) continue;
 
   // SOKET TIPI BILEREK ALINMIYOR. Set, Tesla Model Y'yi pazarlari arasinda
   // Almanya ve Fransa oldugu halde "nacs" olarak veriyor; Avrupa'da o arac
@@ -61,6 +102,7 @@ for (const vehicle of dataset.vehicles ?? []) {
     batteryKwh: Math.round(battery * 10) / 10,
     acKw: Math.round(ac * 10) / 10,
     dcKw: Math.round(dc),
+    consumptionKwhPer100Km: consumption,
   });
 }
 

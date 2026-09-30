@@ -24,6 +24,12 @@ export interface EvVariant {
   batteryKwh: number;
   acKw: number;
   dcKw: number;
+  /**
+   * Ortalama tuketim (kWh/100km). Set bunu dogrudan vermiyor; kullanilabilir
+   * kapasitenin ilan edilen menzile bolunmesiyle turetiliyor (bkz.
+   * scripts/fetch-ev-specs.mjs ve evSpecsExtra).
+   */
+  consumptionKwhPer100Km: number;
   /** Elle girilen kayitlarda degerin alindigi sayfa (bkz. evSpecsExtra). */
   source?: string;
 }
@@ -81,7 +87,15 @@ export interface EvVariantOption {
   variant: EvVariant;
 }
 
-/** Yil disindaki her sey: iki kayit bunda esitse formu AYNI dolduruyorlar. */
+/**
+ * Bir satirin kimligi: ayni araci anlatan kayitlar bunda esitse birlesiyorlar.
+ *
+ * TUKETIM bilerek disinda. Ayni araci ayni donanimla farkli model yillarinda
+ * iceren kayitlar biraz farkli menzil ilan ediyor (BMW i4 eDrive40'ta 13.6 ile
+ * 13.9 arasi); bunu kimlige katmak kullanicinin secemeyecegi, bataryasi ayni
+ * gorunen satirlari ikiye katliyordu. Birlesen grubun tuketimi asagida
+ * seciliyor.
+ */
 const specKey = (variant: EvVariant) =>
   [variant.trim ?? '', variant.batteryKwh, variant.acKw, variant.dcKw].join('|');
 
@@ -115,20 +129,26 @@ const tally = (labels: string[]): Map<string, number> => {
 /**
  * variantsFor sonucunu secici satirlarina cevirir: "2022-2025 · Long Range · 75 kWh".
  *
- * Iki is yapiyor, ikisi de veri setinin bicimi yuzunden gerekli:
+ * Uc is yapiyor, ucu de veri setinin bicimi yuzunden gerekli:
  *
  * 1. TEKLESTIRME. Set ayni araci her model yili icin ayri kayit olarak
  *    tutuyor; BMW i4 eDrive40 uc kez, Audi Q4 e-tron on sekiz kez geliyor ve
- *    cogunun batarya/AC/DC degerleri birebir ayni. Bunlar kullanici icin ayri
- *    secenek DEGIL - hangisini sececegini bilemedigi, formu ayni dolduran
- *    satirlar. Sayilari ayni olanlar tek satirda birlesiyor ve yil aralik
- *    olarak yaziliyor; boylece 1144 surum 443 secenege iniyor ve kullanici
- *    kendi model yilini araligin icinde goruyor.
+ *    cogunun degerleri birebir ayni. Bunlar kullanici icin ayri secenek DEGIL -
+ *    hangisini sececegini bilemedigi, formu ayni dolduran satirlar. Sayilari
+ *    ayni olanlar tek satirda birlesiyor ve yil aralik olarak yaziliyor;
+ *    boylece 1143 surum 442 secenege iniyor ve kullanici kendi model yilini
+ *    araligin icinde goruyor.
  *
- * 2. BENZERSIZ ETIKET. Secici yalnizca metinle calisiyor: iki satirin etiketi
+ * 2. TUKETIMDE IHTIYATLI SECIM. Birlesen grupta model yillari farkli menzil
+ *    ilan etmis olabiliyor, bazen cevrim bile degisiyor (bir yil WLTP, oteki
+ *    CLTC) ve fark %30'a varabiliyor. Grubun EN YUKSEK tuketimini aliyoruz:
+ *    hepsi gercek, kaynakli degerler ama menzil hesabinda iyimser olmanin
+ *    bedeli yolda kalmak - ihtiyatli olani secmek daha az zarar veriyor.
+ *
+ * 3. BENZERSIZ ETIKET. Secici yalnizca metinle calisiyor: iki satirin etiketi
  *    ayni olursa listede ayirt edilemiyorlar, secim her zaman ilkini buluyor ve
  *    ayni key ile cizilen satirlar React'te uyari uretiyor. Mercedes EQE'nin
- *    84 kWh'lik iki surumu yalnizca DC gucunde ayriliyor (170 ve 200 kW);
+ *    84 kWh'lik surumleri yalnizca DC gucunde ayriliyor (170 ve 200 kW);
  *    cakisan etiketlere once DC, gerekirse AC ekleniyor.
  */
 export function variantOptions(variants: EvVariant[]): EvVariantOption[] {
@@ -136,11 +156,16 @@ export function variantOptions(variants: EvVariant[]): EvVariantOption[] {
 
   const merged = new Map<string, { variant: EvVariant; years: number[] }>();
   for (const variant of variants) {
-    const group = merged.get(specKey(variant));
-    if (group) {
-      if (variant.year) group.years.push(variant.year);
-    } else {
-      merged.set(specKey(variant), { variant, years: variant.year ? [variant.year] : [] });
+    const key = specKey(variant);
+    const group = merged.get(key);
+    if (!group) {
+      merged.set(key, { variant, years: variant.year ? [variant.year] : [] });
+      continue;
+    }
+    if (variant.year) group.years.push(variant.year);
+    if (variant.consumptionKwhPer100Km > group.variant.consumptionKwhPer100Km) {
+      // Ihtiyatli olan kazaniyor; satirin geri kalan degerleri zaten ayni.
+      group.variant = variant;
     }
   }
 

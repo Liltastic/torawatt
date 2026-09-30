@@ -19,13 +19,13 @@ import { haptics } from '@/utils/haptics';
 
 const CONNECTOR_OPTIONS: ConnectorType[] = ['TYPE_2', 'CCS2', 'CHADEMO', 'NACS'];
 
-/** Marka/model degisince temizlenen alanlar (bkz. clearSpecs). */
-const SPEC_FIELDS = [
-  'batteryCapacityKwh',
-  'maxAcKw',
-  'maxDcKw',
-  'averageConsumptionKwhPer100Km',
-] as const;
+/**
+ * Marka/model degisince temizlenen alanlar (bkz. clearSpecs).
+ *
+ * Guc alanlari listede yok: onlar formda gorunmuyor ve bos degil SIFIR'a
+ * donuyorlar.
+ */
+const SPEC_FIELDS = ['batteryCapacityKwh', 'averageConsumptionKwhPer100Km'] as const;
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -43,7 +43,9 @@ const vehicleSchema = z.object({
   model: z.string().trim().min(1, 'Model gerekli'),
   modelYear: numeric(1990, CURRENT_YEAR + 2, `1990 - ${CURRENT_YEAR + 2} arası olmalı`),
   batteryCapacityKwh: numeric(5, 250, '5 - 250 kWh arası olmalı'),
-  maxAcKw: numeric(1, 50, '1 - 50 kW arası olmalı'),
+  // Alt sinir 0: bilinmeyen modellerde soket gucu sinirlanmiyor demek
+  // (bkz. store/session ratedPowerFor). Kullanici bu alani gormuyor.
+  maxAcKw: numeric(0, 50, '0 - 50 kW arası olmalı'),
   maxDcKw: numeric(0, 400, '0 - 400 kW arası olmalı'),
   averageConsumptionKwhPer100Km: numeric(5, 60, '5 - 60 kWh/100km arası olmalı'),
 });
@@ -75,8 +77,10 @@ export default function AddVehicleScreen() {
       model: '',
       modelYear: String(CURRENT_YEAR),
       batteryCapacityKwh: '',
-      maxAcKw: '',
-      maxDcKw: '',
+      // Gorunmeyen alanlar hic gecersiz kalmasin: 0 "bilinmiyor" demek
+      // (bkz. clearSpecs).
+      maxAcKw: '0',
+      maxDcKw: '0',
       averageConsumptionKwhPer100Km: '',
     },
   });
@@ -99,6 +103,15 @@ export default function AddVehicleScreen() {
   );
   const [variantLabel, setVariantLabel] = useState<string>();
 
+  /**
+   * Gorunmeyen degerler (guc ve tuketim) hazir bir kaynaktan mi geldi?
+   *
+   * Geldiyse tuketim kutusu hic gosterilmiyor - kullanicinin dolduracagi bir
+   * sey yok. Gelmediyse tek soru olarak kaliyor: menzil hesabi o degere
+   * bakiyor ve yerine bir sayi uydurmak rota planlamasini sessizce yanlislar.
+   */
+  const [specsFromData, setSpecsFromData] = useState(false);
+
   // Secici metin listesi aliyor; her cizimde yeniden uretilmesin.
   const variantLabels = useMemo(() => variants.map((option) => option.label), [variants]);
 
@@ -106,13 +119,21 @@ export default function AddVehicleScreen() {
    * Sayiyi elle degistiren kullanicinin aracinda artik o surum yazili degil;
    * kutu eski etiketi tasimaya devam etse degerlerle celisirdi.
    */
-  const unsetVariant = () => setVariantLabel(undefined);
+  const unsetVariant = () => {
+    setVariantLabel(undefined);
+    // Degerlerin sahibi artik kullanici; tuketimi de gorup duzeltebilsin.
+    setSpecsFromData(false);
+  };
 
   const applyVariant = (option: EvVariantOption) => {
     setVariantLabel(option.label);
+    setSpecsFromData(true);
     setValue('batteryCapacityKwh', String(option.variant.batteryKwh), { shouldValidate: true });
     setValue('maxAcKw', String(option.variant.acKw), { shouldValidate: true });
     setValue('maxDcKw', String(option.variant.dcKw), { shouldValidate: true });
+    setValue('averageConsumptionKwhPer100Km', String(option.variant.consumptionKwhPer100Km), {
+      shouldValidate: true,
+    });
     // Soket BILEREK doldurulmuyor: kaynak bunu bizim pazarimiz icin yanlis
     // verebiliyor (bkz. data/evSpecs).
   };
@@ -128,7 +149,13 @@ export default function AddVehicleScreen() {
    */
   const clearSpecs = () => {
     setVariantLabel(undefined);
+    setSpecsFromData(false);
     for (const field of SPEC_FIELDS) setValue(field, '');
+    // Guc alanlari formda GORUNMUYOR; bos kalsalar gorunmez bir dogrulama
+    // hatasiyla kayit engellenirdi. 0 burada "bilinmiyor" demek: sarj
+    // simulasyonu soketin kendi gucunu tavan aliyor (bkz. store/session).
+    setValue('maxAcKw', '0');
+    setValue('maxDcKw', '0');
     clearErrors([...SPEC_FIELDS]);
   };
 
@@ -154,8 +181,10 @@ export default function AddVehicleScreen() {
       { shouldValidate: true },
     );
     // Hazir ayar kendi sayilarini getiriyor; "Surum" kutusunda onceki aracin
-    // surumu asili kalmasin.
+    // surumu asili kalmasin - ama degerler tam oldugu icin tuketim de
+    // sorulmuyor.
     setVariantLabel(undefined);
+    setSpecsFromData(true);
     setConnectors(preset.connectors);
     setConnectorError(undefined);
   };
@@ -294,9 +323,9 @@ export default function AddVehicleScreen() {
             />
           </View>
 
-          <Text style={styles.sectionTitle}>Batarya ve şarj</Text>
+          <Text style={styles.sectionTitle}>Batarya</Text>
           <Text style={styles.sectionHint}>
-            Değerler rota menzili ve şarj süresi hesaplarında kullanılır.
+            Menzil ve şarj süresi hesapları bu değerden çıkıyor.
           </Text>
 
           <View style={styles.group}>
@@ -321,29 +350,31 @@ export default function AddVehicleScreen() {
               keyboardType="decimal-pad"
               onEdit={unsetVariant}
             />
-            <FormInput
-              control={control}
-              name="maxAcKw"
-              label="Maksimum AC gücü"
-              suffix="kW"
-              keyboardType="decimal-pad"
-              onEdit={unsetVariant}
-            />
-            <FormInput
-              control={control}
-              name="maxDcKw"
-              label="Maksimum DC gücü"
-              suffix="kW"
-              keyboardType="decimal-pad"
-              onEdit={unsetVariant}
-            />
-            <FormInput
-              control={control}
-              name="averageConsumptionKwhPer100Km"
-              label="Ortalama tüketim"
-              suffix="kWh/100km"
-              keyboardType="decimal-pad"
-            />
+
+            {/*
+              Tuketim yalnizca surum SECILI DEGILKEN soruluyor.
+
+              Secili surumde deger uretici verisinden geliyor ve kullaniciya
+              hic gosterilmiyor; bilinmeyen modellerde ise uygulama menzili
+              hesaplayamaz, o yuzden tek soru olarak kaliyor. Gizli tutup
+              uydurma bir sayi yazmak, rota planlamasini sessizce yanlislardi.
+            */}
+            {!specsFromData && (
+              <>
+                <FormInput
+                  control={control}
+                  name="averageConsumptionKwhPer100Km"
+                  label="Ortalama tüketim"
+                  suffix="kWh/100km"
+                  keyboardType="decimal-pad"
+                />
+                <Text style={styles.fieldNote}>
+                  {variants.length > 0
+                    ? 'Sürüm seçersen bu değer kendiliğinden dolar.'
+                    : 'Bu model için üretici verimiz yok; menzil hesabı bu değere bakıyor.'}
+                </Text>
+              </>
+            )}
           </View>
 
           <Text style={styles.sectionTitle}>Soket tipleri</Text>
@@ -463,6 +494,13 @@ const useStyles = createThemedStyles((colors) => ({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+
+  fieldNote: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.lg,
   },
 
   presets: { paddingTop: spacing.lg, paddingBottom: spacing.xs },
