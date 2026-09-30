@@ -1,3 +1,4 @@
+import { extraVariants } from './evSpecsExtra';
 import specs from './ev-specs.json';
 
 /**
@@ -12,9 +13,8 @@ import specs from './ev-specs.json';
  * Almanya ve Fransa oldugu halde NACS olarak veriyor, oysa Avrupa'da CCS2.
  * Soketi kullanici kendisi isaretliyor (bkz. scripts/fetch-ev-specs.mjs).
  *
- * Kapsam tam degil: 62 marka, 1144 surum. Togg veri setinde YOK; onun
- * degerleri uygulamanin kendi hazir ayar listesinden geliyor
- * (bkz. mocks/vehicleCatalog).
+ * Set 62 marka tasiyor ama Kia, Togg, Opel ve Seat tamamen disarida; o
+ * bosluk evSpecsExtra ile, her satirin kaynagi yazilarak kapatiliyor.
  */
 export interface EvVariant {
   make: string;
@@ -24,9 +24,13 @@ export interface EvVariant {
   batteryKwh: number;
   acKw: number;
   dcKw: number;
+  /** Elle girilen kayitlarda degerin alindigi sayfa (bkz. evSpecsExtra). */
+  source?: string;
 }
 
-const variants = specs as EvVariant[];
+// Setin kapsamadigi araclar elle, kaynak gostererek ekleniyor
+// (bkz. evSpecsExtra); ikisi tek liste gibi sorgulaniyor.
+const variants: EvVariant[] = [...(specs as EvVariant[]), ...extraVariants];
 
 const same = (a: string, b: string) =>
   a.localeCompare(b, 'tr', { sensitivity: 'base' }) === 0;
