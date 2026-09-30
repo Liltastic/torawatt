@@ -9,15 +9,30 @@ koymak gerekmiyor.
 
 ## Hızlı başlangıç
 
-```bash
+**PowerShell** (Windows'un varsayılanı). Bu sürümde `&&` bir komut ayracı
+değil, o yüzden satırlar ayrı ayrı yazılıyor:
+
+```powershell
 # 1. Arayüzü derle (çıktı doğrudan backend'in gömdüğü klasöre yazılır)
-cd admin/web && npm install && npm run build
+cd admin\web
+npm install
+npm run build
 
 # 2. Binary'yi üret
-cd ../backend && go build -o toraadmin.exe ./cmd/toraadmin
+cd ..\backend
+go build -o toraadmin.exe ./cmd/toraadmin
 
 # 3. Çalıştır - veritabanı vermezsen örnek veriyle açılır
-ADMIN_PASSWORD="güçlü-bir-parola" ./toraadmin.exe
+$env:ADMIN_PASSWORD = "güçlü-bir-parola"
+.\toraadmin.exe
+```
+
+**Git Bash / Linux / macOS**:
+
+```bash
+cd admin/web && npm install && npm run build
+cd ../backend && go build -o toraadmin ./cmd/toraadmin
+ADMIN_PASSWORD="güçlü-bir-parola" ./toraadmin
 ```
 
 Panel `http://localhost:8090` adresinde. Giriş: `admin@torawatt.local` ve
@@ -29,8 +44,14 @@ verdiğin parola.
 veritabanını okur; alt çubuktaki **"Demo veri"** rozeti **"Canlı veri"**
 olur.
 
+```powershell
+$env:DATABASE_URL = "postgresql://..."
+$env:ADMIN_PASSWORD = "..."
+.\toraadmin.exe
+```
+
 ```bash
-DATABASE_URL="postgresql://..." ADMIN_PASSWORD="..." ./toraadmin.exe
+DATABASE_URL="postgresql://..." ADMIN_PASSWORD="..." ./toraadmin
 ```
 
 Şema değişikliği **gerekmiyor**: panel mobil uygulamanın mevcut tablolarını
@@ -55,12 +76,15 @@ tablo eklenmedi, migration çalıştırmıyor.
 
 İki süreç: Go API'yi, Vite arayüzü verir ve anlık yeniler.
 
-```bash
+```powershell
 # 1. terminal
-cd admin/backend && ADMIN_PASSWORD=dev go run ./cmd/toraadmin
+cd admin\backend
+$env:ADMIN_PASSWORD = "dev"
+go run ./cmd/toraadmin
 
 # 2. terminal
-cd admin/web && npm run dev     # http://localhost:5180
+cd admin\web
+npm run dev                     # http://localhost:5180
 ```
 
 Vite `/api` isteklerini 8090'a geçiriyor, yani arayüzde çalışırken Go'yu
