@@ -63,7 +63,11 @@ const NAV = [
 export function Shell() {
   const { info, theme, toggleTheme, signOut, expire } = useSession();
   const location = useLocation();
-  const [days, setDays] = useState(7);
+  // Varsayilan 30 gun. Haftalik pencere, gunde birkac oturum alan bir agda
+  // cogu zaman bombos cikiyor ve panel bozuk gibi gorunuyor; aylik pencere
+  // hem dolu hem de egilimi okunur kiliyor. Ust koseden 7/30/90 arasinda
+  // gecilebiliyor.
+  const [days, setDays] = useState(30);
   const [data, setData] = useState<Overview>();
   const [loading, setLoading] = useState(true);
 

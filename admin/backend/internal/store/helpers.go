@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -59,14 +60,44 @@ func countConnectors(stations []Station) int {
 	return n
 }
 
-// dayKey, gunluk gruplama anahtari (yerel saat diliminde gun basi).
+// dayKey, verilen anin YEREL gun basi.
+//
+// Local()'a cevirmek sart: veritabanindan gelen zaman damgalari kendi saat
+// dilimi nesnesini tasiyor ve gun siniri okuyanin saat dilimine gore
+// belirlenmeli - "30 Eylul'de ne kadar enerji verildi" sorusunun cevabi
+// sunucunun UTC gunune gore degil, bizim gunumuze gore.
 func dayKey(t time.Time) time.Time {
-	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+	local := t.Local()
+	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, local.Location())
+}
+
+// dayBucket, gunluk gruplama anahtari.
+//
+// METIN, time.Time DEGIL. time.Time bir harita anahtari olarak kullanildiginda
+// karsilastirma saat dilimi NESNESINI de iceriyor: veritabanindan gelen kayitla
+// bizim urettigimiz gun ayni ani gosterse bile esit sayilmiyor ve butun kovalar
+// bos kaliyordu. Grafik sifir cizerken kartlardaki toplam doluydu, cunku
+// toplamlar mutlak zaman karsilastirmasiyla hesaplaniyor.
+func dayBucket(t time.Time) string {
+	return dayKey(t).Format("2006-01-02")
 }
 
 var weekdayShort = map[time.Weekday]string{
 	time.Monday: "Pzt", time.Tuesday: "Sal", time.Wednesday: "Car", time.Thursday: "Per",
 	time.Friday: "Cum", time.Saturday: "Cmt", time.Sunday: "Paz",
+}
+
+var monthShort = [...]string{"Oca", "Sub", "Mar", "Nis", "May", "Haz", "Tem", "Agu", "Eyl", "Eki", "Kas", "Ara"}
+
+// axisLabel, grafigin alt eksenindeki metin.
+//
+// Bir haftada gun adi ("Pzt") en okunakli olan; otuz ya da doksan gunde ayni
+// yedi ad donup duruyor ve hicbir sey anlatmiyor - orada tarih gerekiyor.
+func axisLabel(day time.Time, days int) string {
+	if days <= 7 {
+		return weekdayShort[day.Weekday()]
+	}
+	return fmt.Sprintf("%d %s", day.Day(), monthShort[int(day.Month())-1])
 }
 
 // bucketDaily, verilen gun sayisi kadar geriye giden GUNLUK seri uretir.
@@ -75,19 +106,18 @@ var weekdayShort = map[time.Weekday]string{
 // sarj olmadiysa cizgi orada dibe inmeli, sonraki dolu gune atlayip sanki
 // kesintisizmis gibi gorunmemeli.
 func bucketDaily(sessions []Session, from time.Time, days int, value func(Session) float64) []Point {
-	totals := make(map[time.Time]float64, days)
+	totals := make(map[string]float64, days)
 	for _, s := range sessions {
-		key := dayKey(s.StartedAt)
-		if key.Before(from) {
+		if dayKey(s.StartedAt).Before(from) {
 			continue
 		}
-		totals[key] += value(s)
+		totals[dayBucket(s.StartedAt)] += value(s)
 	}
 
 	points := make([]Point, 0, days)
 	for i := 0; i < days; i++ {
 		day := from.AddDate(0, 0, i)
-		points = append(points, Point{Label: weekdayShort[day.Weekday()], Value: round1(totals[day])})
+		points = append(points, Point{Label: axisLabel(day, days), Value: round1(totals[dayBucket(day)])})
 	}
 	return points
 }
@@ -191,6 +221,9 @@ func buildOverview(sessions []Session, bookings []Reservation, stations []Statio
 	}
 	top := make([]StationLoad, 0, len(loads))
 	for _, l := range loads {
+		if l.Sessions == 0 {
+			continue
+		}
 		top = append(top, *l)
 	}
 	sort.Slice(top, func(i, j int) bool {

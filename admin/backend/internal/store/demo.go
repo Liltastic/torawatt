@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"sort"
 	"strings"
@@ -260,7 +261,11 @@ func (d *Demo) rollUpUsers() {
 	}
 }
 
-func round1(v float64) float64 { return float64(int(v*10+0.5)) / 10 }
+// round1, bir ondaliga yuvarlar.
+//
+// math.Round sart: "int(v*10+0.5)" kalibi sifira dogru kirpiyor ve NEGATIF
+// degerleri bozuyordu - tam dusus (-100) ekranda -99,9 olarak cikiyordu.
+func round1(v float64) float64 { return math.Round(v*10) / 10 }
 
 func (d *Demo) Close() {}
 

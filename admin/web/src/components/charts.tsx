@@ -153,17 +153,30 @@ export function AreaChart({ data, unit }: { data: Point[]; unit: string }) {
       <path d={`${path} L ${coords[coords.length - 1].x} ${padding.top + plotHeight} L ${padding.left} ${padding.top + plotHeight} Z`} fill={`url(#${gradientId})`} />
       <path d={path} fill="none" stroke="var(--accent)" strokeWidth={2.2} strokeLinecap="round" />
 
-      {coords.map((coord) => (
-        <text
-          key={coord.point.label + coord.x}
-          x={coord.x}
-          y={height - 6}
-          fontSize={9}
-          textAnchor="middle"
-          fill="var(--text-tertiary)">
-          {coord.point.label}
-        </text>
-      ))}
+      {/*
+        Etiketler SEYRELTILIYOR. Otuz gunluk pencerede otuz tarih yan yana
+        okunmuyor, ust uste biniyor; yaklasik sekiz etiket birakmak hem
+        araligi hem de yonu gosteriyor. Ilk ve son gun her zaman yaziliyor.
+      */}
+      {coords.map((coord, index) => {
+        const every = Math.max(1, Math.ceil(coords.length / 8));
+        const last = index === coords.length - 1;
+        if (index % every !== 0 && !last) return null;
+        // Son etiket her zaman yaziliyor; ona cok yakin duseni atliyoruz,
+        // yoksa ikisi ust uste biniyor.
+        if (!last && coords.length - 1 - index < every) return null;
+        return (
+          <text
+            key={coord.point.label + coord.x}
+            x={coord.x}
+            y={height - 6}
+            fontSize={9}
+            textAnchor={index === 0 ? 'start' : last ? 'end' : 'middle'}
+            fill="var(--text-tertiary)">
+            {coord.point.label}
+          </text>
+        );
+      })}
 
       <circle cx={peak.x} cy={peak.y} r={4.5} fill="var(--accent)" stroke="var(--bg)" strokeWidth={2} />
       <g transform={`translate(${Math.min(Math.max(peak.x - 30, 2), width - 78)}, ${Math.max(peak.y - 26, 2)})`}>

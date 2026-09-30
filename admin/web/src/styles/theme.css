@@ -8,32 +8,46 @@
  */
 
 :root {
-  /* Marka paleti (mobil uygulamanin koyu temasiyla ayni anahtarlar) */
-  --bg: #0a1512;
-  --bg-deep: #060f0d;
-  --surface: rgba(255, 255, 255, 0.045);
-  --surface-strong: rgba(255, 255, 255, 0.07);
-  --surface-solid: #111f1b;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.14);
+  /*
+   * Zemin NOTR bir koyu gri. Onceki palet yesile calan cok koyu bir tondu ve
+   * her vurgunun etrafinda neon bir hale vardi; ikisi birlikte ekrani bir
+   * arac paneline benzetiyordu. Marka turkuazi duruyor ama artik az ve
+   * yerinde kullaniliyor: aktif durum, grafik cizgisi, tek bir dolu kart.
+   */
+  --bg: #0e0f11;
+  --bg-deep: #0a0b0c;
+  --surface: #16181b;
+  --surface-strong: #1e2125;
+  --surface-solid: #16181b;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.13);
 
-  --text: #e7f3ee;
-  --text-secondary: #a3b9b0;
-  --text-tertiary: #7d938a;
+  --text: #e9ebee;
+  --text-secondary: #9ba3aa;
+  --text-tertiary: #6d757c;
 
-  --accent: #14c8b4;
-  --accent-strong: #0fb5a3;
-  --accent-deep: #0a7f74;
-  --accent-soft: rgba(20, 200, 180, 0.16);
-  --accent-glow: rgba(20, 200, 180, 0.35);
+  --accent: #2fd0bc;
+  --accent-strong: #14b5a3;
+  --accent-deep: #0b7a70;
+  --accent-soft: rgba(47, 208, 188, 0.12);
+  --accent-glow: rgba(47, 208, 188, 0.18);
 
-  --success: #2dd68f;
-  --warning: #ff9a57;
-  --danger: #ff6b85;
-  --info: #58b4ff;
+  --success: #4ade80;
+  --warning: #fbbf7a;
+  --danger: #f87f8f;
+  --info: #7cc4ff;
 
-  --radius-frame: 26px;
-  --radius-card: 18px;
+  /*
+   * Derinlik artik parilti degil golge. Iki katman: temas eden ince bir
+   * cizgi ve genis, dusuk yogunluklu bir yayilim - ekrandan degil kagittan
+   * ogrenilmis bir yukseklik.
+   */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.22);
+  --shadow-lg: 0 1px 3px rgba(0, 0, 0, 0.35), 0 24px 60px rgba(0, 0, 0, 0.42);
+
+  --radius-frame: 20px;
+  --radius-card: 14px;
   --radius-pill: 999px;
 
   --rail-width: 62px;
@@ -43,24 +57,34 @@
   color-scheme: dark;
 }
 
-/* Acik tema: ayni yerlesim, ayni vurgu; yalnizca zemin ve metin donuyor. */
+/* Acik tema: ayni yerlesim, ayni olculer; yalnizca zemin ve metin donuyor. */
 :root[data-theme='light'] {
-  --bg: #f2fbf6;
-  --bg-deep: #e4f4ec;
-  --surface: rgba(255, 255, 255, 0.85);
-  --surface-strong: #ffffff;
+  --bg: #ffffff;
+  --bg-deep: #f4f6f7;
+  --surface: #ffffff;
+  --surface-strong: #f4f6f7;
   --surface-solid: #ffffff;
-  --border: rgba(15, 42, 34, 0.1);
-  --border-strong: rgba(15, 42, 34, 0.18);
+  --border: rgba(16, 24, 32, 0.09);
+  --border-strong: rgba(16, 24, 32, 0.16);
 
-  --text: #0f2a22;
-  --text-secondary: #5b7268;
-  --text-tertiary: #93a79d;
+  --text: #14181c;
+  --text-secondary: #5a646d;
+  --text-tertiary: #8a949d;
 
   --accent: #0fb5a3;
-  --accent-strong: #0a7f74;
-  --accent-soft: rgba(15, 181, 163, 0.14);
-  --accent-glow: rgba(15, 181, 163, 0.28);
+  --accent-strong: #0a9e8e;
+  --accent-deep: #0a7f74;
+  --accent-soft: rgba(15, 181, 163, 0.1);
+  --accent-glow: rgba(15, 181, 163, 0.16);
+
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --info: #2563eb;
+
+  --shadow-sm: 0 1px 2px rgba(16, 24, 32, 0.06);
+  --shadow-md: 0 1px 2px rgba(16, 24, 32, 0.05), 0 8px 24px rgba(16, 24, 32, 0.07);
+  --shadow-lg: 0 1px 3px rgba(16, 24, 32, 0.07), 0 24px 60px rgba(16, 24, 32, 0.12);
 
   color-scheme: light;
 }
@@ -96,10 +120,7 @@ button {
 .app {
   height: 100%;
   padding: 14px;
-  background:
-    radial-gradient(1200px 600px at 12% -10%, rgba(20, 200, 180, 0.12), transparent 60%),
-    radial-gradient(900px 500px at 100% 0%, rgba(88, 180, 255, 0.08), transparent 55%),
-    var(--bg-deep);
+  background: var(--bg-deep);
 }
 
 .frame {
@@ -109,10 +130,9 @@ button {
   height: 100%;
   padding: 12px;
   border-radius: var(--radius-frame);
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
-    var(--bg);
+  background: var(--bg);
   border: 1px solid var(--border);
-  box-shadow: 0 40px 90px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--shadow-lg);
   overflow: hidden;
 }
 
@@ -168,7 +188,7 @@ button {
 .rail__btn[aria-current='page'] {
   background: var(--accent-strong);
   color: #ffffff;
-  box-shadow: 0 8px 20px var(--accent-glow);
+  box-shadow: var(--shadow-sm);
 }
 
 .rail__bottom {
@@ -188,7 +208,7 @@ button {
   background: var(--accent-strong);
   color: #fff;
   cursor: pointer;
-  box-shadow: 0 8px 18px var(--accent-glow);
+  box-shadow: var(--shadow-sm);
 }
 
 /* ---------- Orta sutun ---------- */
@@ -222,9 +242,9 @@ button {
 
 .topbar__greeting {
   margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.2px;
+  font-size: 21px;
+  font-weight: 650;
+  letter-spacing: -0.4px;
 }
 
 .topbar__sub {
@@ -278,16 +298,17 @@ button {
   background: var(--accent-strong);
   border-color: transparent;
   color: #fff;
-  box-shadow: 0 8px 18px var(--accent-glow);
+  box-shadow: var(--shadow-sm);
 }
 
 /* ---------- Kartlar ---------- */
 
 .card {
-  padding: 14px;
+  padding: 15px;
   border-radius: var(--radius-card);
   background: var(--surface);
   border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
 }
 
 
@@ -420,8 +441,9 @@ a.card:hover {
   padding: 16px;
   border-radius: var(--radius-card);
   overflow: hidden;
-  background: linear-gradient(140deg, var(--accent-deep), #0b3b35 55%, #0a1512);
+  background: linear-gradient(145deg, #12403b 0%, #14232a 62%, var(--surface) 100%);
   border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
 }
 
 .spotlight::after {
@@ -431,7 +453,7 @@ a.card:hover {
   width: 240px;
   height: 240px;
   border-radius: 50%;
-  background: radial-gradient(circle, var(--accent-glow), transparent 65%);
+  background: radial-gradient(circle, rgba(47, 208, 188, 0.1), transparent 70%);
 }
 
 .spotlight__label {
@@ -526,7 +548,7 @@ a.card:hover {
 .highlight--accent {
   background: linear-gradient(135deg, var(--accent-strong), var(--accent-deep));
   border-color: transparent;
-  box-shadow: 0 12px 26px var(--accent-glow);
+  box-shadow: var(--shadow-md);
 }
 
 .highlight--accent .highlight__sub,
@@ -772,9 +794,9 @@ a.card:hover {
   gap: 6px;
   padding: 5px;
   border-radius: var(--radius-pill);
-  background: rgba(10, 21, 18, 0.82);
-  border: 1px solid var(--border-strong);
-  backdrop-filter: blur(18px);
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
   z-index: 20;
 }
 
@@ -945,7 +967,7 @@ a.card:hover {
   border-radius: 22px;
   background: var(--surface-solid);
   border: 1px solid var(--border);
-  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-lg);
 }
 
 .login__brand {

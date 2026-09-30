@@ -44,15 +44,23 @@ verdiğin parola.
 veritabanını okur; alt çubuktaki **"Demo veri"** rozeti **"Canlı veri"**
 olur.
 
+Bağlantı dizesi zaten `server/.env` içinde duruyor; elle kopyalamaya gerek yok:
+
 ```powershell
-$env:DATABASE_URL = "postgresql://..."
+# admin\backend klasöründeyken
+$env:DATABASE_URL = (Get-Content ..\..\server\.env |
+  Where-Object { $_ -like 'DATABASE_URL=*' }) -replace '^DATABASE_URL=', '' -replace '^"|"$', ''
 $env:ADMIN_PASSWORD = "..."
 .\toraadmin.exe
 ```
 
 ```bash
-DATABASE_URL="postgresql://..." ADMIN_PASSWORD="..." ./toraadmin
+export DATABASE_URL=$(grep '^DATABASE_URL=' ../../server/.env | cut -d= -f2- | tr -d '"')
+ADMIN_PASSWORD="..." ./toraadmin
 ```
+
+Açılışta logda `veritabanina baglaniliyor...` görürsün; `DATABASE_URL yok` yazıyorsa
+değişken boş kalmış demektir.
 
 Şema değişikliği **gerekmiyor**: panel mobil uygulamanın mevcut tablolarını
 (`User`, `Station`, `Connector`, `Vehicle`, `Reservation`,
