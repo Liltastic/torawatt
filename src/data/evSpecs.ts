@@ -35,23 +35,39 @@ const same = (a: string, b: string) =>
  * Secilen marka ve modelin bilinen surumleri; yoksa bos dizi ve form elle
  * doldurulmaya devam eder.
  */
+/**
+ * Ayni sey iki kaynakta farkli yazilabiliyor: secicide "MG", burada
+ * "MG Motor"; secicide "Megane E-Tech", burada "Megane E-Tech Electric".
+ * Yalnizca biri digerinin basiysa VE kesme noktasi bir sozcuk sinirindaysa
+ * esit sayiyoruz - boylece "ID.4" ile "ID.4 X" ayri modeller olarak kaliyor.
+ * (Aksan ve buyuk/kucuk farki zaten same() ile eleniyor: "Citroën" =
+ * "Citroen", "Škoda" = "Skoda".)
+ */
+const prefixOf = (shorter: string, longer: string) =>
+  longer.length > shorter.length &&
+  longer.toLocaleLowerCase('tr').startsWith(`${shorter.toLocaleLowerCase('tr')} `);
+
+const matches = (a: string, b: string) => same(a, b) || prefixOf(a, b) || prefixOf(b, a);
+
 export function variantsFor(make: string, model: string): EvVariant[] {
   if (!make || !model) return [];
 
-  const ofMake = variants.filter((variant) => same(variant.make, make));
+  const ofMake = variants.filter((variant) => matches(variant.make, make));
+  if (ofMake.length === 0) return [];
+
+  // Once birebir model adi; bulunamazsa onek kuralina dusuyoruz.
   const exact = ofMake.filter((variant) => same(variant.model, model));
   if (exact.length > 0) return exact;
 
-  // Ayni arac iki kaynakta farkli yazilabiliyor: secicideki "Megane E-Tech"
-  // burada "Megane E-Tech Electric". Yalnizca biri digerinin basiysa ve
-  // kesme noktasi bir SOZCUK sinirindaysa esitiyoruz - "ID.4" ile "ID.4 X"
-  // gibi gercekten farkli modelleri birbirine karistirmasin diye.
-  const prefixOf = (shorter: string, longer: string) =>
-    longer.length > shorter.length &&
-    longer.toLocaleLowerCase('tr').startsWith(`${shorter.toLocaleLowerCase('tr')} `);
+  const byPrefix = ofMake.filter((variant) => matches(variant.model, model));
+  if (byPrefix.length > 0) return byPrefix;
 
+  // Bazi markalarda bir katalog marka adini modele katiyor, digeri katmiyor:
+  // secicide "MG" + "4", burada "MG Motor" + "MG4". Marka adini modelin basina
+  // ekleyip bir daha bakiyoruz.
+  const withMake = `${make}${model}`;
   return ofMake.filter(
-    (variant) => prefixOf(model, variant.model) || prefixOf(variant.model, model),
+    (variant) => same(variant.model, withMake) || same(variant.model, `${make} ${model}`),
   );
 }
 
