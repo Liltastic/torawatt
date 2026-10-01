@@ -1,5 +1,3 @@
-import { useState } from 'react';
-
 import { api } from '../lib/api';
 import {
   formatDateTime,
@@ -8,11 +6,12 @@ import {
   formatMoney,
   formatNumber,
 } from '../lib/format';
+import { ExportButton, Pager, SortTh, useTableState } from '../components/table';
 import { PageHeader, SearchInput, TableShell, useList } from '../components/ui';
 
 export function Sessions() {
-  const [search, setSearch] = useState('');
-  const { items, total, loading, error } = useList(api.sessions, { search, limit: 100 });
+  const state = useTableState();
+  const { items, total, loading, error } = useList(api.sessions, state.params);
 
   // Sayfadaki toplam: listelenen kayitlarin toplami, TUM kayitlarin degil.
   // Basligin bunu soylemesi gerekiyor, yoksa 100 satirin toplami butun
@@ -30,21 +29,39 @@ export function Sessions() {
       />
 
       <div className="toolbar">
-        <SearchInput value={search} onChange={setSearch} placeholder="İstasyon veya kullanıcı" />
+        <SearchInput
+          value={state.search}
+          onChange={state.setSearch}
+          placeholder="İstasyon veya kullanıcı"
+        />
+        <span className="toolbar__spacer" />
+        <ExportButton kind="oturumlar" state={state} />
       </div>
 
       <TableShell loading={loading} error={error} empty={items.length === 0}>
         <table className="table">
           <thead>
             <tr>
-              <th>Başlangıç</th>
-              <th>İstasyon</th>
+              <SortTh column="startedAt" state={state}>
+                Başlangıç
+              </SortTh>
+              <SortTh column="station" state={state}>
+                İstasyon
+              </SortTh>
               <th>Soket</th>
-              <th>Kullanıcı</th>
-              <th className="table__num">Süre</th>
-              <th className="table__num">Enerji</th>
+              <SortTh column="user" state={state}>
+                Kullanıcı
+              </SortTh>
+              <SortTh column="duration" state={state} numeric>
+                Süre
+              </SortTh>
+              <SortTh column="energyKwh" state={state} numeric>
+                Enerji
+              </SortTh>
               <th className="table__num">Birim</th>
-              <th className="table__num">Tutar</th>
+              <SortTh column="cost" state={state} numeric>
+                Tutar
+              </SortTh>
             </tr>
           </thead>
           <tbody>
@@ -65,6 +82,8 @@ export function Sessions() {
           </tbody>
         </table>
       </TableShell>
+
+      <Pager state={state} total={total} />
     </div>
   );
 }

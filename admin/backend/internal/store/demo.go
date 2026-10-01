@@ -279,9 +279,7 @@ func (d *Demo) Overview(_ context.Context, days int) (Overview, error) {
 }
 
 func (d *Demo) Users(_ context.Context, q Query) (Page[User], error) {
-	return paginate(filter(d.users, func(u User) bool {
-		return matches(q.Search, u.Name, u.Email)
-	}), q), nil
+	return d.sortedUsers(q), nil
 }
 
 func (d *Demo) DeleteUser(_ context.Context, id string) error {
@@ -295,9 +293,7 @@ func (d *Demo) DeleteUser(_ context.Context, id string) error {
 }
 
 func (d *Demo) Stations(_ context.Context, q Query) (Page[Station], error) {
-	return paginate(filter(d.stations, func(s Station) bool {
-		return matches(q.Search, s.Name, s.Address, s.Operator)
-	}), q), nil
+	return d.sortedStations(q), nil
 }
 
 func (d *Demo) Station(_ context.Context, id string) (Station, error) {
@@ -348,15 +344,11 @@ func (d *Demo) SetConnectorStatus(_ context.Context, id, status string) error {
 }
 
 func (d *Demo) Vehicles(_ context.Context, q Query) (Page[Vehicle], error) {
-	return paginate(filter(d.vehicles, func(v Vehicle) bool {
-		return matches(q.Search, v.Make, v.Model, v.OwnerEmail)
-	}), q), nil
+	return d.sortedVehicles(q), nil
 }
 
 func (d *Demo) Reservations(_ context.Context, q Query) (Page[Reservation], error) {
-	return paginate(filter(d.bookings, func(r Reservation) bool {
-		return matches(q.Search, r.StationName, r.OwnerEmail) && (q.Status == "" || q.Status == r.Status)
-	}), q), nil
+	return d.sortedReservations(q), nil
 }
 
 func (d *Demo) SetReservationStatus(_ context.Context, id, status string) error {
@@ -370,9 +362,7 @@ func (d *Demo) SetReservationStatus(_ context.Context, id, status string) error 
 }
 
 func (d *Demo) Sessions(_ context.Context, q Query) (Page[Session], error) {
-	return paginate(filter(d.sessions, func(s Session) bool {
-		return matches(q.Search, s.StationName, s.OwnerEmail)
-	}), q), nil
+	return d.sortedSessions(q), nil
 }
 
 func (d *Demo) Campaigns(_ context.Context, q Query) (Page[Campaign], error) {

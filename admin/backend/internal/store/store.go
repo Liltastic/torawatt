@@ -155,6 +155,11 @@ type Query struct {
 	Status string
 	Limit  int
 	Offset int
+	// Sort, siralanacak sutunun MANTIKSAL adi. Her depolama bunu kendi beyaz
+	// listesinden geciriyor; disaridan gelen metin hicbir zaman dogrudan
+	// sorguya yazilmiyor.
+	Sort string
+	Desc bool
 }
 
 // Store, panelin ihtiyac duydugu butun okuma ve yazma islemleri.
@@ -162,6 +167,7 @@ type Store interface {
 	Overview(ctx context.Context, days int) (Overview, error)
 
 	Users(ctx context.Context, q Query) (Page[User], error)
+	UserDetail(ctx context.Context, id string) (UserDetail, error)
 	DeleteUser(ctx context.Context, id string) error
 
 	Stations(ctx context.Context, q Query) (Page[Station], error)
@@ -169,6 +175,9 @@ type Store interface {
 	SaveStation(ctx context.Context, s Station) (Station, error)
 	DeleteStation(ctx context.Context, id string) error
 	SetConnectorStatus(ctx context.Context, id, status string) error
+	SaveConnector(ctx context.Context, c Connector) (Connector, error)
+	DeleteConnector(ctx context.Context, id string) error
+	StationDetail(ctx context.Context, id string) (StationDetail, error)
 
 	Vehicles(ctx context.Context, q Query) (Page[Vehicle], error)
 	Reservations(ctx context.Context, q Query) (Page[Reservation], error)
@@ -181,5 +190,50 @@ type Store interface {
 
 	Support(ctx context.Context, q Query) (Page[SupportRequest], error)
 
+	Analytics(ctx context.Context, days int) (Analytics, error)
+
 	Close()
+}
+
+// --- Detay gorunumleri ---
+
+// UserDetail, bir kullanicinin tek ekranda toplanmis gecmisi.
+type UserDetail struct {
+	User         User          `json:"user"`
+	Vehicles     []Vehicle     `json:"vehicles"`
+	Reservations []Reservation `json:"reservations"`
+	Sessions     []Session     `json:"sessions"`
+	TotalSpent   float64       `json:"totalSpent"`
+}
+
+// StationDetail, bir istasyonun soketleri ve son hareketleri.
+type StationDetail struct {
+	Station   Station   `json:"station"`
+	Sessions  []Session `json:"sessions"`
+	EnergyKwh float64   `json:"energyKwh"`
+	Revenue   float64   `json:"revenue"`
+}
+
+// --- Analiz ---
+
+// Slice, bir kirilimin tek satiri (istasyon, soket tipi, saat...).
+type Slice struct {
+	Label     string  `json:"label"`
+	Sessions  int     `json:"sessions"`
+	EnergyKwh float64 `json:"energyKwh"`
+	Revenue   float64 `json:"revenue"`
+}
+
+// Analytics, Analiz sayfasini besleyen kirilimlar.
+type Analytics struct {
+	Days       int     `json:"days"`
+	ByStation  []Slice `json:"byStation"`
+	ByConnpart []Slice `json:"byConnector"`
+	ByHour     []Slice `json:"byHour"`
+	Daily      []Point `json:"daily"`
+	Revenue    []Point `json:"revenue"`
+	// Ortalamalar: bir oturum tipik olarak ne kadar enerji ve para getiriyor.
+	AvgEnergyKwh   float64 `json:"avgEnergyKwh"`
+	AvgRevenue     float64 `json:"avgRevenue"`
+	AvgDurationMin float64 `json:"avgDurationMin"`
 }

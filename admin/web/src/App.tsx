@@ -1,7 +1,9 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
+import { ToastProvider } from './components/Toast';
 import { SessionProvider, useSession } from './lib/session';
 import { Shell } from './layout/Shell';
+import { Analytics } from './pages/Analytics';
 import { Campaigns } from './pages/Campaigns';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
@@ -24,6 +26,7 @@ function Gate() {
     <Routes>
       <Route element={<Shell />}>
         <Route index element={<Dashboard />} />
+        <Route path="analiz" element={<Analytics />} />
         <Route path="istasyonlar" element={<Stations />} />
         <Route path="kullanicilar" element={<Users />} />
         <Route path="rezervasyonlar" element={<Reservations />} />
@@ -40,9 +43,11 @@ function Gate() {
 export function App() {
   return (
     <SessionProvider>
-      <BrowserRouter>
-        <Gate />
-      </BrowserRouter>
+      <ToastProvider>
+        <BrowserRouter>
+          <Gate />
+        </BrowserRouter>
+      </ToastProvider>
     </SessionProvider>
   );
 }

@@ -73,7 +73,7 @@ func like(search string) string { return "%" + search + "%" }
 
 func (p *Postgres) Users(ctx context.Context, q Query) (Page[User], error) {
 	limit, offset := limitOf(q)
-	const query = `
+	query := fmt.Sprintf(`
 		SELECT u."id", u."email", COALESCE(u."name", ''), u."createdAt",
 		       (SELECT COUNT(*) FROM "Vehicle" v WHERE v."ownerId" = u."id"),
 		       (SELECT COUNT(*) FROM "ChargingHistoryEntry" h WHERE h."ownerId" = u."id"),
@@ -81,8 +81,8 @@ func (p *Postgres) Users(ctx context.Context, q Query) (Page[User], error) {
 		       COUNT(*) OVER ()
 		  FROM "User" u
 		 WHERE ($1 = '' OR u."email" ILIKE $2 OR COALESCE(u."name", '') ILIKE $2)
-		 ORDER BY u."createdAt" DESC
-		 LIMIT $3 OFFSET $4`
+		 ORDER BY %s
+		 LIMIT $3 OFFSET $4`, orderBy(q, userColumns, `u."createdAt" DESC`))
 
 	rows, err := p.pool.Query(ctx, query, q.Search, like(q.Search), limit, offset)
 	if err != nil {
@@ -118,12 +118,12 @@ func (p *Postgres) DeleteUser(ctx context.Context, id string) error {
 // Tek JOIN sorgusu istasyonu soket sayisi kadar tekrarlar ve sayfalama
 // bozulurdu (LIMIT satiri sayar, istasyonu degil). Once sayfa kadar istasyon
 // aliniyor, sonra yalnizca onlarin soketleri.
-func (p *Postgres) stationsWithConnectors(ctx context.Context, where string, args []any, limit, offset int) (Page[Station], error) {
+func (p *Postgres) stationsWithConnectors(ctx context.Context, where string, args []any, order string, limit, offset int) (Page[Station], error) {
 	query := fmt.Sprintf(`
 		SELECT "id", "name", "address", "operator", "latitude", "longitude", "amenities", COUNT(*) OVER ()
 		  FROM "Station" %s
-		 ORDER BY "name" ASC
-		 LIMIT $%d OFFSET $%d`, where, len(args)+1, len(args)+2)
+		 ORDER BY %s
+		 LIMIT $%d OFFSET $%d`, where, order, len(args)+1, len(args)+2)
 
 	rows, err := p.pool.Query(ctx, query, append(args, limit, offset)...)
 	if err != nil {
@@ -176,11 +176,12 @@ func (p *Postgres) stationsWithConnectors(ctx context.Context, where string, arg
 func (p *Postgres) Stations(ctx context.Context, q Query) (Page[Station], error) {
 	limit, offset := limitOf(q)
 	where := `WHERE ($1 = '' OR "name" ILIKE $2 OR "address" ILIKE $2 OR "operator" ILIKE $2)`
-	return p.stationsWithConnectors(ctx, where, []any{q.Search, like(q.Search)}, limit, offset)
+	order := orderBy(q, stationColumns, `"name" ASC`)
+	return p.stationsWithConnectors(ctx, where, []any{q.Search, like(q.Search)}, order, limit, offset)
 }
 
 func (p *Postgres) Station(ctx context.Context, id string) (Station, error) {
-	page, err := p.stationsWithConnectors(ctx, `WHERE "id" = $1`, []any{id}, 1, 0)
+	page, err := p.stationsWithConnectors(ctx, `WHERE "id" = $1`, []any{id}, `"name" ASC`, 1, 0)
 	if err != nil {
 		return Station{}, err
 	}
@@ -236,12 +237,12 @@ func (p *Postgres) SetConnectorStatus(ctx context.Context, id, status string) er
 
 func (p *Postgres) Vehicles(ctx context.Context, q Query) (Page[Vehicle], error) {
 	limit, offset := limitOf(q)
-	rows, err := p.pool.Query(ctx, `
+	rows, err := p.pool.Query(ctx, fmt.Sprintf(`
 		SELECT v."id", v."ownerId", COALESCE(u."email", ''), v."make", v."model", v."modelYear",
 		       v."batteryCapacityKwh", v."isActive", COUNT(*) OVER ()
 		  FROM "Vehicle" v LEFT JOIN "User" u ON u."id" = v."ownerId"
 		 WHERE ($1 = '' OR v."make" ILIKE $2 OR v."model" ILIKE $2 OR COALESCE(u."email", '') ILIKE $2)
-		 ORDER BY v."createdAt" DESC LIMIT $3 OFFSET $4`,
+		 ORDER BY %s LIMIT $3 OFFSET $4`, orderBy(q, vehicleColumns, `v."createdAt" DESC`)),
 		q.Search, like(q.Search), limit, offset)
 	if err != nil {
 		return Page[Vehicle]{}, err
@@ -262,13 +263,13 @@ func (p *Postgres) Vehicles(ctx context.Context, q Query) (Page[Vehicle], error)
 
 func (p *Postgres) Reservations(ctx context.Context, q Query) (Page[Reservation], error) {
 	limit, offset := limitOf(q)
-	rows, err := p.pool.Query(ctx, `
+	rows, err := p.pool.Query(ctx, fmt.Sprintf(`
 		SELECT r."id", r."ownerId", COALESCE(u."email", ''), r."stationName", r."connectorLabel",
 		       r."startsAt", r."durationMinutes", r."status", COUNT(*) OVER ()
 		  FROM "Reservation" r LEFT JOIN "User" u ON u."id" = r."ownerId"
 		 WHERE ($1 = '' OR r."stationName" ILIKE $2 OR COALESCE(u."email", '') ILIKE $2)
 		   AND ($3 = '' OR r."status" = $3)
-		 ORDER BY r."startsAt" DESC LIMIT $4 OFFSET $5`,
+		 ORDER BY %s LIMIT $4 OFFSET $5`, orderBy(q, reservationColumns, `r."startsAt" DESC`)),
 		q.Search, like(q.Search), q.Status, limit, offset)
 	if err != nil {
 		return Page[Reservation]{}, err
@@ -300,13 +301,13 @@ func (p *Postgres) SetReservationStatus(ctx context.Context, id, status string) 
 
 func (p *Postgres) Sessions(ctx context.Context, q Query) (Page[Session], error) {
 	limit, offset := limitOf(q)
-	rows, err := p.pool.Query(ctx, `
+	rows, err := p.pool.Query(ctx, fmt.Sprintf(`
 		SELECT h."id", h."ownerId", COALESCE(u."email", ''), h."stationName", h."connectorLabel",
 		       h."startedAt", h."endedAt", h."durationMinutes", h."energyKwh", h."pricePerKwh", h."cost",
 		       COUNT(*) OVER ()
 		  FROM "ChargingHistoryEntry" h LEFT JOIN "User" u ON u."id" = h."ownerId"
 		 WHERE ($1 = '' OR h."stationName" ILIKE $2 OR COALESCE(u."email", '') ILIKE $2)
-		 ORDER BY h."startedAt" DESC LIMIT $3 OFFSET $4`,
+		 ORDER BY %s LIMIT $3 OFFSET $4`, orderBy(q, sessionColumns, `h."startedAt" DESC`)),
 		q.Search, like(q.Search), limit, offset)
 	if err != nil {
 		return Page[Session]{}, err

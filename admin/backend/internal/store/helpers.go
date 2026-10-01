@@ -247,3 +247,119 @@ func buildOverview(sessions []Session, bookings []Reservation, stations []Statio
 		Counts:      counts,
 	}
 }
+
+// --- Analiz ---
+
+// groupBy, oturumlari verilen anahtara gore toplar ve cirodan buyuge siralar.
+func groupBy(sessions []Session, key func(Session) string) []Slice {
+	index := map[string]*Slice{}
+	for _, s := range sessions {
+		label := key(s)
+		if label == "" {
+			continue
+		}
+		slice, ok := index[label]
+		if !ok {
+			slice = &Slice{Label: label}
+			index[label] = slice
+		}
+		slice.Sessions++
+		slice.EnergyKwh += s.EnergyKwh
+		slice.Revenue += s.Cost
+	}
+
+	out := make([]Slice, 0, len(index))
+	for _, slice := range index {
+		slice.EnergyKwh = round1(slice.EnergyKwh)
+		slice.Revenue = round1(slice.Revenue)
+		out = append(out, *slice)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Revenue == out[j].Revenue {
+			return out[i].Label < out[j].Label
+		}
+		return out[i].Revenue > out[j].Revenue
+	})
+	return out
+}
+
+// connectorKind, "CCS2 - 180 kW" etiketinden yalnizca tipi ayirir.
+//
+// Etiket guc degerini de tasiyor; kirilimda her guc ayri satir olsaydi liste
+// tip karsilastirmasi olmaktan cikardi.
+func connectorKind(label string) string {
+	if i := strings.IndexAny(label, "-·"); i > 0 {
+		return strings.TrimSpace(label[:i])
+	}
+	return strings.TrimSpace(label)
+}
+
+// buildAnalytics, Analiz sayfasinin butun kirilimlarini tek gecisle hesaplar.
+//
+// Iki depolama da AYNI kodu cagiriyor; boylece demo ile canli veri ayni
+// tanimlari paylasiyor ve sayfa kaynagi degisince anlam kaymiyor.
+func buildAnalytics(sessions []Session, days int, now time.Time) Analytics {
+	if days <= 0 {
+		days = 30
+	}
+	from := dayKey(now).AddDate(0, 0, -(days - 1))
+
+	inWindow := make([]Session, 0, len(sessions))
+	for _, s := range sessions {
+		if !dayKey(s.StartedAt).Before(from) {
+			inWindow = append(inWindow, s)
+		}
+	}
+
+	hours := groupBy(inWindow, func(s Session) string {
+		return fmt.Sprintf("%02d:00", s.StartedAt.Local().Hour())
+	})
+	// Saat kirilimi ciroya gore degil SAATE gore okunur; gun icindeki egriyi
+	// gormek icin yeniden siraliyoruz.
+	sort.Slice(hours, func(i, j int) bool { return hours[i].Label < hours[j].Label })
+
+	var energy, revenue, duration float64
+	for _, s := range inWindow {
+		energy += s.EnergyKwh
+		revenue += s.Cost
+		duration += float64(s.DurationMinutes)
+	}
+	count := float64(len(inWindow))
+	avg := func(total float64) float64 {
+		if count == 0 {
+			return 0
+		}
+		return round1(total / count)
+	}
+
+	return Analytics{
+		Days:           days,
+		ByStation:      groupBy(inWindow, func(s Session) string { return s.StationName }),
+		ByConnpart:     groupBy(inWindow, func(s Session) string { return connectorKind(s.ConnectorLabel) }),
+		ByHour:         hours,
+		Daily:          bucketDaily(inWindow, from, days, func(s Session) float64 { return s.EnergyKwh }),
+		Revenue:        bucketDaily(inWindow, from, days, func(s Session) float64 { return s.Cost }),
+		AvgEnergyKwh:   avg(energy),
+		AvgRevenue:     avg(revenue),
+		AvgDurationMin: avg(duration),
+	}
+}
+
+// --- Siralama ---
+
+// sortPage, demo kaynagindaki listeleri istenen sutuna gore sirala.
+//
+// Karsilastirici haritasi her varlik icin ayri veriliyor; bilinmeyen sutun
+// adi sessizce yok sayiliyor ve varsayilan sira korunuyor.
+func sortPage[T any](items []T, q Query, comparators map[string]func(a, b T) bool) {
+	less, ok := comparators[q.Sort]
+	if !ok {
+		return
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		if q.Desc {
+			return less(items[j], items[i])
+		}
+		return less(items[i], items[j])
+	})
+}

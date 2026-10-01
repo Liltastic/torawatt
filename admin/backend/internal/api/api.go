@@ -31,13 +31,17 @@ func (s *Server) Routes() http.Handler {
 	private.HandleFunc("GET /api/overview", s.overview)
 
 	private.HandleFunc("GET /api/users", s.users)
+	private.HandleFunc("GET /api/users/{id}", s.userDetail)
 	private.HandleFunc("DELETE /api/users/{id}", s.deleteUser)
 
 	private.HandleFunc("GET /api/stations", s.stations)
 	private.HandleFunc("GET /api/stations/{id}", s.station)
 	private.HandleFunc("POST /api/stations", s.saveStation)
 	private.HandleFunc("DELETE /api/stations/{id}", s.deleteStation)
+	private.HandleFunc("GET /api/stations/{id}/detail", s.stationDetail)
 	private.HandleFunc("POST /api/connectors/{id}/status", s.connectorStatus)
+	private.HandleFunc("POST /api/connectors", s.saveConnector)
+	private.HandleFunc("DELETE /api/connectors/{id}", s.deleteConnector)
 
 	private.HandleFunc("GET /api/vehicles", s.vehicles)
 	private.HandleFunc("GET /api/reservations", s.reservations)
@@ -49,6 +53,8 @@ func (s *Server) Routes() http.Handler {
 	private.HandleFunc("DELETE /api/campaigns/{id}", s.deleteCampaign)
 
 	private.HandleFunc("GET /api/support", s.support)
+	private.HandleFunc("GET /api/analytics", s.analytics)
+	private.HandleFunc("GET /api/export/{kind}", s.export)
 
 	guarded := s.Auth.Middleware(private)
 
@@ -88,6 +94,8 @@ func queryOf(r *http.Request) store.Query {
 	q := store.Query{
 		Search: r.URL.Query().Get("search"),
 		Status: r.URL.Query().Get("status"),
+		Sort:   r.URL.Query().Get("sort"),
+		Desc:   r.URL.Query().Get("dir") == "desc",
 	}
 	if v, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil {
 		q.Limit = v
@@ -362,4 +370,81 @@ func (s *Server) support(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, page)
+}
+
+// --- Detay gorunumleri ---
+
+func (s *Server) userDetail(w http.ResponseWriter, r *http.Request) {
+	detail, err := s.Store.UserDetail(r.Context(), r.PathValue("id"))
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, detail)
+}
+
+func (s *Server) stationDetail(w http.ResponseWriter, r *http.Request) {
+	detail, err := s.Store.StationDetail(r.Context(), r.PathValue("id"))
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, detail)
+}
+
+// --- Soket yonetimi ---
+
+var connectorTypes = map[string]bool{"TYPE_2": true, "CCS2": true, "CHADEMO": true, "NACS": true}
+
+func (s *Server) saveConnector(w http.ResponseWriter, r *http.Request) {
+	body, ok := decode[store.Connector](w, r)
+	if !ok {
+		return
+	}
+	// Tip ve durum SABIT kumelerden gelmeli: mobil uygulama bilmedigi bir
+	// degeri cizemiyor ve soket listede sessizce kayboluyor.
+	if !connectorTypes[body.Type] {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Gecersiz soket tipi"})
+		return
+	}
+	if body.Status == "" {
+		body.Status = "AVAILABLE"
+	}
+	if !connectorStatuses[body.Status] {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Gecersiz soket durumu"})
+		return
+	}
+	if body.PowerKw <= 0 || body.PowerKw > 400 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Guc 0 ile 400 kW arasinda olmali"})
+		return
+	}
+	saved, err := s.Store.SaveConnector(r.Context(), body)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, saved)
+}
+
+func (s *Server) deleteConnector(w http.ResponseWriter, r *http.Request) {
+	if err := s.Store.DeleteConnector(r.Context(), r.PathValue("id")); err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// --- Analiz ---
+
+func (s *Server) analytics(w http.ResponseWriter, r *http.Request) {
+	days, _ := strconv.Atoi(r.URL.Query().Get("days"))
+	if days != 7 && days != 30 && days != 90 {
+		days = 30
+	}
+	data, err := s.Store.Analytics(r.Context(), days)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, data)
 }

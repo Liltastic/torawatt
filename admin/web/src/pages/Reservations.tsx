@@ -7,6 +7,8 @@ import {
   formatDuration,
   formatNumber,
 } from '../lib/format';
+import { ExportButton, Pager, SortTh, useTableState } from '../components/table';
+import { useToast } from '../components/Toast';
 import { PageHeader, SearchInput, StatusPill, TableShell, useList } from '../components/ui';
 
 const FILTERS = ['', 'PENDING', 'CONFIRMED', 'ARRIVED', 'COMPLETED', 'CANCELLED', 'EXPIRED'];
@@ -22,22 +24,18 @@ const NEXT: Record<string, string[]> = {
 };
 
 export function Reservations() {
-  const [search, setSearch] = useState('');
+  const toast = useToast();
   const [status, setStatus] = useState('');
-  const { items, total, loading, error, reload } = useList(api.reservations, {
-    search,
-    status,
-    limit: 100,
-  });
-  const [actionError, setActionError] = useState<string>();
+  const state = useTableState({ status });
+  const { items, total, loading, error, reload } = useList(api.reservations, state.params);
 
   const change = async (id: string, next: string) => {
-    setActionError(undefined);
     try {
       await api.setReservationStatus(id, next);
+      toast.ok(`Durum "${RESERVATION_STATUS_LABELS[next]}" olarak güncellendi`);
       reload();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Durum değiştirilemedi');
+      toast.error(err instanceof Error ? err.message : 'Durum değiştirilemedi');
     }
   };
 
@@ -46,7 +44,16 @@ export function Reservations() {
       <PageHeader title="Rezervasyonlar" subtitle={`${formatNumber(total)} kayıt`} />
 
       <div className="toolbar">
-        <SearchInput value={search} onChange={setSearch} placeholder="İstasyon veya kullanıcı" />
+        <SearchInput
+          value={state.search}
+          onChange={state.setSearch}
+          placeholder="İstasyon veya kullanıcı"
+        />
+        <span className="toolbar__spacer" />
+        <ExportButton kind="rezervasyonlar" state={state} />
+      </div>
+
+      <div className="toolbar">
         {FILTERS.map((value) => (
           <button
             key={value || 'all'}
@@ -56,24 +63,35 @@ export function Reservations() {
                 ? { background: 'var(--accent-soft)', color: 'var(--accent)', borderColor: 'transparent' }
                 : undefined
             }
-            onClick={() => setStatus(value)}>
+            onClick={() => {
+              setStatus(value);
+              state.setPage(0);
+            }}>
             {value ? RESERVATION_STATUS_LABELS[value] : 'Tümü'}
           </button>
         ))}
       </div>
 
-      {actionError && <div className="error">{actionError}</div>}
-
       <TableShell loading={loading} error={error} empty={items.length === 0}>
         <table className="table">
           <thead>
             <tr>
-              <th>Başlangıç</th>
-              <th>İstasyon</th>
+              <SortTh column="startsAt" state={state}>
+                Başlangıç
+              </SortTh>
+              <SortTh column="station" state={state}>
+                İstasyon
+              </SortTh>
               <th>Soket</th>
-              <th>Kullanıcı</th>
-              <th className="table__num">Süre</th>
-              <th>Durum</th>
+              <SortTh column="user" state={state}>
+                Kullanıcı
+              </SortTh>
+              <SortTh column="duration" state={state} numeric>
+                Süre
+              </SortTh>
+              <SortTh column="status" state={state}>
+                Durum
+              </SortTh>
               <th />
             </tr>
           </thead>
@@ -107,6 +125,8 @@ export function Reservations() {
           </tbody>
         </table>
       </TableShell>
+
+      <Pager state={state} total={total} />
     </div>
   );
 }

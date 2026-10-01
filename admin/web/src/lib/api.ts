@@ -185,6 +185,43 @@ export interface ListParams {
   status?: string;
   limit?: number;
   offset?: number;
+  /** Siralanacak sutunun mantiksal adi; sunucu beyaz listeden geciriyor. */
+  sort?: string;
+  dir?: 'asc' | 'desc';
+}
+
+export interface UserDetail {
+  user: User;
+  vehicles: Vehicle[];
+  reservations: Reservation[];
+  sessions: Session[];
+  totalSpent: number;
+}
+
+export interface StationDetail {
+  station: Station;
+  sessions: Session[];
+  energyKwh: number;
+  revenue: number;
+}
+
+export interface Slice {
+  label: string;
+  sessions: number;
+  energyKwh: number;
+  revenue: number;
+}
+
+export interface Analytics {
+  days: number;
+  byStation: Slice[];
+  byConnector: Slice[];
+  byHour: Slice[];
+  daily: Point[];
+  revenue: Point[];
+  avgEnergyKwh: number;
+  avgRevenue: number;
+  avgDurationMin: number;
 }
 
 export const api = {
@@ -196,12 +233,18 @@ export const api = {
   overview: (days: number) => request<Overview>(`/overview${query({ days })}`),
 
   users: (p: ListParams = {}) => request<Page<User>>(`/users${query({ ...p })}`),
+  userDetail: (id: string) => request<UserDetail>(`/users/${id}`),
   deleteUser: (id: string) => request<{ ok: boolean }>(`/users/${id}`, { method: 'DELETE' }),
 
   stations: (p: ListParams = {}) => request<Page<Station>>(`/stations${query({ ...p })}`),
   saveStation: (station: Partial<Station>) =>
     request<Station>('/stations', { method: 'POST', body: JSON.stringify(station) }),
   deleteStation: (id: string) => request<{ ok: boolean }>(`/stations/${id}`, { method: 'DELETE' }),
+  stationDetail: (id: string) => request<StationDetail>(`/stations/${id}/detail`),
+  saveConnector: (connector: Partial<Connector>) =>
+    request<Connector>('/connectors', { method: 'POST', body: JSON.stringify(connector) }),
+  deleteConnector: (id: string) =>
+    request<{ ok: boolean }>(`/connectors/${id}`, { method: 'DELETE' }),
   setConnectorStatus: (id: string, status: string) =>
     request<{ ok: boolean }>(`/connectors/${id}/status`, {
       method: 'POST',
@@ -225,4 +268,13 @@ export const api = {
   deleteCampaign: (id: string) => request<{ ok: boolean }>(`/campaigns/${id}`, { method: 'DELETE' }),
 
   support: (p: ListParams = {}) => request<Page<SupportRequest>>(`/support${query({ ...p })}`),
+
+  analytics: (days: number) => request<Analytics>(`/analytics${query({ days })}`),
+
+  /**
+   * Disa aktarim tarayicinin kendi indirme akisiyla yapiliyor: dosyayi
+   * bellege almak yerine adresi aciyoruz, boylece buyuk dosya da sorunsuz
+   * iniyor ve sunucunun verdigi dosya adi korunuyor.
+   */
+  exportUrl: (kind: string, p: ListParams = {}) => `/api/export/${kind}${query({ ...p })}`,
 };

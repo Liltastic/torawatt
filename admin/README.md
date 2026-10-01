@@ -7,6 +7,10 @@ koymak gerekmiyor.
 
 ![Panel](docs/admin-panel.png)
 
+![Analiz](docs/admin-analiz.png)
+
+![İstasyon detayı](docs/admin-istasyon-detay.png)
+
 ## Hızlı başlangıç
 
 **PowerShell** (Windows'un varsayılanı). Bu sürümde `&&` bir komut ayracı
@@ -103,13 +107,28 @@ yeniden derlemek gerekmiyor.
 | Bölüm | Yapılabilenler |
 | --- | --- |
 | **Panel** | Enerji, oturum, ciro, doluluk; dönem grafiği (7/30/90 gün), en yoğun istasyonlar, yaklaşan rezervasyonlar |
-| **İstasyonlar** | Listeleme, arama, soketleri açıp durum değiştirme (müsait/dolu/arızalı/çevrimdışı), istasyon silme |
-| **Kullanıcılar** | Arama, araç/oturum/enerji özeti, hesap silme |
+| **Analiz** | İstasyona, soket tipine ve günün saatine göre kırılım; günlük ciro eğrisi; oturum başına ortalama enerji/ciro/süre |
+| **İstasyonlar** | **Ekleme ve düzenleme**, detay paneli (konum, toplam enerji/ciro, son oturumlar), **soket ekleme/düzenleme/silme** (tip, güç, fiyat, durum), istasyon silme |
+| **Kullanıcılar** | Detay paneli (araçları, son rezervasyonları, son şarj oturumları, toplam harcama), hesap silme |
 | **Rezervasyonlar** | Duruma göre süzme, durum ilerletme (onayla / geldi / tamamla / iptal) |
 | **Şarj oturumları** | Geçmiş kayıtlar, enerji ve ciro toplamı |
 | **Araçlar** | Salt okunur liste (kullanıcının kendi kaydı; teknik değerleri yönetim değiştirmez) |
 | **Kampanyalar** | Ekleme, düzenleme, yayından kaldırma, silme |
 | **Destek** | Talep listesi (şemada durum alanı yok, salt okunur) |
+
+Her tabloda ortak olanlar:
+
+- **Sıralama** — başlığa tıklayınca sunucu tarafında sıralanır, yani "en çok
+  harcayan kullanıcı" sorusu yalnızca görünen sayfanın içinde değil, **tüm
+  kayıtlar** arasında cevaplanır.
+- **Sayfalama** — 50'şer kayıt; arama ya da sıralama değişince başa döner.
+- **CSV dışa aktarım** — ekrandaki aramayı uygular, sayfalamayı uygulamaz:
+  "dışa aktar" diyen biri görünen 50 satırı değil aramasına uyan her kaydı
+  bekler. Excel için UTF-8 BOM ve noktalı virgül ayracı ile.
+- **Detay paneli** — satıra tıklayınca sağdan açılır; liste yerini kaybetmez.
+
+**Ctrl/Cmd + K** her yerden genel aramayı açar: tek kutudan istasyon, kullanıcı
+ve bölüm aranır.
 
 ## Tasarım
 

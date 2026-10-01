@@ -19,6 +19,17 @@ export function formatCompact(value: number): string {
 
 export const formatMoney = (value: number) => `${money.format(Math.round(value))} TL`;
 
+/**
+ * Konum icin dort ondalik: bir ondalik yaklasik 11 km'ye denk geliyor ve
+ * "41, 29,1" gibi bir deger istasyonun yerini anlatmiyor.
+ */
+const coord = new Intl.NumberFormat('tr-TR', {
+  minimumFractionDigits: 4,
+  maximumFractionDigits: 4,
+});
+
+export const formatCoord = (value: number) => coord.format(value);
+
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('tr-TR', {
     day: '2-digit',

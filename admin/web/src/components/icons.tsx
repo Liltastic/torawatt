@@ -173,3 +173,12 @@ export const IconStation = (p: IconProps) => (
     <path d="m10.2 12-1.6 3h2.4l-1.2 3" />
   </Icon>
 );
+
+export const IconChart = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M3 20.5h18" />
+    <rect x="5" y="11" width="3.4" height="6" rx="1" />
+    <rect x="10.3" y="6.5" width="3.4" height="10.5" rx="1" />
+    <rect x="15.6" y="9" width="3.4" height="8" rx="1" />
+  </Icon>
+);

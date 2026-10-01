@@ -12,8 +12,10 @@ import { Avatar } from '@react-cupertino-ui/avatar';
 import { api, UnauthorisedError, type Overview } from '../lib/api';
 import { formatDateTime, formatNumber } from '../lib/format';
 import { useSession } from '../lib/session';
+import { CommandPalette } from '../components/CommandPalette';
 import {
   IconBell,
+  IconChart,
   IconBolt,
   IconCalendar,
   IconCar,
@@ -51,6 +53,7 @@ export function useOverview(): OverviewState {
 
 const NAV = [
   { to: '/', label: 'Panel', Icon: IconGrid, end: true },
+  { to: '/analiz', label: 'Analiz', Icon: IconChart, end: false },
   { to: '/istasyonlar', label: 'İstasyonlar', Icon: IconStation, end: false },
   { to: '/kullanicilar', label: 'Kullanıcılar', Icon: IconUsers, end: false },
   { to: '/rezervasyonlar', label: 'Rezervasyonlar', Icon: IconCalendar, end: false },
@@ -68,6 +71,19 @@ export function Shell() {
   // hem dolu hem de egilimi okunur kiliyor. Ust koseden 7/30/90 arasinda
   // gecilebiliyor.
   const [days, setDays] = useState(30);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  // Ctrl/Cmd + K her yerden aramayi aciyor; alisilmis kisayol.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setPaletteOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const [data, setData] = useState<Overview>();
   const [loading, setLoading] = useState(true);
 
@@ -123,7 +139,11 @@ export function Shell() {
           </nav>
 
           <main className="main">
-            <TopBar title={current?.label ?? 'Panel'} email={info?.email ?? ''} />
+            <TopBar
+              title={current?.label ?? 'Panel'}
+              email={info?.email ?? ''}
+              onSearch={() => setPaletteOpen(true)}
+            />
             <Outlet />
           </main>
 
@@ -131,13 +151,22 @@ export function Shell() {
         </div>
 
         <Dock demo={info?.demo ?? false} />
+        <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       </div>
     </OverviewContext.Provider>
   );
 }
 
 /** Ust cubuk: selamlama, arama ve bildirim - referanstaki ile ayni duzen. */
-function TopBar({ title, email }: { title: string; email: string }) {
+function TopBar({
+  title,
+  email,
+  onSearch,
+}: {
+  title: string;
+  email: string;
+  onSearch: () => void;
+}) {
   const hour = new Date().getHours();
   const greeting = hour < 11 ? 'Günaydın' : hour < 18 ? 'İyi günler' : 'İyi akşamlar';
 
@@ -152,10 +181,16 @@ function TopBar({ title, email }: { title: string; email: string }) {
         </p>
       </div>
       <div className="topbar__actions">
-        <label className="searchbox">
+        {/*
+          Kutu artik gorsel degil: tiklayinca genel aramayi aciyor
+          (bkz. CommandPalette). Oncesinde readOnly bir girdiydi ve hicbir sey
+          yapmiyordu - panelde en cok yaniltan ayrinti oydu.
+        */}
+        <button className="searchbox" type="button" onClick={onSearch}>
           <IconSearch size={16} />
-          <input placeholder="İstasyon, kullanıcı, kayıt ara..." aria-label="Ara" readOnly />
-        </label>
+          <span className="searchbox__text">İstasyon, kullanıcı, kayıt ara...</span>
+          <kbd className="searchbox__kbd">Ctrl K</kbd>
+        </button>
         <button className="iconbtn iconbtn--accent" aria-label="Bildirimler">
           <IconBell size={17} />
         </button>
