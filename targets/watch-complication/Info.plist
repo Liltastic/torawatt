@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+		Bu dosyayi biz verdigimiz icin eklenti kendi Info.plist'ini URETMIYOR
+		(bkz. @bacons/apple-targets README). Dolayisiyla normalde onun koydugu
+		NSExtension blogunu da burada tasimamiz gerekiyor - degerler eklentinin
+		kaynagindaki getTargetInfoPlistForType ile birebir ayni.
+	-->
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.widgetkit-extension</string>
+	</dict>
+
+	<!--
+		Complication'in konum okuyabilmesi icin sart. Izin kullanicidan SAAT
+		uygulamasinda aliniyor; bu anahtar o izni uzantiya tasiyor. Anahtar
+		olmadan CLLocationManager.location uzanti icinde her zaman nil doner.
+	-->
+	<key>NSWidgetWantsLocation</key>
+	<true/>
+</dict>
+</plist>

@@ -53,7 +53,8 @@
         }
       ],
       "@bacons/apple-targets",
-      "./plugins/withToraWidget"
+      "./plugins/withToraWidget",
+      "./plugins/withToraCarPlay"
     ],
     "experiments": {
       "typedRoutes": true,

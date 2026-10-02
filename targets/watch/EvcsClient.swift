@@ -1,4 +1,6 @@
+import CoreLocation
 import Foundation
+import MapKit
 
 // MARK: - Model
 //
@@ -37,13 +39,16 @@ struct Station: Decodable, Identifiable {
     let brand: String?
     let address: String
     let province: String?
+    let latitude: Double
+    let longitude: Double
     let socketCount: Int
     let maxPowerKw: Double
     let distanceKm: Double?
     let sockets: [Socket]?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, brand, address, province, socketCount, maxPowerKw, distanceKm, sockets
+        case id, name, brand, address, province, latitude, longitude
+        case socketCount, maxPowerKw, distanceKm, sockets
         case operatorName = "operator"
     }
 
@@ -69,6 +74,39 @@ struct Station: Decodable, Identifiable {
             return String(format: "%.1f km", distanceKm)
         }
         return "\(Int(distanceKm.rounded())) km"
+    }
+
+    /// Bilekte yer az: "180 kW" tek basina en cok sey anlatan deger.
+    var powerLabel: String {
+        "\(Int(maxPowerKw.rounded())) kW"
+    }
+
+    /// Soket tipleri, tekrarsiz ve guce gore sirali ("CCS2", "Type 2").
+    ///
+    /// Liste ucunda soketler gelmiyor; o zaman bos donuyor ve gorunum
+    /// yalnizca sayiyi gosteriyor - sayidan tip uretmek tahmin olurdu.
+    var socketTypeLabels: [String] {
+        guard let sockets, !sockets.isEmpty else { return [] }
+        var seen = Set<String>()
+        return sockets
+            .sorted { $0.powerKw > $1.powerKw }
+            .compactMap { seen.insert($0.typeLabel).inserted ? $0.typeLabel : nil }
+    }
+
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+
+    /// Apple Haritalar uzerinden yol tarifi baslatir.
+    ///
+    /// Saatte tarifi baslatabilmek telefonu cebinden cikarmadan yola
+    /// koyulmayi sagliyor; bir sarj uygulamasinda en cok istenen eylem bu.
+    func openDirections() {
+        let item = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
+        item.name = displayName
+        item.openInMaps(launchOptions: [
+            MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving
+        ])
     }
 }
 

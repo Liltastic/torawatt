@@ -10,6 +10,10 @@ module.exports = {
   // net.torasarj.torawatt.watchkitapp
   bundleIdentifier: '.watchkitapp',
 
+  // watchOS 10: SwiftUI Map, .containerBackground ve aksesuar Gauge bu
+  // surumle geliyor. Series 4 ve sonrasini kapsiyor.
+  deploymentTarget: '10.0',
+
   // Telefonun ikonuyla ayni marka isareti (assets/images/icon.png).
   // Ikon verilmezse eklenti AppIcon asset'ini hic uretmiyor ve Xcode
   // derlemede patliyor - bu yuzden bilerek veriyoruz.
