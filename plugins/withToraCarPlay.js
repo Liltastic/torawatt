@@ -75,14 +75,18 @@ function withCarPlayBuildPhase(config) {
     const project = modConfig.modResults;
     const projectName = modConfig.modRequest.projectName;
 
-    // Grup bir kez olusuyor; prebuild tekrar calistiginda cogalmasin.
+    // Grup YOLSUZ olusturuluyor ve KOK gruba baglaniyor.
+    //
+    // Xcode'da bir dosyanin diskteki yeri, bagli oldugu gruplarin yollarinin
+    // zinciriyle cozuluyor. Gruba "CarPlay" yolu verilirse dosya yolu onun
+    // ALTINA ekleniyor ve derleme "Build input files cannot be found:
+    // ios/CarPlay/TORAWATT/CarPlay/..." ile dusuyor. Yolsuz grup zincire
+    // hicbir sey katmiyor, kok grubun da yolu yok; boylece asagida verilen
+    // proje koku goreli yol oldugu gibi gecerli oluyor.
     let groupKey = project.findPBXGroupKey({ name: GROUP_NAME });
     if (!groupKey) {
-      groupKey = project.pbxCreateGroup(GROUP_NAME, GROUP_NAME);
-      const mainGroupKey = project.findPBXGroupKey({ name: projectName });
-      if (mainGroupKey) {
-        project.addToPbxGroup(groupKey, mainGroupKey);
-      }
+      groupKey = project.pbxCreateGroup(GROUP_NAME);
+      project.addToPbxGroup(groupKey, project.getFirstProject().firstProject.mainGroup);
     }
 
     const targetUuid = project.getFirstTarget().uuid;
