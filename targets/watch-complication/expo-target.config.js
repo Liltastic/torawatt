@@ -17,7 +17,12 @@ module.exports = {
   // containerBackground ve Gauge'un aksesuar bicimi watchOS 10 istiyor.
   deploymentTarget: '10.0',
 
-  icon: '../../assets/images/icon.png',
+  // IKON YOK, bilerek. Bir widget uzantisinin kendi uygulama ikonu olmaz;
+  // complication galerisinde SAAT uygulamasinin ikonu gorunuyor. Ikon
+  // verildiginde eklenti hedefe ASSETCATALOG_COMPILER_APPICON_NAME ekliyor
+  // (bkz. configuration-list.js createWatchWidgetConfigurationList) ve
+  // watchOS uzantisinda uygulanabilir icerik bulunmadigi icin derleme
+  // "AppIcon did not have any applicable content" ile dusuyor.
 
   colors: {
     $accent: '#0FB5A3',
