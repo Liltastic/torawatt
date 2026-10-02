@@ -9,7 +9,10 @@ module.exports = {
 
   // Paket adi saat uygulamasinin ALTINDA olmali, yoksa gomme dogrulamasi
   // (ValidateEmbeddedBinary) hedefi reddediyor.
-  bundleIdentifier: '.watchkitapp.complication',
+  // '.watchkitapp.complication' Apple tarafindan "kullanilabilir degil"
+  // diye reddedildi; o ad hesapta zaten kayitli. Tek sart bu kimligin SAAT
+  // uygulamasinin kimligiyle baslamasi - son parca serbest.
+  bundleIdentifier: '.watchkitapp.watchwidget',
 
   // containerBackground ve Gauge'un aksesuar bicimi watchOS 10 istiyor.
   deploymentTarget: '10.0',
