@@ -20,45 +20,8 @@ export interface Connector {
   type: ConnectorType;
   powerKw: number;
   status: ChargerStatus;
-  pricePerKwh?: number;
-  idleFeePerMin?: number;
-  /**
-   * Kullaniciya gosterilecek soket numarasi. Kendi istasyonlarimizda id'nin
-   * kendisi okunabilir ("C1"); katalogda EPDK soket numarasi ("SKT/22202")
-   * id'nin icinde kayboldugu icin ayrica tasiniyor.
-   */
+  /** Kullaniciya gosterilecek soket numarasi; yoksa id gosterilir. */
   label?: string;
-}
-
-/**
- * Istasyon verisinin nereden geldigi.
- *  'own'  - kendi backend'imiz: canli musaitlik, fiyat, rezervasyon ve sarj var.
- *  'epdk' - EVCS mobil API'sindeki ulusal katalog (bkz. services/evcs.ts):
- *           konum, adres, isletmeci ve soket bilgisi var; musaitlik ve fiyat
- *           YOK, uygulamadan sarj/rezervasyon yapilamaz.
- * Alan bos ise kayit kendi backend'imizden gelmistir.
- */
-export type StationSource = 'own' | 'epdk';
-
-/**
- * Ulusal katalogdaki (EPDK) kayit bilgileri. Kendi istasyonlarimizda
- * bulunmaz; katalog istasyonlarinin detayinda oldugu gibi gosterilir.
- */
-export interface StationCatalogInfo {
-  /** Sarj istasyonu sicil numarasi (ornek: ŞRJ/10332). */
-  stationNo?: string;
-  /** Isletmecinin ticari unvani; marka adi Station.operator alaninda. */
-  operatorLegalName?: string;
-  /** Sarj ag isletmeci lisans numarasi. */
-  licenseNo?: string;
-  province?: string;
-  distributionCompany?: string;
-  /** Herkese acik mi, yoksa site/kurum ici mi. */
-  publicAccess?: boolean;
-  /** Yenilenebilir kaynakli elektrik. */
-  greenEnergy?: boolean;
-  /** Kaydin katalogda en son dogrulandigi an. */
-  lastSeenAt?: string;
 }
 
 export interface Station {
@@ -73,47 +36,6 @@ export interface Station {
   connectors: Connector[];
   /** Kullanicinin konumuna gore hesaplanir; backend veya istemci doldurur. */
   distanceKm?: number;
-  source?: StationSource;
-  /** Yalnizca katalog istasyonlarinda dolu (bkz. services/evcs.ts). */
-  catalog?: StationCatalogInfo;
-}
-
-/** Yalnizca bilgi amacli katalog istasyonu mu (sarj/rezervasyon/favori yok). */
-export function isExternalStation(station: Pick<Station, 'source'>): boolean {
-  return station.source === 'epdk';
-}
-
-export type ChargingSessionStatus = 'STARTING' | 'CHARGING' | 'COMPLETED' | 'STOPPING' | 'ERROR';
-
-export interface ChargingSession {
-  id: string;
-  stationId: string;
-  connectorId: string;
-  startedAt: string;
-  endedAt?: string;
-  energyKwh: number;
-  powerKw: number;
-  cost: number;
-  batteryPercent?: number;
-  status: ChargingSessionStatus;
-}
-
-/** Spec bolum 10: draft -> pending -> confirmed -> arrived -> expired/cancelled */
-export type ReservationStatus =
-  | 'DRAFT'
-  | 'PENDING'
-  | 'CONFIRMED'
-  | 'ARRIVED'
-  | 'EXPIRED'
-  | 'CANCELLED';
-
-export interface Reservation {
-  id: string;
-  stationId: string;
-  connectorId: string;
-  startsAt: string;
-  durationMinutes: number;
-  status: ReservationStatus;
 }
 
 /** Spec bolum 14. */
@@ -129,26 +51,6 @@ export interface Vehicle {
   averageConsumptionKwhPer100Km: number;
   /** Filtreleme ve rota onerilerinde kullanilacak arac; sahibin en fazla bir aktif araci olur. */
   isActive: boolean;
-}
-
-/** Kart verisi asla saklanmaz; yalnizca saglayici token'i ve maskelenmis alanlar. */
-export interface PaymentMethod {
-  id: string;
-  brand: string;
-  last4: string;
-  expiryMonth: number;
-  expiryYear: number;
-  isDefault: boolean;
-}
-
-export interface ChargingHistoryItem {
-  id: string;
-  stationName: string;
-  startedAt: string;
-  endedAt: string;
-  energyKwh: number;
-  durationMinutes: number;
-  cost: number;
 }
 
 /** Bir soketin guc sinifini dondurur (spec bolum 5 rozetleri). */
@@ -183,66 +85,4 @@ export function stationAvailability(station: Pick<Station, 'connectors'>): Stati
   if (available === 0) return 'FULL';
   if (available === usable.length) return 'AVAILABLE';
   return 'PARTIAL';
-}
-
-/** Gecmis detayinda gosterilen ek alanlar; liste karti icin gerekmez. */
-export interface ChargingHistoryDetail extends ChargingHistoryItem {
-  stationId?: string;
-  connectorLabel: string;
-  pricePerKwh: number;
-  idleFee?: number;
-}
-
-/** Rezervasyon karti icin gerekli, istasyon aramadan gosterilebilen alanlar. */
-export interface ReservationDetail extends Reservation {
-  stationName: string;
-  connectorLabel: string;
-  createdAt: string;
-}
-
-/** Rezervasyon baslangicindan sonra soketin tutuldugu sure. */
-export const RESERVATION_GRACE_MINUTES = 15;
-
-/**
- * Kayitli durum ile gercek durum ayrisabilir: bekleme suresi dolmus bir
- * rezervasyon hala CONFIRMED yaziyor olabilir. Gosterirken bunu kullan.
- */
-export function effectiveReservationStatus(
-  reservation: Pick<Reservation, 'status' | 'startsAt' | 'durationMinutes'>,
-  now: number = Date.now(),
-): ReservationStatus {
-  if (reservation.status === 'CANCELLED' || reservation.status === 'EXPIRED') {
-    return reservation.status;
-  }
-
-  const startsAt = new Date(reservation.startsAt).getTime();
-  const deadline = startsAt + RESERVATION_GRACE_MINUTES * 60_000;
-
-  // Geldiyse bekleme suresi artik islemez - kullanici zaten orada. Ama rezerve
-  // ETTIGI sure dolunca kayit kapanmali: aksi halde "Geldin" hicbir zaman
-  // bitmiyor ve haritadaki serit kalici hale geliyor. Bunu normalde sarjin
-  // baslamasi kapatirdi, ama o akis henuz kaydi geri yazmiyor.
-  if (reservation.status === 'ARRIVED') {
-    const reservedUntil = startsAt + reservation.durationMinutes * 60_000;
-    return now > reservedUntil ? 'EXPIRED' : 'ARRIVED';
-  }
-
-  return now > deadline ? 'EXPIRED' : reservation.status;
-}
-
-export const reservationStatusLabels: Record<ReservationStatus, string> = {
-  DRAFT: 'Taslak',
-  PENDING: 'Onay bekliyor',
-  CONFIRMED: 'Onaylandı',
-  ARRIVED: 'Geldin',
-  EXPIRED: 'Süresi doldu',
-  CANCELLED: 'İptal edildi',
-};
-
-export interface Campaign {
-  id: string;
-  title: string;
-  description: string;
-  discountLabel: string;
-  validUntil: string | null;
 }

@@ -17,7 +17,6 @@ import { BOOT_SCREEN_MS, BootScreen, CrashScreen } from '@/components';
 import { warmUpServer } from '@/services/api';
 import { installErrorLog, logError, setErrorLogRoute, setErrorLogUser } from '@/services/errorLog';
 import { setQueryClientForAuth, useAuthStore } from '@/store/auth';
-import { useSessionStore } from '@/store/session';
 import { useColors } from '@/theme';
 import { checkForImmediateUpdate } from '@/utils/autoUpdate';
 
@@ -93,8 +92,8 @@ export default function RootLayout() {
             retry: 1,
             /**
              * 10 saniyeydi. refetchOnMount acik oldugu icin bu, her sekme
-             * gecisinde araclarin, favorilerin, rezervasyonlarin ve gecmisin
-             * yeniden sorgulanmasi demekti - kullanici az once bakmis olsa bile
+             * gecisinde araclarin ve favorilerin yeniden sorgulanmasi
+             * demekti - kullanici az once bakmis olsa bile
              * ekran yukleniyor durumuna donup agi bekliyordu. Backend Render'in
              * ucretsiz katmaninda oldugu icin bu bekleme bazen saniyelerle
              * olculuyor.
@@ -143,14 +142,9 @@ export default function RootLayout() {
   }, [hydrateAuth]);
 
   // Cikista onceki hesabin hicbir izi bellekte kalmasin. Burada yapiliyor cunku
-  // bu effect, (tabs)/_layout'un Redirect'e dusup sekmeleri unmount ettigi
-  // render'dan sonra calisir; logout() icinde cagrilsaydi hala mount olan
+  // bu effect oturum durumu degistikten sonra calisir ve hesap sorgulari o anda
+  // zaten kapali (bkz. useIsSignedIn); logout() icinde cagrilsaydi hala acik
   // sorgular token'siz refetch edip 401 -> logout zincirini tetiklerdi.
-  //
-  // Sarj oturumu da temizleniyor: o zustand store'u modul seviyesinde yasiyor ve
-  // kendi setInterval'ini tutuyor. Temizlenmezse B kullanicisi giris yaptiginda
-  // Sarj sekmesi A'nin canli oturumunu gostermeye devam ediyor, dahasi oturum
-  // COMPLETED olunca A'nin sarj kaydi B'nin token'iyla B'nin gecmisine yaziliyor.
   const userId = useAuthStore((s) => s.user?.id);
   useEffect(() => {
     setErrorLogUser(userId);
@@ -158,7 +152,6 @@ export default function RootLayout() {
   useEffect(() => {
     if (userId) return;
     queryClient.clear();
-    useSessionStore.getState().clear();
   }, [userId, queryClient]);
 
   // Stack, oturum durumu belli olmadan mount olmasin: src/app/index.tsx ilk
@@ -191,8 +184,6 @@ export default function RootLayout() {
                 ekliyorum / onayliyorum, isim bitince kapanacak" akisi
                 detay sayfalarindan ayrisiyor. Gecis animasyonunu her platform
                 kendi yerel bicimiyle yapiyor. */}
-            <Stack.Screen name="charger/[connectorId]" options={MODAL_SCREEN} />
-            <Stack.Screen name="booking/new" options={MODAL_SCREEN} />
             <Stack.Screen name="vehicles/add" options={MODAL_SCREEN} />
           </Stack>
         </SafeAreaProvider>

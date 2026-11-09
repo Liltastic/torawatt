@@ -15,23 +15,19 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { Button, Card } from '@/components';
 import { ApiError, supportApi } from '@/services/api';
+import { useIsSignedIn } from '@/store/auth';
 import { createThemedStyles, radius, spacing, typography, useColors } from '@/theme';
 
 const MIN_MESSAGE_LENGTH = 10;
 
 const FAQ_ITEMS = [
   {
-    question: 'Rezervasyonum ne zaman düşer?',
+    question: 'Haritadaki istasyonlar gerçek mi?',
     answer:
-      'Seçtiğin başlangıç saatinden itibaren soket 15 dakika sana ayrılır. Bu süre içinde gelip "Geldim" demezsen rezervasyon otomatik düşer ve soket serbest kalır.',
+      'Hayır. Bu sürüm örnek verilerle çalışıyor; "Demo" ile başlayan istasyonlar ve soket durumları gerçek değildir. Bu noktalara şarj etmek için gitme.',
   },
   {
-    question: 'Ödeme yöntemleri gerçek mi?',
-    answer:
-      'Hayır, şu an demo aşamasında. Eklediğin kart bilgileri hiçbir yere kaydedilmiyor; gerçek bir ödeme sağlayıcısı bağlandığında bu bölüm güncellenecek.',
-  },
-  {
-    question: 'Favorilerim ve geçmişim nerede saklanıyor?',
+    question: 'Favorilerim ve araçlarım nerede saklanıyor?',
     answer:
       'Hesabına bağlı olarak sunucuda saklanıyor. Farklı bir cihazdan aynı hesapla giriş yaptığında hepsini görürsün.',
   },
@@ -45,6 +41,7 @@ export default function SupportScreen() {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
+  const signedIn = useIsSignedIn();
   const [expanded, setExpanded] = useState<number>();
 
   const [message, setMessage] = useState('');
@@ -123,7 +120,15 @@ export default function SupportScreen() {
 
           <Text style={styles.sectionTitle}>Bize yaz</Text>
           <Card style={styles.card}>
-            {sent ? (
+            {!signedIn ? (
+              // Destek talebi hesaba yaziliyor; misafir icin e-posta yolu var.
+              <View style={styles.sentRow}>
+                <Ionicons name="mail-outline" size={20} color={colors.textSecondary} />
+                <Text style={styles.sentText}>
+                  Mesaj göndermek için giriş yap ya da info@torasarj.com adresine yaz.
+                </Text>
+              </View>
+            ) : sent ? (
               <View style={styles.sentRow}>
                 <Ionicons name="checkmark-circle-outline" size={20} color={colors.successText} />
                 <Text style={styles.sentText}>Mesajın ulaştı, en kısa sürede döneriz.</Text>

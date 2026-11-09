@@ -172,8 +172,7 @@ export default function SettingsScreen() {
           <Text style={styles.sectionTitle}>Tehlikeli bölge</Text>
           <Card style={styles.card}>
             <Text style={styles.dangerText}>
-              Hesabını silmek; araçlarını, favorilerini, rezervasyonlarını ve şarj geçmişini kalıcı
-              olarak kaldırır.
+              Hesabını silmek; araçlarını ve favorilerini kalıcı olarak kaldırır.
             </Text>
             <Button
               label="Hesabı sil"

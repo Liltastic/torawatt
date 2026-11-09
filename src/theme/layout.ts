@@ -60,7 +60,7 @@ export const shadows = {
 export const fontFamilies = {
   headingSemiBold: 'PlusJakartaSans_600SemiBold',
   headingBold: 'PlusJakartaSans_700Bold',
-  /** Buyuk gosterge sayilari (sarj yuzdesi, fatura toplami). */
+  /** Buyuk gosterge sayilari. */
   displayExtraBold: 'PlusJakartaSans_800ExtraBold',
 } as const;
 

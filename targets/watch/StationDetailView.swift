@@ -3,13 +3,8 @@ import SwiftUI
 
 /// Tek istasyonun haritasi, soketleri ve adresi.
 ///
-/// Soket listesi yalnizca detay ucunda geliyor; listedeki kayitta soket
-/// SAYISI var ama tipleri yok. Telefonda da ayni sebeple detay cekiliyor
-/// (bkz. src/services/evcs.ts withDetails) - sayidan tip uretmek tahmin olur.
-///
-/// Listeden gelen kayit `known` olarak tasiniyor: ag cevabi beklenirken ad,
-/// mesafe ve harita zaten cizilebiliyor, ekran bos kalmiyor. Detay gelince
-/// yalnizca soketler ekleniyor.
+/// Listeden gelen kayit `known` olarak tasiniyor: detay gelene kadar ad, mesafe
+/// ve harita zaten cizilebiliyor, ekran bos kalmiyor.
 struct StationDetailView: View {
     let stationId: Int
     let known: Station?
@@ -251,11 +246,10 @@ private struct SectionTitle: View {
     }
 }
 
-/// Verinin nereden geldigini ve neyi ICERMEDIGINI soyluyor: katalogda anlik
-/// doluluk ve fiyat yok, kullanici bosa beklememeli.
+/// Verinin ornek oldugunu soyluyor: kullanici bu noktaya sarj icin gitmemeli.
 private struct FootNote: View {
     var body: some View {
-        Text("Soket bilgisi ulusal katalogdan (EPDK) geliyor; anlık doluluk ve fiyat bu kayıtta yok.")
+        Text("Demo veri: bu istasyon ve soketler örnektir, gerçek değildir.")
             .font(.system(size: 10))
             .foregroundStyle(.tertiary)
             .multilineTextAlignment(.leading)

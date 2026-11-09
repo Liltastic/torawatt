@@ -16,19 +16,18 @@ import {
   AnimatedPressable,
   Button,
   Card,
-  ChargingMiniBar,
   DetailSkeleton,
   EmptyState,
   TextField,
-  useChargingMiniBarInset,
 } from '@/components';
 import { StationMap, type MapRoute } from '@/map';
 import { useStations } from '@/queries/stations';
 import { useActiveVehicle, useVehicles } from '@/queries/vehicles';
 import { geocode, getRoute, type Place } from '@/services/routing';
 import { planTrip, type TripPlan } from '@/services/tripPlanner';
+import { useIsSignedIn } from '@/store/auth';
 import { createThemedStyles, radius, spacing, typography, useColors } from '@/theme';
-import { formatEnergy, formatMinutes, formatPrice } from '@/utils/format';
+import { formatEnergy, formatMinutes } from '@/utils/format';
 import { haptics } from '@/utils/haptics';
 import { useTabBarInset } from '@/utils/tabBar';
 
@@ -41,7 +40,7 @@ export default function RouteScreen() {
   const router = useRouter();
   // iOS sekme cubugu icerigin uzerine biniyor (bkz. utils/tabBar).
   const tabBarInset = useTabBarInset();
-  const miniBarInset = useChargingMiniBarInset();
+  const signedIn = useIsSignedIn();
   const { isLoading: vehiclesLoading } = useVehicles();
   const vehicle = useActiveVehicle();
   const { data: stations } = useStations();
@@ -75,7 +74,6 @@ export default function RouteScreen() {
           <Text style={styles.title}>Rota</Text>
         </View>
         <DetailSkeleton />
-        <ChargingMiniBar />
       </SafeAreaView>
     );
   }
@@ -89,12 +87,17 @@ export default function RouteScreen() {
         <View style={styles.centered}>
           <EmptyState
             icon="car-sport-outline"
-            title="Önce araç ekle"
+            title={signedIn ? 'Önce araç ekle' : 'Rota için giriş yap'}
             description="Şarj molalarını hesaplayabilmek için aracının batarya kapasitesi ve tüketimi gerekiyor."
-            action={<Button label="Araç ekle" onPress={() => router.push('/vehicles/add')} />}
+            action={
+              signedIn ? (
+                <Button label="Araç ekle" onPress={() => router.push('/vehicles/add')} />
+              ) : (
+                <Button label="Giriş yap veya üye ol" onPress={() => router.replace('/welcome')} />
+              )
+            }
           />
         </View>
-        <ChargingMiniBar />
       </SafeAreaView>
     );
   }
@@ -141,7 +144,7 @@ export default function RouteScreen() {
         <ScrollView
           contentContainerStyle={[
             styles.content,
-            { paddingBottom: spacing.huge + tabBarInset + miniBarInset },
+            { paddingBottom: spacing.huge + tabBarInset },
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
@@ -187,8 +190,6 @@ export default function RouteScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
-
-      <ChargingMiniBar />
     </SafeAreaView>
   );
 }
@@ -247,12 +248,6 @@ function PlanResult({
             value={trip.unreachable ? '—' : `%${Math.round(trip.arrivalPercent)}`}
           />
         </View>
-
-        {trip.totalChargeCost > 0 && (
-          <Text style={styles.summaryCost}>
-            Tahmini şarj maliyeti {formatPrice(trip.totalChargeCost)}
-          </Text>
-        )}
       </Card>
 
       {trip.unreachable ? (
@@ -296,7 +291,6 @@ function PlanResult({
                   <Text style={styles.stopStat}>
                     {formatMinutes(Math.round(stop.chargeMinutes))}
                   </Text>
-                  <Text style={[styles.stopStat, styles.stopCost]}>{formatPrice(stop.cost)}</Text>
                 </View>
               </Card>
             </Animated.View>
@@ -457,12 +451,6 @@ const useStyles = createThemedStyles((colors) => ({
   summaryItem: { width: '50%', paddingVertical: spacing.sm },
   summaryLabel: { ...typography.caption, color: colors.textSecondary },
   summaryValue: { ...typography.h3, color: colors.text, marginTop: 1 },
-  summaryCost: {
-    ...typography.caption,
-    color: colors.primaryText,
-    marginTop: spacing.md,
-    fontWeight: '600',
-  },
 
   warnBox: {
     flexDirection: 'row',
@@ -505,7 +493,6 @@ const useStyles = createThemedStyles((colors) => ({
     justifyContent: 'space-between',
   },
   stopStat: { ...typography.caption, color: colors.textSecondary },
-  stopCost: { color: colors.text, fontWeight: '700' },
 
   disclaimer: { ...typography.caption, color: colors.textTertiary, marginTop: spacing.xl },
 }));

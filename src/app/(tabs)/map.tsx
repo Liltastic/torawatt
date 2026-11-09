@@ -1,14 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import BottomSheet, {
   BottomSheetFlatList,
-  BottomSheetFooter,
   BottomSheetScrollView,
-  useBottomSheet,
   type BottomSheetBackgroundProps,
-  type BottomSheetFooterProps,
 } from '@gorhom/bottom-sheet';
 import { GlassView } from 'expo-glass-effect';
-import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Linking,
@@ -22,7 +18,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
   Extrapolation,
   FadeInDown,
-  FadeOutUp,
   interpolate,
   runOnJS,
   useAnimatedReaction,
@@ -33,8 +28,6 @@ import Animated, {
 import {
   AnimatedPressable,
   AvailabilityBadge,
-  Button,
-  ChargingMiniBar,
   ConnectorCard,
   EmptyState,
   FavoriteHeart,
@@ -44,28 +37,18 @@ import {
   SegmentedControl,
   StationCard,
   StationCardSkeleton,
-  useChargingMiniBarInset,
 } from '@/components';
 import { BASEMAPS, StationMap, type StationMapHandle } from '@/map';
 import { useIsFavorite, useToggleFavorite } from '@/queries/favorites';
-import { useActiveReservation } from '@/queries/reservations';
 import { useStation, useStations } from '@/queries/stations';
 import { useActiveVehicle } from '@/queries/vehicles';
 import { haversineKm } from '@/services/routing';
+import { useIsSignedIn } from '@/store/auth';
 import { useLocationStore } from '@/store/location';
 import { useMapIntentStore } from '@/store/mapIntent';
 import { useMapStyleStore } from '@/store/mapStyle';
 import { createThemedStyles, radius, shadows, spacing, typography, useColors } from '@/theme';
-import {
-  effectiveReservationStatus,
-  reservationStatusLabels,
-  isExternalStation,
-  stationAvailability,
-  type Station,
-  type Vehicle,
-} from '@/types/domain';
-import { formatPrice, formatTime } from '@/utils/format';
-import { catalogInfoRows } from '@/utils/station';
+import { stationAvailability, type Station, type Vehicle } from '@/types/domain';
 import { GLASS_ENABLED } from '@/utils/glass';
 import { haptics } from '@/utils/haptics';
 import { useTabBarInset } from '@/utils/tabBar';
@@ -103,9 +86,6 @@ function SheetBackground({ animatedIndex, style }: BottomSheetBackgroundProps) {
   return <Animated.View pointerEvents="none" style={[style, styles.sheetBackground, animatedStyle]} />;
 }
 
-/** Bu indeksin altinda (peek'e yakin) footer gizlenir; sheet kucukken basligin ustune binmesin. */
-const FOOTER_VISIBLE_FROM_INDEX = 0.6;
-
 /** Harita uzerindeki yuvarlak butonlar (katman secici + konumuma git). */
 const MAP_FAB_SIZE = 48;
 const MAP_FAB_STACK_HEIGHT = MAP_FAB_SIZE * 2 + spacing.sm;
@@ -117,65 +97,16 @@ const MAP_FAB_STACK_HEIGHT = MAP_FAB_SIZE * 2 + spacing.sm;
 const FAB_GLASS_OFF_FROM_INDEX = 1.45;
 
 /**
- * Kutuphanenin footer'i sheet'in gorunur alaninin altina yapisir; sheet
- * peek konumundayken bu alan o kadar kucuk ki footer basligin ustune
- * cikiyordu. Sheet asagi indikce footer'i soluklastirip dokunmaya kapatiyoruz.
+ * Kamera kullaniciya ancak bu mesafede istasyon varsa gider. Ornek istasyonlar
+ * Istanbul-Ankara hattinda; baska yerdeki kullanici ilk acilista bos harita
+ * gormesin, varsayilan merkezde (Istanbul) kalsin.
  */
-function DetailFooter({
-  animatedFooterPosition,
-  bottomInset,
-  reservedBottom,
-  children,
-}: BottomSheetFooterProps & {
-  bottomInset: number;
-  /**
-   * Butonlarin altinda bos birakilan alan: sarj surerken mini cubuk tam
-   * buraya oturuyor. Footer'i yukari kaydirmak yerine kendi zeminini uzatiyoruz;
-   * boylece butonlarla mini cubuk arasinda kayan liste gorunmuyor.
-   */
-  reservedBottom: number;
-  children: React.ReactNode;
-}) {
-  const styles = useStyles();
-  const { animatedIndex } = useBottomSheet();
-  const [interactive, setInteractive] = useState(true);
-
-  useAnimatedReaction(
-    () => animatedIndex.value >= FOOTER_VISIBLE_FROM_INDEX,
-    (visible, previous) => {
-      if (visible !== previous) runOnJS(setInteractive)(visible);
-    },
-  );
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(
-      animatedIndex.value,
-      [0, FOOTER_VISIBLE_FROM_INDEX, 1],
-      [0, 0, 1],
-      Extrapolation.CLAMP,
-    ),
-  }));
-
-  return (
-    <BottomSheetFooter animatedFooterPosition={animatedFooterPosition} bottomInset={bottomInset}>
-      <Animated.View
-        pointerEvents={interactive ? 'auto' : 'none'}
-        style={[
-          styles.detailFooter,
-          reservedBottom > 0 && { paddingBottom: spacing.md + reservedBottom },
-          animatedStyle,
-        ]}>
-        {children}
-      </Animated.View>
-    </BottomSheetFooter>
-  );
-}
+const CENTER_ON_USER_WITHIN_KM = 150;
 
 /**
  * Cipler veriye gore kuruluyor: "Aracima uygun" yalnizca aktif arac varken,
- * "Musait" ve "24 saat" ise o bilgiyi tasiyan istasyon varken listeleniyor.
- * Ulusal katalogda canli doluluk ve calisma saati YOK (bkz. services/evcs.ts);
- * o cipler her zaman bos sonuc veren olu dugmelere donusuyordu.
+ * "Musait" ve "24 saat" ise o bilgiyi tasiyan istasyon varken listeleniyor;
+ * yoksa her zaman bos sonuc veren olu dugmelere donusuyorlar.
  */
 function buildFilters(vehicle: Vehicle | undefined, stations: Station[]): MapFilter[] {
   const filters: MapFilter[] = [];
@@ -211,9 +142,7 @@ export default function MapScreen() {
   const [query, setQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string>();
-  const [selectedConnectorId, setSelectedConnectorId] = useState<string>();
   const [detailTab, setDetailTab] = useState<DetailTab>('station');
-  const router = useRouter();
   const { height: windowHeight } = useWindowDimensions();
   const sheetRef = useRef<BottomSheet>(null);
   const mapRef = useRef<StationMapHandle>(null);
@@ -222,39 +151,31 @@ export default function MapScreen() {
   const sheetPosition = useSharedValue(windowHeight);
 
   const activeVehicle = useActiveVehicle();
-  const activeReservation = useActiveReservation();
   const { data: allStations, isLoading, isError, error, refetch } = useStations();
 
   // iOS sekme cubugu yari saydam ve icerigin USTUNE biniyor; sheet'in govdesi
   // cubugun altindan kayar, listenin son ogesi ise bu kadar yukarida bitmeli
   // (bkz. utils/tabBar). Android'de 0.
   const tabBarInset = useTabBarInset();
-  // Sarj surerken sekme cubugunun ustunde mini sarj cubugu duruyor; o da
-  // sheet'in uzerine biniyor (bkz. components/ChargingMiniBar).
-  const miniBarInset = useChargingMiniBarInset();
-  const bottomChrome = tabBarInset + miniBarInset;
-  const listContentStyle = { ...styles.list, paddingBottom: spacing.xl + bottomChrome };
+  const listContentStyle = { ...styles.list, paddingBottom: spacing.xl + tabBarInset };
 
   // Yuzdelik snap noktalari cubugun arkasinda kalan ~83pt'yi de sayiyordu;
   // peek konumunda cubugun ustunde neredeyse bir sey kalmiyordu. Oranlari
   // cubugun ustundeki kullanilabilir yukseklige uygulayip payi geri ekliyoruz:
-  // gorunen kisim tasarimdaki oran, govde yine cubugun altina uzaniyor. Mini
-  // sarj cubugu da ayni sekilde sayiliyor; yoksa peek'teki baslik onun altinda
-  // kaliyordu. Kapsayici olculene kadar (ve Android'de, sarj yokken) yuzdeler
-  // aynen kalir.
+  // gorunen kisim tasarimdaki oran, govde yine cubugun altina uzaniyor.
+  // Kapsayici olculene kadar (ve Android'de) yuzdeler aynen kalir.
   const [sheetContainerHeight, setSheetContainerHeight] = useState(0);
   const sheetSnapPoints = useMemo<(string | number)[]>(() => {
-    if (bottomChrome <= 0 || sheetContainerHeight <= 0) return SHEET_SNAP_POINTS;
-    const usable = sheetContainerHeight - bottomChrome;
-    return SHEET_SNAP_FRACTIONS.map((f) => Math.round(usable * f + bottomChrome));
-  }, [bottomChrome, sheetContainerHeight]);
+    if (tabBarInset <= 0 || sheetContainerHeight <= 0) return SHEET_SNAP_POINTS;
+    const usable = sheetContainerHeight - tabBarInset;
+    return SHEET_SNAP_FRACTIONS.map((f) => Math.round(usable * f + tabBarInset));
+  }, [tabBarInset, sheetContainerHeight]);
 
   const basemap = useMapStyleStore((s) => s.basemap);
   const toggleBasemap = useMapStyleStore((s) => s.toggle);
 
-  // Baslik (logo + arama + varsa rezervasyon bandi) haritanin uzerine biniyor;
-  // haritanin hata afisi onun arkasinda kalip okunamiyordu. Yuksekligi olcup
-  // afisi altina gonderiyoruz - rezervasyon bandi acilip kapandikca da guncellenir.
+  // Baslik (logo + arama) haritanin uzerine biniyor; haritanin hata afisi onun
+  // arkasinda kalip okunamiyordu. Yuksekligi olcup afisi altina gonderiyoruz.
   const [headerHeight, setHeaderHeight] = useState(0);
 
   const userLocation = useLocationStore((s) => s.coords);
@@ -272,8 +193,13 @@ export default function MapScreen() {
   useEffect(() => {
     if (!userLocation || hasCenteredOnUser.current) return;
     hasCenteredOnUser.current = true;
-    mapRef.current?.flyTo(userLocation, { zoom: 12.5, offsetY: windowHeight * 0.12 });
-  }, [userLocation, windowHeight]);
+    const stationNearby = allStations.some(
+      (station) => haversineKm(userLocation, station) <= CENTER_ON_USER_WITHIN_KM,
+    );
+    if (stationNearby) {
+      mapRef.current?.flyTo(userLocation, { zoom: 12.5, offsetY: windowHeight * 0.12 });
+    }
+  }, [userLocation, windowHeight, allStations]);
 
   const toggleFilter = (id: string) =>
     setActiveFilters((prev) => (prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]));
@@ -319,9 +245,6 @@ export default function MapScreen() {
       .sort((a, b) => a.distanceKm - b.distanceKm);
   }, [matching, userLocation]);
 
-  // Katalog istasyonlarinin soketleri yalnizca detay ucunda; listedeki kayitta
-  // sayilardan uretilmis tahmin duruyor (bkz. services/evcs.ts). Detay gelene
-  // kadar listedeki kayit gosteriliyor, geldiginde gercek soketlerle degisiyor.
   const { data: selectedStationDetail } = useStation(selectedId);
   const selectedStation = useMemo(
     () => selectedStationDetail ?? stations.find((s) => s.id === selectedId),
@@ -331,7 +254,6 @@ export default function MapScreen() {
   const openStation = useCallback(
     (station: Station) => {
       setSelectedId(station.id);
-      setSelectedConnectorId(undefined);
       setDetailTab('station');
       // Yari acik: detay okunur, secili pin ustteki harita alaninda ortada kalir.
       sheetRef.current?.snapToIndex(1);
@@ -384,7 +306,6 @@ export default function MapScreen() {
 
   const closeStationDetail = useCallback(() => {
     setSelectedId(undefined);
-    setSelectedConnectorId(undefined);
     sheetRef.current?.snapToIndex(1);
   }, []);
 
@@ -392,7 +313,6 @@ export default function MapScreen() {
   // sheet'i (ve varsa acik istasyon detayini) geri cekip haritaya yer aciyoruz.
   const handleMapPress = useCallback(() => {
     setSelectedId(undefined);
-    setSelectedConnectorId(undefined);
     sheetRef.current?.snapToIndex(0);
   }, []);
 
@@ -421,49 +341,6 @@ export default function MapScreen() {
       </Animated.View>
     ),
     [openStation],
-  );
-
-  const renderFooter = useCallback(
-    (footerProps: BottomSheetFooterProps) => {
-      if (!selectedStation) return null;
-      // Katalog istasyonunda uygulamadan sarj/rezervasyon yapilamiyor (bkz.
-      // services/evcs.ts); calismayacak buton gostermek yerine cubuk hic cizilmiyor.
-      if (isExternalStation(selectedStation)) return null;
-      const connector = selectedStation.connectors.find((c) => c.id === selectedConnectorId);
-
-      // Sheet ekranin dibine kadar iniyor; iOS'ta cam cubuk yer kaplamayip
-      // icerigin ustune bindigi icin butonlari o kadar yukari aliyoruz.
-      return (
-        <DetailFooter {...footerProps} bottomInset={tabBarInset} reservedBottom={miniBarInset}>
-          <Button
-            label="Rezerve Et"
-            variant="secondary"
-            disabled={!connector}
-            style={styles.secondaryAction}
-            onPress={() =>
-              connector &&
-              router.push({
-                pathname: '/booking/new',
-                params: { stationId: selectedStation.id, connectorId: connector.id },
-              })
-            }
-          />
-          <Button
-            label={connector ? 'Şarj Başlat' : 'Önce soket seç'}
-            disabled={!connector}
-            style={styles.primaryAction}
-            onPress={() =>
-              connector &&
-              router.push({
-                pathname: '/charger/[connectorId]',
-                params: { connectorId: connector.id, stationId: selectedStation.id },
-              })
-            }
-          />
-        </DetailFooter>
-      );
-    },
-    [selectedStation, selectedConnectorId, router, tabBarInset, miniBarInset, styles],
   );
 
   return (
@@ -537,18 +414,6 @@ export default function MapScreen() {
         onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}>
         <View style={styles.headerRow}>
           <Logo width={104} />
-          <AnimatedPressable
-            accessibilityRole="button"
-            accessibilityLabel="Bildirimler"
-            hitSlop={10}
-            haptic="tap"
-            onPress={() => router.push('/notifications')}
-            style={[styles.iconButton, GLASS_ENABLED && styles.glassSurface]}>
-            {GLASS_ENABLED && (
-              <GlassView pointerEvents="none" glassEffectStyle="regular" style={styles.iconButtonGlass} />
-            )}
-            <Ionicons name="notifications-outline" size={20} color={colors.text} />
-          </AnimatedPressable>
         </View>
 
         <SearchBar
@@ -558,32 +423,6 @@ export default function MapScreen() {
           containerStyle={styles.search}
           glass
         />
-
-        {activeReservation && (
-          <Animated.View entering={FadeInDown} exiting={FadeOutUp.duration(150)}>
-            <AnimatedPressable
-              accessibilityRole="button"
-              accessibilityLabel="Aktif rezervasyonu aç"
-              haptic="tap"
-              scaleTo={0.98}
-              onPress={() =>
-                router.push({ pathname: '/booking/[id]', params: { id: activeReservation.id } })
-              }
-              style={({ pressed }) => [styles.reservationBanner, pressed && styles.bannerPressed]}>
-              <Ionicons name="calendar" size={18} color={colors.white} />
-              <View style={styles.bannerText}>
-                <Text style={styles.bannerTitle} numberOfLines={1}>
-                  {activeReservation.stationName}
-                </Text>
-                <Text style={styles.bannerMeta}>
-                  {formatTime(activeReservation.startsAt)} ·{' '}
-                  {reservationStatusLabels[effectiveReservationStatus(activeReservation)]}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.white} />
-            </AnimatedPressable>
-          </Animated.View>
-        )}
       </SafeAreaView>
 
       <BottomSheet
@@ -594,23 +433,19 @@ export default function MapScreen() {
         // `bottom` + overflow:hidden olarak uyguluyor; sheet cubugun ustunde
         // keskin bir cizgiyle bitip arkasinda harita gorunuyordu. Sheet dibe
         // kadar iner, cam cubugun altindan gecer; icerigin ve footer'in cubugun
-        // ustunde kalmasini paylar (listContentStyle, detailContentStyle,
-        // DetailFooter bottomInset) saglar.
+        // ustunde kalmasini paylar (listContentStyle, detailContentStyle) saglar.
         animatedIndex={sheetIndex}
         animatedPosition={sheetPosition}
         enableDynamicSizing={false}
         backgroundComponent={SheetBackground}
         handleIndicatorStyle={styles.grabber}
         handleStyle={styles.handle}
-        footerComponent={selectedStation ? renderFooter : undefined}
         style={shadows.sheet}>
         {selectedStation ? (
           <StationDetail
             station={selectedStation}
             tab={detailTab}
             onTabChange={setDetailTab}
-            selectedConnectorId={selectedConnectorId}
-            onSelectConnector={setSelectedConnectorId}
             onBack={closeStationDetail}
             onDirections={() => openDirections(selectedStation)}
           />
@@ -684,11 +519,14 @@ export default function MapScreen() {
                 />
               </View>
             ) : (
-              // Liste artik ulusal katalogla besleniyor: Istanbul'da 200 kayit
-              // geliyor. Hepsini birden cizmek (onceki ScrollView + satir basina
+              // Uzun listeyi birden cizmek (onceki ScrollView + satir basina
               // giris/yerlesim animasyonu) sheet'i hic acilamaz hale getirdi;
               // sanallastirilmis liste yalnizca gorunen satirlari kuruyor.
               <BottomSheetFlatList
+                // Konum gelince sira degisiyor; giris animasyonu surerken yer
+                // degistiren satir eski yerinde takili kalip digerinin ustune
+                // biniyordu. Liste o anda bir kez yeniden kuruluyor.
+                key={userLocation ? 'by-distance' : 'unsorted'}
                 data={stations}
                 keyExtractor={(station: Station) => station.id}
                 renderItem={renderStationRow}
@@ -699,9 +537,6 @@ export default function MapScreen() {
           </>
         )}
       </BottomSheet>
-
-      {/* Sheet'ten SONRA: ikisi de mutlak konumlu, cubuk ustte cizilmeli. */}
-      <ChargingMiniBar />
     </View>
   );
 }
@@ -711,25 +546,18 @@ function StationDetail({
   station,
   tab,
   onTabChange,
-  selectedConnectorId,
-  onSelectConnector,
   onBack,
   onDirections,
 }: {
   station: Station;
   tab: DetailTab;
   onTabChange: (tab: DetailTab) => void;
-  selectedConnectorId?: string;
-  onSelectConnector: (id: string) => void;
   onBack: () => void;
   onDirections: () => void;
 }) {
   const colors = useColors();
   const styles = useStyles();
-  // enableFooterMarginAdjustment yalnizca footer'in OLCULEN yuksekligini pay
-  // olarak ekliyor; DetailFooter'a verdigimiz bottomInset footer'i yukari
-  // kaydiriyor ama o olcuye girmiyor. Payi biz ekliyoruz; yoksa iOS'ta icerigin
-  // son ~83pt'si (Ucretlendirme karti) butonlarin altinda kaliyor.
+  // iOS'ta sekme cubugu icerigin ustune biniyor; payi biz ekliyoruz.
   //
   // DIKKAT: contentContainerStyle DUZ bir nesne olmali. Dizi verilirse
   // kutuphane (useBottomSheetContentContainerStyle) StyleSheet.compose ile yine
@@ -740,11 +568,8 @@ function StationDetail({
   const detailContentStyle = { ...styles.detailContent, paddingBottom: spacing.xl + tabBarInset };
   const availability = stationAvailability(station);
   const availableCount = station.connectors.filter((c) => c.status === 'AVAILABLE').length;
-  const selectedConnector = station.connectors.find((c) => c.id === selectedConnectorId);
-  // Katalog istasyonu: doluluk ve fiyat verisi yok, favori de eklenemiyor
-  // (favoriler kendi backend'imizde, bu kayitlar orada yok).
-  const external = isExternalStation(station);
-  const catalogRows = catalogInfoRows(station);
+  // Favoriler hesaba bagli; misafire kalp gosterilmiyor.
+  const signedIn = useIsSignedIn();
   const socketSummary =
     availability === 'UNKNOWN'
       ? `${station.connectors.length} soket`
@@ -775,7 +600,7 @@ function StationDetail({
           </View>
         </View>
 
-        {!external && (
+        {signedIn && (
           <AnimatedPressable
             accessibilityRole="button"
             accessibilityLabel={isFavorite ? 'Favorilerden çıkar' : 'Favorilere ekle'}
@@ -804,81 +629,29 @@ function StationDetail({
 
       <BottomSheetScrollView
         showsVerticalScrollIndicator={false}
-        enableFooterMarginAdjustment
         contentContainerStyle={detailContentStyle}>
         {tab === 'station' ? (
           <>
             <Text style={styles.detailSectionHint}>
-              {external
-                ? 'Soket bilgisi ulusal katalogdan (EPDK) geliyor; anlık doluluk ve fiyat bu kayıtta yok.'
-                : 'Şarj başlatmak için bir soket seç.'}
+              Demo veri: bu istasyon ve soket durumları örnektir, gerçek değildir.
             </Text>
             {station.connectors.map((connector, index) => (
-              <ConnectorCard
-                key={connector.id}
-                connector={connector}
-                index={index + 1}
-                selected={connector.id === selectedConnectorId}
-                onPress={() => onSelectConnector(connector.id)}
-              />
+              <ConnectorCard key={connector.id} connector={connector} index={index + 1} />
             ))}
-
-            {/* Katalogda fiyat yok; bos bir kart yerine bolum hic cizilmiyor. */}
-            {!external && (
-              <>
-                <Text style={styles.detailSectionTitle}>Ücretlendirme</Text>
-                <View style={styles.detailInfoCard}>
-                  <InfoRow
-                    label="Enerji"
-                    value={
-                      selectedConnector?.pricePerKwh != null
-                        ? `${formatPrice(selectedConnector.pricePerKwh)} / kWh`
-                        : 'Soket seçince görünür'
-                    }
-                  />
-                  <InfoRow
-                    label="Bekleme ücreti"
-                    value={
-                      selectedConnector?.idleFeePerMin != null
-                        ? `${formatPrice(selectedConnector.idleFeePerMin)} / dk`
-                        : 'Yok'
-                    }
-                    last
-                  />
-                </View>
-              </>
-            )}
           </>
         ) : (
           <View style={styles.detailInfoCard}>
             <InfoRow label="İşletmeci" value={station.operator} />
             <InfoRow label="Adres" value={station.address} />
-            {external ? (
-              // Katalog kunyesi: il, sicil/lisans numarasi, dagitim sirketi,
-              // erisim ve yesil enerji bilgisi (bkz. utils/station).
-              catalogRows.map((row, index) => (
-                <InfoRow
-                  key={row.label}
-                  label={row.label}
-                  value={row.value}
-                  last={index === catalogRows.length - 1}
-                />
-              ))
-            ) : (
-              <>
-                <InfoRow
-                  label="Çalışma saatleri"
-                  value={station.isOpen24h ? '7/24 açık' : 'Belirtilmemiş'}
-                />
-                <InfoRow
-                  label="Olanaklar"
-                  value={
-                    station.amenities.length > 0 ? station.amenities.join(', ') : 'Belirtilmemiş'
-                  }
-                  last
-                />
-              </>
-            )}
+            <InfoRow
+              label="Çalışma saatleri"
+              value={station.isOpen24h ? '7/24 açık' : 'Belirtilmemiş'}
+            />
+            <InfoRow
+              label="Olanaklar"
+              value={station.amenities.length > 0 ? station.amenities.join(', ') : 'Belirtilmemiş'}
+              last
+            />
           </View>
         )}
       </BottomSheetScrollView>
@@ -907,16 +680,6 @@ const useStyles = createThemedStyles((colors) => ({
     justifyContent: 'space-between',
     paddingTop: spacing.sm,
   },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.chip,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   search: { marginTop: spacing.lg },
 
   mapFabs: { position: 'absolute', top: 0, right: spacing.xl },
@@ -943,28 +706,6 @@ const useStyles = createThemedStyles((colors) => ({
     bottom: 0,
     borderRadius: MAP_FAB_SIZE / 2,
   },
-  iconButtonGlass: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 20,
-  },
-
-  reservationBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.button,
-    backgroundColor: colors.primaryStrong,
-  },
-  bannerPressed: { backgroundColor: colors.primaryStrongPressed },
-  bannerText: { flex: 1, marginHorizontal: spacing.md },
-  bannerTitle: { ...typography.captionStrong, color: colors.white },
-  bannerMeta: { ...typography.caption, color: 'rgba(255,255,255,0.85)', marginTop: 1 },
 
   sheetBackground: {
     backgroundColor: colors.surface,
@@ -1042,7 +783,6 @@ const useStyles = createThemedStyles((colors) => ({
   detailTabs: { marginHorizontal: spacing.xl, marginTop: spacing.lg },
   detailContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.xl },
   detailSectionHint: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.md },
-  detailSectionTitle: { ...typography.h3, color: colors.text, marginTop: spacing.lg, marginBottom: spacing.sm },
   detailInfoCard: {
     backgroundColor: colors.surfaceMuted,
     borderRadius: radius.card,
@@ -1052,17 +792,4 @@ const useStyles = createThemedStyles((colors) => ({
   infoRowDivider: { borderBottomWidth: 1, borderBottomColor: colors.border },
   infoLabel: { ...typography.caption, color: colors.textSecondary },
   infoValue: { ...typography.body, color: colors.text, marginTop: 2 },
-
-  detailFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.md,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderColor: colors.border,
-  },
-  secondaryAction: { flex: 1, marginRight: spacing.md },
-  primaryAction: { flex: 1 },
 }));

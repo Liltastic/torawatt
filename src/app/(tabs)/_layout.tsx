@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Redirect, Tabs } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { useEffect } from 'react';
 import { Platform, Pressable, type GestureResponderEvent, type PressableProps } from 'react-native';
@@ -10,7 +10,6 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { useAuthStore } from '@/store/auth';
 import { createThemedStyles, spacing, typography, useColors } from '@/theme';
 import { haptics } from '@/utils/haptics';
 
@@ -18,7 +17,7 @@ type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 type IoniconColor = React.ComponentProps<typeof Ionicons>['color'];
 
 /**
- * Spec bolum 4: Harita / Rota / Sarj / Gecmis / Profil.
+ * Harita / Rota / Profil.
  *
  * Her sekmenin hem Ionicons (Android'in kendi cizdigimiz cubugu) hem SF Symbols
  * (iOS'un native cubugu) karsiligi var. `md` iOS'ta kullanilmiyor ama
@@ -43,24 +42,6 @@ const TABS = [
     sf: 'paperplane',
     sfSelected: 'paperplane.fill',
     md: 'navigation',
-  },
-  {
-    name: 'charging',
-    title: 'Şarj',
-    icon: 'flash-outline',
-    iconActive: 'flash',
-    sf: 'bolt',
-    sfSelected: 'bolt.fill',
-    md: 'bolt',
-  },
-  {
-    name: 'history',
-    title: 'Geçmiş',
-    icon: 'time-outline',
-    iconActive: 'time',
-    sf: 'clock',
-    sfSelected: 'clock.fill',
-    md: 'history',
   },
   {
     name: 'profile',
@@ -184,15 +165,8 @@ function LiquidGlassTabs() {
   );
 }
 
+/** Sekmeler misafire de acik: harita uyelik istemiyor (Apple 5.1.1(v)). */
 export default function TabsLayout() {
-  const status = useAuthStore((s) => s.status);
-
-  // Token suresi dolup useAuthStore.logout() cagrildiginda (bkz. src/services/api.ts
-  // 401 yakalayan yerler) sekmelerde kalinmasin diye guvenlik agi.
-  if (status === 'unauthenticated') {
-    return <Redirect href="/welcome" />;
-  }
-
   // Platform.OS calisma zamaninda degismiyor, yani bu dal bir kez secilip sabit
   // kaliyor - navigator ortasinda tur degistirme riski yok.
   return Platform.OS === 'ios' ? <LiquidGlassTabs /> : <StyledTabs />;

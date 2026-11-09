@@ -58,7 +58,7 @@ export function StationCardSkeleton() {
 }
 
 /**
- * Kart listeleri (favoriler, araclar, kampanyalar, odeme yontemleri) icin
+ * Kart listeleri (favoriler, araclar, kampanyalar) icin
  * yerini tutan kart. Kac tane basilacagini ekran belirler; uc tane ekranin
  * ust yarisini doldurmaya yetiyor.
  */
@@ -77,7 +77,7 @@ export function ListCardSkeleton({ style }: { style?: StyleProp<ViewStyle> }) {
 }
 
 /**
- * Detay ekranlari (istasyon, soket, rezervasyon, gecmis kaydi) icin: baslik
+ * Detay ekranlari icin: baslik
  * blogu ve altinda kart yuksekliginde bloklar. Basligi ekranin kendisi zaten
  * cizdigi icin bu yalnizca govdeyi doldurur.
  */

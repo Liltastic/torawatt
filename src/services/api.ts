@@ -1,13 +1,7 @@
 import { getDeviceId } from '@/lib/deviceId';
 import type {
-  Campaign,
-  ChargingHistoryDetail,
   Connector,
   ConnectorType,
-  PaymentMethod,
-  ReservationDetail,
-  ReservationStatus,
-  Station,
   Vehicle,
 } from '@/types/domain';
 
@@ -217,7 +211,7 @@ async function request<T>(
     // register/login/me kendi 401'ini kendisi ele aliyor (auth:false ya da hydrate'teki try/catch).
     if (response.status === 401 && options.auth !== false) {
       // Zaten token'siz gitmisse bu 401 yeni bir bilgi degil: cikistan sonra
-      // mount kalmis bir kok rota (station/[id], favorites...) refetch ettiginde
+      // mount kalmis bir kok rota (favorites, vehicles...) refetch ettiginde
       // olan tam olarak bu. onUnauthorized'i tekrar tetiklemek
       // logout -> cache temizligi -> refetch -> 401 dongusunu besliyor.
       const hadToken = authToken !== undefined;
@@ -282,17 +276,6 @@ export const authApi = {
 
 // --- Istasyonlar (kimlik dogrulama gerekmez) ---
 
-export const stationsApi = {
-  list: () => request<Station[]>('/stations', { auth: false }),
-  get: (id: string) => request<Station>(`/stations/${id}`, { auth: false }),
-};
-
-// --- Kampanyalar (kimlik dogrulama gerekmez) ---
-
-export const campaignsApi = {
-  list: () => request<Campaign[]>('/campaigns', { auth: false }),
-};
-
 // --- Araclar ---
 
 export interface CreateVehicleInput {
@@ -314,44 +297,6 @@ export const vehiclesApi = {
   remove: (id: string) => request<void>(`/vehicles/${id}`, { method: 'DELETE' }),
 };
 
-// --- Rezervasyonlar ---
-
-export interface CreateReservationInput {
-  stationId: string;
-  connectorId: string;
-  startsAt: string;
-  durationMinutes: number;
-}
-
-export const reservationsApi = {
-  list: () => request<ReservationDetail[]>('/reservations'),
-  create: (input: CreateReservationInput) =>
-    request<ReservationDetail>('/reservations', { method: 'POST', body: input }),
-  setStatus: (id: string, status: Extract<ReservationStatus, 'CONFIRMED' | 'ARRIVED' | 'CANCELLED'>) =>
-    request<ReservationDetail>(`/reservations/${id}`, { method: 'PATCH', body: { status } }),
-};
-
-// --- Sarj gecmisi ---
-
-export interface CreateHistoryInput {
-  stationId?: string;
-  stationName: string;
-  connectorLabel: string;
-  startedAt: string;
-  endedAt: string;
-  durationMinutes: number;
-  energyKwh: number;
-  pricePerKwh: number;
-  cost: number;
-}
-
-export const historyApi = {
-  list: () => request<ChargingHistoryDetail[]>('/charging-history'),
-  get: (id: string) => request<ChargingHistoryDetail>(`/charging-history/${id}`),
-  create: (input: CreateHistoryInput) =>
-    request<ChargingHistoryDetail>('/charging-history', { method: 'POST', body: input }),
-};
-
 // --- Favori istasyonlar ---
 
 export const favoritesApi = {
@@ -366,24 +311,6 @@ export const favoritesApi = {
 export const supportApi = {
   send: (message: string) =>
     request<{ id: string; createdAt: string }>('/support', { method: 'POST', body: { message } }),
-};
-
-// --- Odeme yontemleri (demo) ---
-
-export interface CreatePaymentMethodInput {
-  brand: string;
-  last4: string;
-  expiryMonth: number;
-  expiryYear: number;
-}
-
-export const paymentMethodsApi = {
-  list: () => request<PaymentMethod[]>('/payment-methods'),
-  create: (input: CreatePaymentMethodInput) =>
-    request<PaymentMethod>('/payment-methods', { method: 'POST', body: input }),
-  setDefault: (id: string) =>
-    request<PaymentMethod>(`/payment-methods/${id}/default`, { method: 'POST' }),
-  remove: (id: string) => request<void>(`/payment-methods/${id}`, { method: 'DELETE' }),
 };
 
 export type { Connector };

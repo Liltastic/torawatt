@@ -1,8 +1,15 @@
-# TORA WATT — mağaza yayını (iç test)
+# TORA WATT — mağaza yayını
 
 Bu dosya App Store Connect ve Play Console'da doldurulacak alanların
-hazır karşılıklarını tutuyor. Hedef: **iç test** (TestFlight iç testçiler +
-Play iç test). Bu aşamada Apple incelemesi yok, Play incelemesi yok.
+hazır karşılıklarını tutuyor. Hedef: önce iç test (TestFlight + Play iç test),
+sonra halka açık App Store yayını.
+
+Uygulamanın kapsamı: haritada örnek istasyonlar, soket durumları, rota planlama
+ve üyelik. **Şarj başlatma, ödeme, rezervasyon ve faturalandırma yok.**
+
+**Bu sürüm demo verilerle çalışıyor.** İstasyonlar uygulamanın içinde gömülü, adları
+"Demo" ile başlıyor ve gerçek şarj noktalarını göstermiyor. Telefon, saat, widget
+ve CarPlay aynı listeyi kullanıyor (`src/data/demoStations.ts`).
 
 ## Kimlik
 
@@ -16,6 +23,10 @@ Play iç test). Bu aşamada Apple incelemesi yok, Play incelemesi yok.
 | Güncelleme kanalı | `production` |
 | Gizlilik politikası | https://torasarj.com/kvkk-aydinlatma-metni/ |
 | Destek e-postası | info@torasarj.com |
+| Destek URL'si (App Store zorunlu) | https://torasarj.com/iletisim/ |
+| Telif hakkı (App Store zorunlu) | 2026 Tora Teknik Hizmetler İşletme A.Ş. |
+| Üçüncü taraf içeriği | Evet, gerekli haklar var (harita: Mapbox/OpenStreetMap, araç görselleri) |
+| Fiyat ve bölge | Ücretsiz, yalnızca Türkiye |
 
 ## Yapılacaklar
 
@@ -67,13 +78,15 @@ Toplanan her şey uygulamanın çalışması için; reklam yok, veri satışı y
 | --- | --- | --- |
 | E-posta adresi | Hesap oluşturma ve giriş | torawatt-api.onrender.com |
 | Ad | İsteğe bağlı profil adı | aynı |
-| Yaklaşık ve kesin konum | Yakındaki istasyonları ve mesafeyi göstermek | Sorgu olarak istasyon API'sine (`testmobileapi2.torasarj.net`); kendi sunucumuzda saklanmıyor |
-| Uygulama etkileşimleri | Favoriler, rezervasyonlar, şarj geçmişi, araç bilgileri | torawatt-api.onrender.com |
+| Arama geçmişi | Rota için yazılan adres | OpenStreetMap servisleri (Nominatim, OSRM); saklanmıyor |
+| Uygulama etkileşimleri | Favoriler, araç bilgileri | torawatt-api.onrender.com |
 | Cihaz veya diğer kimlikler | Hesap açmadan önce oluşturulan verinin yeni hesaba taşınması | aynı |
 | Kilitlenme günlükleri / tanılama | Hata ayıklama | Sunucu loguna yazılır, veritabanına değil |
 
-**Ödeme bilgisi toplanmıyor** — ödeme ekranındaki kartlar tamamen sahte,
-gerçek kart numarası hiçbir zaman girilmiyor. Finansal veri işaretleme.
+**Ödeme bilgisi toplanmıyor**, uygulamada ödeme yok. Finansal veri işaretleme.
+
+**Konum toplanmıyor**: mesafe hesabı cihazda yapılıyor, konum hiçbir sunucuya
+gönderilmiyor.
 
 Verinin aktarımda şifrelendiğini (HTTPS) ve kullanıcının silme talebinde
 bulunabileceğini işaretle.
@@ -84,12 +97,26 @@ Play tablosunun karşılığı. Hiçbiri izleme (tracking) amaçlı değil,
 "Uygulama İşlevselliği" seçilecek:
 
 - İletişim Bilgileri → E-posta Adresi, Ad — kimliğe bağlı
-- Konum → Kesin Konum — kimliğe bağlı **değil**
-- Tanımlayıcılar → Kullanıcı Kimliği — kimliğe bağlı
-- Kullanım Verileri → Ürün Etkileşimi — kimliğe bağlı
-- Tanılama → Kilitlenme Verileri, Performans Verileri — kimliğe bağlı değil
+- Kullanıcı İçeriği → Müşteri Desteği — kimliğe bağlı (destek mesajları)
+- Arama Geçmişi — kimliğe bağlı **değil** (rota için yazılan adresler)
+- Tanımlayıcılar → Kullanıcı Kimliği, Cihaz Kimliği — kimliğe bağlı
+- Kullanıcı İçeriği → Diğer Kullanıcı İçeriği — kimliğe bağlı (araç kayıtları, favoriler)
+- Teşhis → Kaza Verileri — kimliğe bağlı (hata kaydı kullanıcı kimliğini taşıyor)
+
+Konum listeye girmiyor: cihazdan çıkmıyor.
 
 "Verileriniz sizi izlemek için kullanılıyor mu?" → **Hayır**.
+
+## Apple — İnceleme notu (App Review Information)
+
+Demo hesap gerekmiyor, uygulama üye olmadan açılıyor. Notlar alanına:
+
+```
+This build runs on built-in sample data. Stations whose names start with "Demo"
+and their connector statuses are examples and do not represent real chargers.
+The app does not start charging sessions or take payments. No login is required:
+choose "Üye olmadan devam et" on the first screen.
+```
 
 ## İçerik derecelendirme
 
@@ -106,64 +133,71 @@ Hedef kitle: 18+ (şarj hizmeti, çocuklara yönelik değil).
 **Kısa açıklama (Play, en fazla 80 karakter)**
 
 ```
-TORA şarj istasyonlarını haritada bul, soketlerini ve gücünü gör.
+Şarj istasyonu bulma deneyimini örnek verilerle dene.
+```
+
+**Tanıtım metni (App Store, en fazla 170 karakter)**
+
+```
+Şarj istasyonlarını haritada bul, soketlerin tipini, gücünü ve durumunu gör. Bu sürüm örnek verilerle çalışır, gösterilen istasyonlar gerçek değildir.
 ```
 
 **Uzun açıklama**
 
 ```
-TORA WATT, TORA şarj ağındaki istasyonları elektrikli aracınla bulmanı sağlar.
+TORA WATT, elektrikli aracın için şarj istasyonu bulma deneyimini örnek verilerle gösterir.
 
-• Türkiye genelindeki TORA istasyonları haritada — 17 ilde 68 istasyon
-• Her istasyonun soketleri: tip (Type 2, CCS2, CHAdeMO), güç ve soket numarası
-• İstasyon künyesi: işletmeci, lisans numarası, dağıtım şirketi, erişim bilgisi
-• Konumuna en yakın istasyonlar mesafeye göre sıralı
-• Tek dokunuşla yol tarifi
-• Favori istasyonlarını kaydet
-• Aracını tanımla, uygun soketleri kolayca ayırt et
+Bu sürümdeki istasyonlar ve soket durumları ÖRNEK VERİDİR, gerçek şarj noktalarını göstermez. "Demo" ile başlayan noktalara şarj etmek için gitme.
 
-İstasyon bilgileri ulusal şarj ağı kataloğundan (EPDK) geliyor ve olduğu gibi
-gösteriliyor; tahmin edilen hiçbir veri yok.
+HARİTA VE LİSTE
+• İstasyonları haritada ve konumuna göre sıralı listede gör
+• Müsait, hızlı, 7/24 açık ve aracına uygun istasyonları filtrele
+
+SOKET BİLGİLERİ
+• Soket tipi: Type 2, CCS2, CHAdeMO, NACS
+• Güç sınıfı: AC, DC ve yüksek güçlü şarj
+• Soket durumu: müsait, dolu, arızalı, çevrimdışı
+
+ÜYELİK
+• Harita ve istasyon detayları için üyelik gerekmez
+• Üye olursan aracını kaydedebilir, istasyonları favorilerine ekleyebilir ve şarj molalarıyla rota planlayabilirsin
+• Hesabını istediğin zaman uygulama içinden silebilirsin
+
+APPLE WATCH VE WIDGET
+• En yakın örnek istasyonu saatinde ve ana ekranında gör
+
+TORA WATT üzerinden şarj başlatılmaz ve ödeme alınmaz.
 ```
 
 **Anahtar kelimeler (App Store, virgülle, en fazla 100 karakter)**
 
 ```
-şarj,elektrikli araç,şarj istasyonu,EV,tora,elektrik,harita,soket,menzil
+şarj,elektrikli araç,şarj istasyonu,EV,rota,harita,soket,menzil,Type 2,CCS
 ```
 
 **Kategori:** Seyahat (birincil) / Yardımcı Programlar (ikincil)
 
 ## Ekran görüntüleri
 
-Play iç test için en az 2 telefon görüntüsü, App Store için 6,9" iPhone
-(1320×2868) görüntüleri gerekiyor. Önerilen sıra:
-
-1. Harita, istasyon iğneleriyle
-2. Açılan panelde istasyon listesi
-3. İstasyon detayı — soketler ve künye
-4. Favoriler
-5. Araç profili
-
-iOS görüntülerini kendi iPhone'undan TestFlight yapısıyla almak en doğrusu.
+Play iç test için en az 2 telefon görüntüsü gerekiyor. App Store'un zorunlu tuttuğu
+iPhone yuvası "Dynamic Island (medium display)", kabul ettiği ölçü 1206×2622; uygulamada
+saat olduğu için bir de Apple Watch görüntüsü isteniyor. Hazır dosyalar:
+`screenshots/iphone-orta-ekran/` (zorunlu yuva), `screenshots/` kökündeki 1320×2868
+kopyalar (isteğe bağlı "large display" yuvası) ve `4-apple-watch.png` (416×496).
 
 `play-feature-graphic.png` (1024×500) Play'in "Öne çıkan grafik" alanı için
 bu klasörde hazır.
 
-## Bilinen sınırlar (iç testte bilinçli bırakıldı)
+## Bilinen sınırlar
 
-- **Ödeme, şarj başlatma ve rezervasyon simülasyon.** Kartlar sahte, şarj
-  ilerlemesi uygulama içinde üretiliyor, rezervasyon onayı taklit ediliyor.
-  Halka açık yayına çıkmadan önce ya gerçek EVCS entegrasyonu yapılmalı ya
-  da bu akışlar gizlenmeli — Apple 2.2 ve 4.2 bunları reddediyor.
-- **İstasyon verisi test sunucusundan** (`testmobileapi2.torasarj.net`)
-  geliyor. Yayın adresi belli olunca EAS ortam değişkeni güncellenip
-  `eas update` ile mağazadaki sürüme de ulaştırılabilir.
+- **Apple büyük ihtimalle reddeder.** Madde 2.2 demo ve deneme sürümlerini App Store'a
+  kabul etmiyor, TestFlight'a yönlendiriyor; 4.2 de asgari işlev istiyor. TestFlight iç
+  test için engel yok. Halka açık yayın için gerçek istasyon verisi gerekir.
+- **Demo adlar ve uyarılar çıkarılmamalı.** Gerçek gibi görünen sahte istasyon, sürücüyü
+  olmayan bir şarj noktasına yollar ve Apple'a yanlış beyan olur.
+- **Rota servisleri** (`src/services/routing.ts`) herkese açık demo/topluluk sunucuları.
 - **Backend Render'ın ücretsiz katmanında.** 15 dk isteksiz kalınca uyuyor,
-  uyanması ölçülen 22,5 saniye. Uygulama bunu biliyor (90 sn zaman aşımı +
-  önden uyandırma isteği), ama ilk giriş yavaş görünür.
-- **Gizlilik politikası konumdan söz etmiyor.** Sayfa mobil uygulamayı anıyor
-  ama konum verisi geçmiyor; mağaza formlarında konum topladığımızı beyan
-  ediyoruz. Halka açık yayından önce sayfaya şu anlamda bir paragraf eklenmeli:
-  uygulama, yakındaki şarj istasyonlarını ve mesafeyi gösterebilmek için
-  kullanıcının konumunu yalnızca uygulama açıkken işler, bu veriyi saklamaz.
+  uyanması ölçülen 22,5 saniye. Harita bundan etkilenmiyor, ama giriş ve üyelik
+  ilk istekte yavaş.
+- **Android widget'ı** (`plugins/android/ToraWidgetProvider.kt`) hâlâ test sunucusundaki
+  gerçek kataloğu okuyor. Android yayınından önce demo listeye alınmalı.

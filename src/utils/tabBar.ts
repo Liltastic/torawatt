@@ -35,8 +35,7 @@ export function useTabBarInset(): number {
    * Yukaridaki 49+34 hesabi yalnizca cubuk olcuye GIRDIGINDE geciyor. iOS 26'da
    * cubuk yuzuyor ve safeAreaInsets.bottom yalnizca home gostergesini veriyor;
    * o zaman pay cubugun yarisi kadar bile olmuyor ve icerigin sonu altinda
-   * kaliyor (katalog istasyonunda alt buton cubugu hic cizilmedigi icin -
-   * bkz. (tabs)/map.tsx renderFooter - acigi kapatacak baska pay da yok).
+   * kaliyor.
    *
    * Iki durumu ayirt etmek icin degerin kendisine bakiyoruz: cubuk iceride
    * olsaydi tek basina bir cubuk yuksekligini asardi. Asmiyorsa cubugu biz

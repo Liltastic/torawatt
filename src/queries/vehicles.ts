@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { vehiclesApi, type CreateVehicleInput } from '@/services/api';
+import { useIsSignedIn } from '@/store/auth';
 import type { Vehicle } from '@/types/domain';
 
 export const vehicleKeys = {
@@ -11,6 +12,7 @@ export function useVehicles() {
   return useQuery({
     queryKey: vehicleKeys.all,
     queryFn: vehiclesApi.list,
+    enabled: useIsSignedIn(),
   });
 }
 

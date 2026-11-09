@@ -44,7 +44,7 @@ const vehicleSchema = z.object({
   modelYear: numeric(1990, CURRENT_YEAR + 2, `1990 - ${CURRENT_YEAR + 2} arası olmalı`),
   batteryCapacityKwh: numeric(5, 250, '5 - 250 kWh arası olmalı'),
   // Alt sinir 0: bilinmeyen modellerde soket gucu sinirlanmiyor demek
-  // (bkz. store/session ratedPowerFor). Kullanici bu alani gormuyor.
+  // (bkz. services/tripPlanner effectivePowerKw). Kullanici bu alani gormuyor.
   maxAcKw: numeric(0, 50, '0 - 50 kW arası olmalı'),
   maxDcKw: numeric(0, 400, '0 - 400 kW arası olmalı'),
   averageConsumptionKwhPer100Km: numeric(5, 60, '5 - 60 kWh/100km arası olmalı'),
@@ -152,8 +152,8 @@ export default function AddVehicleScreen() {
     setSpecsFromData(false);
     for (const field of SPEC_FIELDS) setValue(field, '');
     // Guc alanlari formda GORUNMUYOR; bos kalsalar gorunmez bir dogrulama
-    // hatasiyla kayit engellenirdi. 0 burada "bilinmiyor" demek: sarj
-    // simulasyonu soketin kendi gucunu tavan aliyor (bkz. store/session).
+    // hatasiyla kayit engellenirdi. 0 burada "bilinmiyor" demek: rota
+    // planlayici soketin kendi gucunu tavan aliyor (bkz. services/tripPlanner).
     setValue('maxAcKw', '0');
     setValue('maxDcKw', '0');
     clearErrors([...SPEC_FIELDS]);

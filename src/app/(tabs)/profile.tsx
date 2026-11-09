@@ -1,39 +1,39 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { Text, View } from 'react-native';
+import { Linking, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-
-import { useMemo } from 'react';
 
 import {
   AnimatedPressable,
   Card,
-  ChargingMiniBar,
   CompactHeader,
-  useChargingMiniBarInset,
   useCollapsingTitle,
 } from '@/components';
-import { useChargingHistory } from '@/queries/history';
 import { useActiveVehicle } from '@/queries/vehicles';
-import { useAuthStore } from '@/store/auth';
+import { useAuthStore, useIsSignedIn } from '@/store/auth';
 import { createThemedStyles, radius, spacing, typography, useColors } from '@/theme';
 import { connectorLabels } from '@/types/domain';
 import { getRunningUpdateLabel } from '@/utils/buildInfo';
-import { formatEnergy, formatPrice } from '@/utils/format';
 import { useTabBarInset } from '@/utils/tabBar';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
-/** Spec bolum 4'teki profil menusu. Yapilmamis olanlar gorunur ama pasif. */
-const MENU: { icon: IoniconName; label: string; href?: string; tag?: string }[] = [
-  { icon: 'car-sport-outline', label: 'Araçlarım', href: '/vehicles' },
-  { icon: 'card-outline', label: 'Ödeme yöntemleri', href: '/payment/methods', tag: 'demo' },
-  { icon: 'heart-outline', label: 'Favoriler', href: '/favorites' },
-  { icon: 'notifications-outline', label: 'Bildirimler', href: '/notifications' },
-  { icon: 'pricetag-outline', label: 'Kampanyalar', href: '/campaigns' },
+const PRIVACY_POLICY_URL = 'https://torasarj.com/kvkk-aydinlatma-metni/';
+
+/** Profil menusu. accountOnly satirlar hesap gerektiriyor, misafire gosterilmiyor. */
+const MENU: {
+  icon: IoniconName;
+  label: string;
+  href?: string;
+  url?: string;
+  accountOnly?: boolean;
+}[] = [
+  { icon: 'car-sport-outline', label: 'Araçlarım', href: '/vehicles', accountOnly: true },
+  { icon: 'heart-outline', label: 'Favoriler', href: '/favorites', accountOnly: true },
   { icon: 'help-buoy-outline', label: 'Yardım ve destek', href: '/support' },
-  { icon: 'settings-outline', label: 'Ayarlar', href: '/settings' },
+  { icon: 'shield-checkmark-outline', label: 'Gizlilik politikası', url: PRIVACY_POLICY_URL },
+  { icon: 'settings-outline', label: 'Ayarlar', href: '/settings', accountOnly: true },
 ];
 
 export default function ProfileScreen() {
@@ -41,14 +41,12 @@ export default function ProfileScreen() {
   const styles = useStyles();
   const router = useRouter();
   const activeVehicle = useActiveVehicle();
-  const { data: history } = useChargingHistory();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
-  const miniBarInset = useChargingMiniBarInset();
-  // iOS'ta sekme cubugu icerigin UZERINDE duruyor (bkz. utils/tabBar).
-  // Diger dort sekme bu payi ekliyordu, profil eklemiyordu: sarj oturumu
-  // yokken miniBarInset 0 oldugu icin "Cikis yap" ve surum satiri cubugun
-  // altinda kaliyordu.
+  const signedIn = useIsSignedIn();
+  const menu = signedIn ? MENU : MENU.filter((item) => !item.accountOnly);
+  // iOS'ta sekme cubugu icerigin UZERINDE duruyor (bkz. utils/tabBar); bu pay
+  // olmadan "Cikis yap" ve surum satiri cubugun altinda kaliyor.
   const tabBarInset = useTabBarInset();
   const { scrollY, onScroll } = useCollapsingTitle();
 
@@ -57,18 +55,6 @@ export default function ProfileScreen() {
     router.replace('/welcome');
   };
 
-  const stats = useMemo(() => {
-    if (!history || history.length === 0) return null;
-    return history.reduce(
-      (acc, item) => ({
-        sessions: acc.sessions + 1,
-        energyKwh: acc.energyKwh + item.energyKwh,
-        cost: acc.cost + item.cost,
-      }),
-      { sessions: 0, energyKwh: 0, cost: 0 },
-    );
-  }, [history]);
-
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
       <Animated.ScrollView
@@ -76,7 +62,7 @@ export default function ProfileScreen() {
         scrollEventThrottle={16}
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: spacing.xxl + tabBarInset + miniBarInset },
+          { paddingBottom: spacing.xxl + tabBarInset },
         ]}
         showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Profil</Text>
@@ -89,9 +75,17 @@ export default function ProfileScreen() {
 
         <Animated.View entering={FadeInDown.duration(320)}>
           <Card style={styles.vehicleCard}>
-            <Text style={styles.vehicleCardLabel}>Aktif araç</Text>
+            <Text style={styles.vehicleCardLabel}>{signedIn ? 'Aktif araç' : 'Üyelik'}</Text>
 
-            {activeVehicle ? (
+            {!signedIn ? (
+              <>
+                <Text style={styles.vehicleEmpty}>Henüz giriş yapmadın</Text>
+                <Text style={styles.vehicleSpecs}>
+                  Üye olursan aracını kaydedip rota planlayabilir, istasyonları favorilerine
+                  ekleyebilirsin.
+                </Text>
+              </>
+            ) : activeVehicle ? (
               <>
                 <Text style={styles.vehicleName}>
                   {activeVehicle.make} {activeVehicle.model}
@@ -113,32 +107,23 @@ export default function ProfileScreen() {
             <AnimatedPressable
               accessibilityRole="button"
               haptic="tap"
-              onPress={() => router.push('/vehicles')}
+              onPress={() => (signedIn ? router.push('/vehicles') : router.replace('/welcome'))}
               style={({ pressed }) => [styles.vehicleAction, pressed && styles.vehicleActionPressed]}>
               <Text style={styles.vehicleActionText}>
-                {activeVehicle ? 'Araçları yönet' : 'Araç ekle'}
+                {!signedIn
+                  ? 'Giriş yap veya üye ol'
+                  : activeVehicle
+                    ? 'Araçları yönet'
+                    : 'Araç ekle'}
               </Text>
               <Ionicons name="chevron-forward" size={16} color={colors.primaryText} />
             </AnimatedPressable>
           </Card>
         </Animated.View>
 
-        {stats && (
-          <Animated.View entering={FadeInDown.delay(60).duration(320)}>
-            <Card style={styles.statsCard}>
-              <Text style={styles.vehicleCardLabel}>Şarj özetin</Text>
-              <View style={styles.statsRow}>
-                <Stat value={String(stats.sessions)} label="oturum" />
-                <Stat value={formatEnergy(stats.energyKwh)} label="enerji" />
-                <Stat value={formatPrice(stats.cost, 0)} label="harcama" />
-              </View>
-            </Card>
-          </Animated.View>
-        )}
-
         <View style={styles.menu}>
-          {MENU.map((item, index) => {
-            const enabled = !!item.href;
+          {menu.map((item, index) => {
+            const enabled = !!item.href || !!item.url;
             return (
               <Animated.View
                 key={item.label}
@@ -149,10 +134,13 @@ export default function ProfileScreen() {
                   disabled={!enabled}
                   haptic="selection"
                   scaleTo={0.98}
-                  onPress={() => item.href && router.push(item.href as never)}
+                  onPress={() => {
+                    if (item.url) void Linking.openURL(item.url);
+                    else if (item.href) router.push(item.href as never);
+                  }}
                   style={({ pressed }) => [
                     styles.menuRow,
-                    index < MENU.length - 1 && styles.menuRowDivider,
+                    index < menu.length - 1 && styles.menuRowDivider,
                     pressed && enabled && styles.menuRowPressed,
                   ]}>
                   <Ionicons
@@ -164,9 +152,6 @@ export default function ProfileScreen() {
                     {item.label}
                   </Text>
 
-                  {item.tag ? (
-                    <Text style={styles.tag}>{item.tag}</Text>
-                  ) : null}
                   {enabled ? (
                     <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
                   ) : (
@@ -178,44 +163,28 @@ export default function ProfileScreen() {
           })}
         </View>
 
-        <AnimatedPressable
-          accessibilityRole="button"
-          haptic="heavy"
-          scaleTo={0.98}
-          onPress={onLogout}
-          style={({ pressed }) => [styles.logout, pressed && styles.logoutPressed]}>
-          <Ionicons name="log-out-outline" size={20} color={colors.dangerText} />
-          <Text style={styles.logoutLabel}>Çıkış yap</Text>
-        </AnimatedPressable>
+        {signedIn && (
+          <AnimatedPressable
+            accessibilityRole="button"
+            haptic="heavy"
+            scaleTo={0.98}
+            onPress={onLogout}
+            style={({ pressed }) => [styles.logout, pressed && styles.logoutPressed]}>
+            <Ionicons name="log-out-outline" size={20} color={colors.dangerText} />
+            <Text style={styles.logoutLabel}>Çıkış yap</Text>
+          </AnimatedPressable>
+        )}
 
         <Text style={styles.version}>TORA WATT · {getRunningUpdateLabel()}</Text>
       </Animated.ScrollView>
 
       <CompactHeader title="Profil" scrollY={scrollY} />
-      <ChargingMiniBar />
     </SafeAreaView>
-  );
-}
-
-function Stat({ value, label }: { value: string; label: string }) {
-  const styles = useStyles();
-  return (
-    <View style={styles.stat}>
-      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
-        {value}
-      </Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
   );
 }
 
 const useStyles = createThemedStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.background },
-  statsCard: { marginTop: spacing.md },
-  statsRow: { flexDirection: 'row', marginTop: spacing.md },
-  stat: { flex: 1 },
-  statValue: { ...typography.h3, color: colors.text },
-  statLabel: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
   content: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl },
   title: { ...typography.h2, color: colors.text, paddingTop: spacing.sm },
   accountEmail: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
@@ -262,12 +231,6 @@ const useStyles = createThemedStyles((colors) => ({
   menuLabel: { ...typography.body, color: colors.text, flex: 1, marginLeft: spacing.md },
   menuLabelDisabled: { color: colors.textTertiary },
   soon: { ...typography.caption, color: colors.textTertiary },
-  tag: {
-    ...typography.caption,
-    color: colors.warningText,
-    fontWeight: '700',
-    marginRight: spacing.sm,
-  },
 
   logout: {
     flexDirection: 'row',

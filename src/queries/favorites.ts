@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { favoritesApi } from '@/services/api';
+import { useIsSignedIn } from '@/store/auth';
 
 export const favoriteKeys = {
   all: ['favorites'] as const,
@@ -10,6 +11,7 @@ export function useFavoriteIds() {
   return useQuery({
     queryKey: favoriteKeys.all,
     queryFn: favoritesApi.list,
+    enabled: useIsSignedIn(),
   });
 }
 

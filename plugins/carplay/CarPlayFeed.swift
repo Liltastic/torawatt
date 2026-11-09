@@ -1,49 +1,21 @@
-// EVCS katalogundan veri cekme katmani; iOS widget'indakinin (bkz.
-// targets/widget/EvcsFeed.swift) CarPlay icin kopyasi.
-//
-// NEDEN KOPYA: CarPlay kodu ANA uygulama hedefinde derleniyor, widget ise
-// ayri bir uzanti hedefi. Ikisi arasinda paylasilan kaynak klasoru yok.
-//
 import CoreLocation
 import Foundation
 
-/// Widget'in katalog istemcisi.
+/// CarPlay'in istasyon listesi: ORNEK VERI, ag istegi yok.
 ///
-/// targets/watch/EvcsClient.swift'in kirpilmis kopyasi: widget yalnizca liste
-/// ucunu kullaniyor, detay ucuna hic gitmiyor. Kopya olmasinin sebebi Xcode
-/// hedeflerinin ayri derleme birimleri olmasi ve eklentinin yalnizca hedefin
-/// kendi klasorundeki dosyalari baglamasi - paylasmak icin ayri bir framework
-/// hedefi kurmak gerekirdi, iki kucuk dosya icin orantisiz.
-///
-/// Alan adlari icin bkz. src/services/evcs.ts (CatalogStation).
-struct CarStation: Decodable, Identifiable {
+/// Telefondaki src/data/demoStations.ts ile ayni liste. Kopya olmasinin sebebi
+/// Xcode hedeflerinin ayri derleme birimleri olmasi (bkz. targets/README.md);
+/// liste degisirse dort Swift dosyasi da guncellenmeli.
+struct CarStation: Identifiable {
     let id: Int
     let name: String
     let operatorName: String
-    let brand: String?
     let latitude: Double
     let longitude: Double
     let socketCount: Int
-    let distanceKm: Double?
+    var distanceKm: Double?
 
-    enum CodingKeys: String, CodingKey {
-        case id, name, brand, latitude, longitude, socketCount, distanceKm
-        case operatorName = "operator"
-    }
-
-    /// Katalogda ad bazen sicil kodu ("000056") oluyor; o zaman marka adi
-    /// daha anlamli (telefonda ve saatte de ayni kural isliyor).
-    var displayName: String {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let isOnlyDigits = !trimmed.isEmpty && trimmed.allSatisfy { $0.isNumber }
-        if !trimmed.isEmpty && !isOnlyDigits { return trimmed }
-
-        let brandName = brand?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if !brandName.isEmpty { return brandName }
-
-        let operatorLabel = operatorName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return operatorLabel.isEmpty ? "İsimsiz istasyon" : operatorLabel
-    }
+    var displayName: String { name }
 
     var distanceLabel: String {
         guard let distanceKm else { return "—" }
@@ -59,101 +31,37 @@ struct CarStation: Decodable, Identifiable {
 
     /// CarPlay listesinde tek satirda gorunen ozet.
     var subtitle: String {
-        var parts: [String] = [distanceLabel]
-        parts.append("(socketCount) soket")
-        return parts.joined(separator: " · ")
+        "\(distanceLabel) · \(socketCount) soket"
     }
 }
 
 enum CarPlayFeed {
-    /// Telefondaki EXPO_PUBLIC_EVCS_API_URL ile ayni adres. Widget Metro'dan
-    /// gecmedigi icin ortam degiskeni okuyamiyor; adres degisirse burasi ve
-    /// targets/watch/EvcsClient.swift birlikte guncellenmeli.
-    private static let baseURL = "https://testmobileapi2.torasarj.net"
+    private static let stations: [CarStation] = [
+        CarStation(id: 1, name: "Demo Maslak", operatorName: "TORA WATT Demo", latitude: 41.1106, longitude: 29.0206, socketCount: 4),
+        CarStation(id: 2, name: "Demo Levent", operatorName: "TORA WATT Demo", latitude: 41.0819, longitude: 29.0117, socketCount: 2),
+        CarStation(id: 3, name: "Demo Kağıthane", operatorName: "TORA WATT Demo", latitude: 41.0876, longitude: 28.9712, socketCount: 3),
+        CarStation(id: 4, name: "Demo Beşiktaş", operatorName: "TORA WATT Demo", latitude: 41.0422, longitude: 29.0061, socketCount: 2),
+        CarStation(id: 5, name: "Demo Ataşehir", operatorName: "TORA WATT Demo", latitude: 40.9923, longitude: 29.1244, socketCount: 3),
+        CarStation(id: 6, name: "Demo Gebze", operatorName: "TORA WATT Demo", latitude: 40.8021, longitude: 29.4307, socketCount: 2),
+        CarStation(id: 7, name: "Demo Sakarya", operatorName: "TORA WATT Demo", latitude: 40.7654, longitude: 30.4012, socketCount: 2),
+        CarStation(id: 8, name: "Demo Düzce", operatorName: "TORA WATT Demo", latitude: 40.8438, longitude: 31.1565, socketCount: 2),
+        CarStation(id: 9, name: "Demo Bolu", operatorName: "TORA WATT Demo", latitude: 40.7396, longitude: 31.6112, socketCount: 3),
+        CarStation(id: 10, name: "Demo Gerede", operatorName: "TORA WATT Demo", latitude: 40.8005, longitude: 32.1985, socketCount: 1),
+        CarStation(id: 11, name: "Demo Kızılcahamam", operatorName: "TORA WATT Demo", latitude: 40.4712, longitude: 32.6489, socketCount: 2),
+    ]
 
-    private static let radiusKm = 50
-    /// Widget en fazla uc istasyon gosteriyor; sayfayi kucuk tutmak
-    /// yenileme butcesi icinde isi hizlandiriyor.
-    private static let pageSize = 50
-
-    private static let deviceId: String = {
-        let key = "tora-watt-carplay-device-id"
-        if let existing = UserDefaults.standard.string(forKey: key) {
-            return existing
-        }
-        let created = UUID().uuidString
-        UserDefaults.standard.set(created, forKey: key)
-        return created
-    }()
-
-    private struct Envelope<T: Decodable>: Decodable {
-        let success: Bool
-        let data: T?
-        let message: String?
-    }
-
-    private struct Page<T: Decodable>: Decodable {
-        let items: [T]
-    }
-
-    enum FeedError: LocalizedError {
-        case badStatus(Int)
-        case rejected(String)
-
-        var errorDescription: String? {
-            switch self {
-            case .badStatus(let code): return "Servis \(code) döndü"
-            case .rejected(let message): return message
-            }
-        }
-    }
-
-    /// Katalogda isletmeci filtresi yok; TORA kayitlarini istemcide ayikliyoruz.
-    /// Kelime sinirini sozcuklere bolerek sagliyoruz ki icinde "tora" gecen
-    /// baska adlar yanlislikla eslesmesin (telefonda karsiligi /\btora\b/i).
-    private static func mentionsTora(_ value: String?) -> Bool {
-        guard let value else { return false }
-        return value
-            .lowercased()
-            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
-            .contains { $0 == "tora" }
-    }
-
+    /// En yakindan uzaga sirali. Yaricap yok: ornek istasyonlar tek bir hatta
+    /// duruyor ve baska sehirdeki kullanici bos ekran gormemeli.
     static func nearbyToraStations(latitude: Double, longitude: Double) async throws -> [CarStation] {
-        guard var components = URLComponents(string: baseURL) else {
-            throw FeedError.rejected("İstek adresi kurulamadı")
-        }
-        components.path = "/api/v1/stations/external"
-        components.queryItems = [
-            URLQueryItem(name: "lat", value: String(latitude)),
-            URLQueryItem(name: "lng", value: String(longitude)),
-            URLQueryItem(name: "radius", value: String(radiusKm)),
-            URLQueryItem(name: "page", value: "1"),
-            URLQueryItem(name: "size", value: String(pageSize)),
-        ]
-        guard let url = components.url else {
-            throw FeedError.rejected("İstek adresi kurulamadı")
-        }
-
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 15
-        request.setValue("TORA WATT", forHTTPHeaderField: "X-App-Name")
-        request.setValue("1.0.0", forHTTPHeaderField: "X-App-Version")
-        // Bilerek "iOS": uc bilinmeyen platform degerinde 400 donebiliyor.
-        request.setValue("iOS", forHTTPHeaderField: "X-App-Platform")
-        request.setValue(deviceId, forHTTPHeaderField: "X-Device-Id")
-        request.setValue("tr", forHTTPHeaderField: "X-App-Locale")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-            throw FeedError.badStatus(http.statusCode)
-        }
-
-        let envelope = try JSONDecoder().decode(Envelope<Page<CarStation>>.self, from: data)
-        guard envelope.success, let page = envelope.data else {
-            throw FeedError.rejected(envelope.message ?? "Servis isteği reddetti")
-        }
-
-        return page.items.filter { mentionsTora($0.brand) || mentionsTora($0.operatorName) }
+        let here = CLLocation(latitude: latitude, longitude: longitude)
+        return stations
+            .map { station in
+                var located = station
+                located.distanceKm = here.distance(
+                    from: CLLocation(latitude: station.latitude, longitude: station.longitude)
+                ) / 1000
+                return located
+            }
+            .sorted { ($0.distanceKm ?? 0) < ($1.distanceKm ?? 0) }
     }
 }

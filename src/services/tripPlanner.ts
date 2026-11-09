@@ -40,7 +40,6 @@ export interface ChargingStop {
   departurePercent: number;
   addedKwh: number;
   chargeMinutes: number;
-  cost: number;
 }
 
 export interface TripPlan {
@@ -52,7 +51,6 @@ export interface TripPlan {
    */
   arrivalPercent: number;
   totalChargeMinutes: number;
-  totalChargeCost: number;
   /** Menzil yetmiyor ve uygun istasyon da bulunamadiysa true. */
   unreachable: boolean;
 }
@@ -79,8 +77,8 @@ function rangeKm(vehicle: Vehicle, percent: number): number {
  * Guvenlik payi BILEREK uygulanmiyor. Pay yalnizca "bu bacagi bu sarjla gecebilir
  * miyim" testine ait (bkz. rangeKm). Buraya da katsaydik varista batarya oldugundan
  * dusuk gorunur, addedKwh = (hedef - varis) oldugu icin her molaya gercekte
- * harcanmayan enerji eklenir ve kullaniciya gosterilen sarj suresi ile maliyet
- * sisirdi - 250 km'lik bir bacakta durak basina ~5 kWh hayalet enerji.
+ * harcanmayan enerji eklenir ve kullaniciya gosterilen sarj suresi sisirdi -
+ * 250 km'lik bir bacakta durak basina ~5 kWh hayalet enerji.
  */
 function consumedPercent(vehicle: Vehicle, km: number): number {
   const kwh = (km * vehicle.averageConsumptionKwhPer100Km) / 100;
@@ -164,14 +162,9 @@ function effectivePowerKw(vehicle: Vehicle, station: Station): number {
 
   const stationMax = Math.max(...usable.map((c) => c.powerKw));
   const isAc = usable.every((c) => c.type === 'TYPE_2');
-  return Math.min(stationMax, isAc ? vehicle.maxAcKw : vehicle.maxDcKw);
-}
-
-function cheapestPrice(station: Station): number {
-  const prices = plannableConnectors(station)
-    .filter((c) => c.pricePerKwh != null)
-    .map((c) => c.pricePerKwh!);
-  return prices.length ? Math.min(...prices) : 0;
+  const vehicleLimitKw = isAc ? vehicle.maxAcKw : vehicle.maxDcKw;
+  // 0 "bilinmiyor" demek (bkz. vehicles/add); yoksa o arac hicbir istasyonu aday goremiyor.
+  return vehicleLimitKw > 0 ? Math.min(stationMax, vehicleLimitKw) : stationMax;
 }
 
 export function planTrip({
@@ -209,7 +202,6 @@ export function planTrip({
         // batarya nereye duserdi. Eksi cikmasi menzil aciginin olcusu.
         arrivalPercent: batteryPercent - consumedPercent(vehicle, remainingKm),
         totalChargeMinutes: stops.reduce((s, x) => s + x.chargeMinutes, 0),
-        totalChargeCost: stops.reduce((s, x) => s + x.cost, 0),
         unreachable: true,
       };
     }
@@ -235,7 +227,6 @@ export function planTrip({
       departurePercent: targetPercent,
       addedKwh,
       chargeMinutes: powerKw > 0 ? (addedKwh / (powerKw * AVERAGE_POWER_RATIO)) * 60 : 0,
-      cost: addedKwh * cheapestPrice(next.station),
     });
 
     batteryPercent = targetPercent;
@@ -248,7 +239,6 @@ export function planTrip({
     stops,
     arrivalPercent: batteryPercent - consumedPercent(vehicle, finalLegKm),
     totalChargeMinutes: stops.reduce((s, x) => s + x.chargeMinutes, 0),
-    totalChargeCost: stops.reduce((s, x) => s + x.cost, 0),
     unreachable: false,
   };
 }

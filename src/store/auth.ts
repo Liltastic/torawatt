@@ -65,7 +65,7 @@ function parseCachedUser(raw: string | null): AuthUser | undefined {
  * setAuthToken ile ayni desen: store, QueryClientProvider'in altinda olmadigi
  * icin useQueryClient kullanamiyor; client'i src/app/_layout.tsx bir kez
  * kaydediyor. Oturum degisiminde cache'i bosaltmak icin gerekli - aksi halde
- * onceki hesabin araclari/rezervasyonlari/gecmisi yeni kullaniciya gorunuyor.
+ * onceki hesabin araclari ve favorileri yeni kullaniciya gorunuyor.
  */
 let queryClient: QueryClient | undefined;
 
@@ -197,6 +197,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ token: undefined, user: undefined, status: 'unauthenticated' });
   },
 }));
+
+/** Oturum acik mi. Misafir haritayi gorur; hesaba bagli sorgular calismaz. */
+export const useIsSignedIn = () => useAuthStore((s) => s.status === 'authenticated');
 
 // api.ts, token gecersiz/suresi dolmus 401 aldiginda oturumu otomatik kapatabilsin diye.
 setUnauthorizedHandler(() => {

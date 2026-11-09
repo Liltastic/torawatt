@@ -10,13 +10,14 @@ tarafına native modül sokmuyor, dolayısıyla **Expo Go çalışmaya devam edi
 | iPhone widget'ı | `targets/widget/` | Ana ekran ve kilit ekranı |
 | CarPlay | `plugins/carplay/` | Araç ekranında harita + istasyonlar (bkz. aşağıda) |
 
-## Neden hepsi veriyi kendisi çekiyor
+## Neden hepsi kendi listesini taşıyor
 
-Dördü de EVCS kataloğuna **doğrudan** bağlanıyor; telefonun JS tarafından veri
-almıyorlar. Sebebi mimari değil, bir kısıt: paylaşılan veri için JS'e native bir
-modül girmesi gerekirdi ve o an Expo Go uygulamayı açamaz hale gelir. Bu yüzden
-her hedefin kendi küçük istemcisi var (`EvcsClient`, `EvcsFeed`, `WatchFeed`,
-`CarPlayFeed`) — dördü de aynı uca, aynı başlıklarla gidiyor.
+Bu sürüm **örnek verilerle** çalışıyor. Dördü de `src/data/demoStations.ts`
+listesinin bir kopyasını kendi içinde taşıyor; ağ isteği yapmıyorlar ve telefonun
+JS tarafından veri almıyorlar. Sebebi mimari değil, bir kısıt: paylaşılan veri
+için JS'e native bir modül girmesi gerekirdi ve o an Expo Go uygulamayı açamaz
+hale gelir. Liste değişirse dört dosya da (`EvcsClient`, `EvcsFeed`, `WatchFeed`,
+`CarPlayFeed`) güncellenmeli.
 
 Bunun bedeli dosya tekrarı. Tek kaynağa indirmek ortak bir Swift paketi kurmayı
 gerektiriyor; dört küçük dosya için kurulması gereken fazla makine.

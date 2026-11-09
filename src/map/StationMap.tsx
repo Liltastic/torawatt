@@ -35,8 +35,8 @@ import { BASEMAPS, buildMapHtml } from './mapHtml';
  * Harita, uzerine binen basligin arkasina kadar uzaniyor; hata afisi de bu
  * kadar asagida basliyor. Cagiran ekran kendi basliginin gercek yuksekligini
  * biliyorsa `errorTopOffset` ile bildirir - sabit bir deger, guvenli alani
- * buyuk olan telefonlarda (veya rezervasyon bandi acikken) afisi arama
- * kutusunun altinda birakip okunmaz hale getiriyordu.
+ * buyuk olan telefonlarda afisi arama kutusunun altinda birakip okunmaz hale
+ * getiriyordu.
  */
 const ERROR_BANNER_TOP = 130;
 

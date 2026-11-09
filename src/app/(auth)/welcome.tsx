@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AuthBackdrop, Button, Logo } from '@/components';
+import { AnimatedPressable, AuthBackdrop, Button, Logo } from '@/components';
 import { createThemedStyles, spacing, typography, useColors } from '@/theme';
 import { getRunningUpdateLabel } from '@/utils/buildInfo';
 
@@ -46,6 +46,13 @@ export default function WelcomeScreen() {
             style={styles.secondaryAction}
             onPress={() => router.push('/login')}
           />
+          <AnimatedPressable
+            accessibilityRole="button"
+            haptic="tap"
+            onPress={() => router.replace('/map')}
+            style={styles.guestAction}>
+            <Text style={styles.guestLabel}>Üye olmadan devam et</Text>
+          </AnimatedPressable>
           <Text style={styles.footer}>TORA WATT · {getRunningUpdateLabel()}</Text>
         </Animated.View>
       </SafeAreaView>
@@ -69,6 +76,8 @@ const useStyles = createThemedStyles((colors) => ({
 
   actions: { paddingTop: spacing.xxxl, paddingBottom: spacing.lg },
   secondaryAction: { marginTop: spacing.md },
+  guestAction: { marginTop: spacing.sm, paddingVertical: spacing.md, alignItems: 'center' },
+  guestLabel: { ...typography.body, fontWeight: '600', color: colors.white },
   footer: {
     ...typography.caption,
     color: 'rgba(255, 255, 255, 0.62)',
