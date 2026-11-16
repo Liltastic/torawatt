@@ -43,6 +43,18 @@ const ERROR_BANNER_TOP = 130;
 /** Harita acildiktan sonra gelen gecici hatalarin afiste kalma suresi. */
 const ERROR_BANNER_TIMEOUT_MS = 6000;
 
+/**
+ * Ekranda gosterilen harita hatasi. Ham mesaj (yukleme asamasi, URL, HTTP kodu)
+ * yalnizca hata kaydina gidiyor: kullanici eskiden "Harita acilamadi - son
+ * asama: stil geldi" gibi ic ayrinti goruyordu (yavas baglantida yukleme bekcisi
+ * 20 sn'yi asinca, Android emulatorde goruldu).
+ */
+function userFacingMapError(opened: boolean): string {
+  return opened
+    ? 'Haritanın bir kısmı yüklenemedi.'
+    : 'Harita yüklenemedi. İnternet bağlantını kontrol et.';
+}
+
 /** Istanbul merkezi; konum alinana kadar varsayilan kamera. */
 const DEFAULT_CENTER = { centerLatitude: 41.055, centerLongitude: 29.0, zoom: 10.5 };
 
@@ -185,7 +197,7 @@ export const StationMap = forwardRef<StationMapHandle, StationMapProps>(function
         source: 'map',
         context: { basemap, colorScheme, opened: readyRef.current },
       });
-      setError(message);
+      setError(userFacingMapError(readyRef.current));
       clearErrorTimer();
       if (readyRef.current) {
         errorTimer.current = setTimeout(() => setError(null), ERROR_BANNER_TIMEOUT_MS);

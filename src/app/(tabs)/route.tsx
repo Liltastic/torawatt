@@ -130,7 +130,13 @@ export default function RouteScreen() {
       haptics.success();
     } catch (e) {
       haptics.error();
-      setError(e instanceof Error ? e.message : 'Rota hesaplanamadı');
+      // Kendi hatalarimiz (services/routing) Turkce; fetch'in ag hatasi ise
+      // TypeError("Network request failed") ve oldugu gibi gosterilmemeli.
+      setError(
+        e instanceof Error && !(e instanceof TypeError)
+          ? e.message
+          : 'Rota hesaplanamadı. İnternet bağlantını kontrol et.',
+      );
     } finally {
       setPlanning(false);
     }
