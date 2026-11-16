@@ -51,45 +51,93 @@ ve CarPlay aynı listeyi kullanıyor (`src/data/demoStations.ts`).
 İhracat uyumluluğu sorusu `ITSAppUsesNonExemptEncryption: false` ile
 önceden yanıtlandı; her yüklemede tekrar sorulmayacak.
 
-### Android (Play iç test)
+### Android (Google Play)
 
-1. Play Console → Uygulama oluştur. Ad `TORA WATT`, dil Türkçe,
+1. Play Console → Uygulama oluştur. Ad `TORA WATT`, varsayılan dil Türkçe (tr-TR),
    uygulama türü "Uygulama", ücretsiz.
-2. **Uygulama içeriği** bölümündeki formlar (aşağıdaki cevaplar) doldurulmadan
-   hiçbir sürüm yayına alınamıyor.
-3. Servis hesabı anahtarı: Play Console → Kurulum → API erişimi →
-   Google Cloud projesinde servis hesabı oluştur, JSON anahtarı indir,
-   Play Console'da "Sürümleri yönet" yetkisi ver. JSON'u depoya **koyma**;
-   `eas.json` içindeki `submit.production.android.serviceAccountKeyPath`
-   alanına yerel yolunu yaz ya da yükleme sırasında yolu ver.
-4. Yükleme:
-   ```
-   npx eas-cli submit --platform android --latest
-   ```
-   `eas.json` zaten `track: internal` diyor.
+2. Derleme: `npx eas-cli build --platform android --profile production` (AAB üretir).
+3. **İlk AAB elle yüklenir.** Google, API ile (`eas submit`) yüklemeye ancak ilk
+   yüklemeden sonra izin veriyor: Test → Dahili test → Yeni sürüm oluştur → AAB'yi sürükle.
+4. **Uygulama içeriği** formları (aşağıdaki cevaplar) doldurulmadan hiçbir sürüm
+   yayına alınamıyor.
+5. Üretime çıkış: hesap 13 Kasım 2023'ten sonra açılmış **kişisel** bir geliştirici
+   hesabıysa önce en az 12 test kullanıcısıyla 14 gün kesintisiz kapalı test gerekiyor.
+   Kuruluş (D-U-N-S'li şirket) hesabında bu şart yok.
+6. Sonraki yüklemeler için servis hesabı: Play Console → Kurulum → API erişimi →
+   Google Cloud projesinde servis hesabı oluştur, JSON anahtarı indir, "Sürümleri yönet"
+   yetkisi ver. JSON'u depoya **koyma**; yolu `eas.json` içindeki
+   `submit.production.android.serviceAccountKeyPath` alanına yaz ya da yükleme sırasında ver.
+   Sonra: `npx eas-cli submit --platform android --latest` (`track: internal`).
+
+## Play — Mağaza kaydı
+
+| Alan | Değer |
+| --- | --- |
+| Uygulama adı | TORA WATT |
+| Kısa açıklama | aşağıda "Kısa açıklama" |
+| Tam açıklama | aşağıda "Uzun açıklama (Play)" |
+| Uygulama simgesi (512×512) | `play/icon-512.png` |
+| Öne çıkan görsel (1024×500, saydamlıksız) | `play/feature-graphic.jpg` |
+| Telefon ekran görüntüleri (en az 2, oran en fazla 2:1) | `play/screenshots/` |
+| Uygulama kategorisi | Haritalar ve Navigasyon |
+| E-posta | info@torasarj.com |
+| Web sitesi | https://torasarj.com |
+| Gizlilik politikası | https://torasarj.com/kvkk-aydinlatma-metni/ |
+
+**Uygulama erişimi:** "Tüm işlevler ya da bazıları kısıtlı" seç, talimat ekle:
+ad `Demo hesap`, kullanıcı adı `appreview@torasarj.com`, şifre Play Console'a yazılır
+(depoda yok), not: "İlk ekranda 'Zaten hesabım var'a dokunun. Harita ve istasyon
+detayları için giriş gerekmez; rota, araç ve favoriler için gerekir."
+
+**Reklamlar:** Hayır. **Hedef kitle:** 18 ve üzeri, çocuklara yönelik değil.
+**Haber uygulaması / sağlık / finans özellikleri / devlet uygulaması:** Hayır, hiçbiri.
 
 ## Play — Veri güvenliği formu
 
-Toplanan her şey uygulamanın çalışması için; reklam yok, veri satışı yok,
-üçüncü taraf analitik yok. Hepsi için "Aktarılıyor mu? Evet",
-"Kullanıcı silebilir mi? Evet" (Ayarlar → Hesabımı sil).
+Reklam yok, veri satışı yok, üçüncü taraf analitik yok. Hepsi için amaç
+"Uygulama işlevselliği"; hesapla ilgili olanlar için ayrıca "Hesap yönetimi".
 
-| Veri türü | Neden | Nereye gidiyor |
-| --- | --- | --- |
-| E-posta adresi | Hesap oluşturma ve giriş | torawatt-api.onrender.com |
-| Ad | İsteğe bağlı profil adı | aynı |
-| Arama geçmişi | Rota için yazılan adres | OpenStreetMap servisleri (Nominatim, OSRM); saklanmıyor |
-| Uygulama etkileşimleri | Favoriler, araç bilgileri | torawatt-api.onrender.com |
-| Cihaz veya diğer kimlikler | Hesap açmadan önce oluşturulan verinin yeni hesaba taşınması | aynı |
-| Kilitlenme günlükleri / tanılama | Hata ayıklama | Sunucu loguna yazılır, veritabanına değil |
+| Play kategorisi → veri türü | Ne | Paylaşılıyor mu | Zorunlu mu |
+| --- | --- | --- | --- |
+| Kişisel bilgiler → E-posta adresi | Hesap ve giriş | Hayır | Evet |
+| Kişisel bilgiler → Ad | Profil adı | Hayır | İsteğe bağlı |
+| Kişisel bilgiler → Kullanıcı kimlikleri | Hesap kimliği | Hayır | Evet |
+| Mesajlar → Diğer uygulama içi mesajlar | Destek formundan gönderilen mesajlar | Hayır | İsteğe bağlı |
+| Uygulama etkinliği → Diğer kullanıcı tarafından oluşturulan içerik | Araç kayıtları, favoriler | Hayır | İsteğe bağlı |
+| Uygulama etkinliği → Uygulama içi arama geçmişi | Rota için yazılan adres; OpenStreetMap Nominatim'e gidiyor, saklanmıyor ("geçici olarak işleniyor": Evet) | Evet (Nominatim) | İsteğe bağlı |
+| Cihaz veya diğer kimlikler | Hesap açılmadan önceki verinin hesaba taşınması | Hayır | Evet |
+| Uygulama bilgileri ve performansı → Kilitlenme günlükleri, Diğer tanılama verileri | Hata kaydı; sunucu günlüğüne yazılıyor, veritabanına değil | Hayır | Evet |
 
-**Ödeme bilgisi toplanmıyor**, uygulamada ödeme yok. Finansal veri işaretleme.
+**Konum toplanmıyor**: mesafe cihazda hesaplanıyor, konum hiçbir sunucuya gitmiyor
+(rota başlangıcı ve varışı yazılan adreslerden geliyor). **Ödeme bilgisi yok.**
 
-**Konum toplanmıyor**: mesafe hesabı cihazda yapılıyor, konum hiçbir sunucuya
-gönderilmiyor.
+Güvenlik bölümü: veriler aktarımda şifreleniyor (HTTPS) → Evet. Kullanıcı verilerinin
+silinmesini isteyebilir → Evet. **Hesap silme URL'si zorunlu**: aşağıdaki "Hesap silme
+sayfası" metni web'de yayınlanmalı ve adresi bu alana yazılmalı.
 
-Verinin aktarımda şifrelendiğini (HTTPS) ve kullanıcının silme talebinde
-bulunabileceğini işaretle.
+## Hesap silme sayfası (Play zorunlu)
+
+Google, hesap açılabilen uygulamalardan uygulama yüklü olmadan da silme talebi
+yapılabilen bir web sayfası istiyor. Sayfa uygulama ya da geliştirici adını ve
+adımları açıkça göstermeli. Yayınlanacak metin:
+
+```
+TORA WATT — Hesap ve veri silme
+
+TORA WATT uygulaması Tora Teknik Hizmetler İşletme A.Ş. tarafından geliştirilir. Hesabını ve ona bağlı verileri iki yolla silebilirsin.
+
+Uygulamadan
+Profil > Ayarlar > Hesabı sil adımlarını izle ve onayla. Hesabın hemen silinir.
+
+Uygulama olmadan
+Hesabına kayıtlı e-posta adresinden info@torasarj.com adresine "TORA WATT hesap silme" konulu bir e-posta gönder. Talebini en geç 30 gün içinde yerine getirir ve sonucu e-postayla bildiririz.
+
+Silinen veriler
+E-posta adresin, adın, şifren, kayıtlı araçların, favori istasyonların ve destek mesajların.
+
+Saklanan veriler
+Uygulama hata kayıtları sunucu günlüklerinde, barındırma hizmetinin saklama süresi boyunca kalır ve sonra otomatik olarak silinir.
+```
 
 ## Apple — Uygulama Gizliliği
 
@@ -109,21 +157,52 @@ Konum listeye girmiyor: cihazdan çıkmıyor.
 
 ## Apple — İnceleme notu (App Review Information)
 
-Demo hesap gerekmiyor, uygulama üye olmadan açılıyor. Notlar alanına:
+Apple 1.0.0 (14) için Guideline 2.1 kapsamında bu bilgileri istedi (2026-11-10). Aynı metin
+hem App Review yanıtına hem Notes alanına giriyor. Demo hesabın şifresi depoda tutulmuyor,
+App Store Connect'te "Sign-In Information" alanında duruyor.
 
 ```
-This build runs on built-in sample data. Stations whose names start with "Demo"
-and their connector statuses are examples and do not represent real chargers.
-The app does not start charging sessions or take payments. No login is required:
-choose "Üye olmadan devam et" on the first screen.
+1. Screen recording
+Attached. It was captured on a physical iPhone running the latest iOS version and begins with launching the app. It shows the map and station details without an account, then registration, route planning, login and account deletion. The app has no paid content and no content shared between users, so it has no reporting or blocking flow.
+
+2. Purpose and target audience
+TORA WATT is for electric vehicle drivers in Türkiye. It helps them find charging stations on a map and see each connector's type, power and status. Members can also save their vehicle and favorite stations, and plan a route with charging stops based on the vehicle's battery and consumption.
+
+This version runs on built-in sample data. Stations whose names start with "Demo" and their connector statuses are examples and do not represent real chargers. The app states this in the station details and in Help. The app does not start charging sessions, sell energy or take payments.
+
+3. Setup and access
+No setup is required and login is optional.
+- Without an account: on the first screen, tap "Üye olmadan devam et". The "Harita" tab opens.
+- Station details: tap a map pin or a list row.
+- Demo account: on the first screen, tap "Zaten hesabım var" and sign in.
+  Email: appreview@torasarj.com
+  Password: <App Store Connect, Sign-In Information>
+  This account already has a vehicle and a favorite station.
+- Route planning (needs an account with a vehicle): open the "Rota" tab, fill in "Nereden" and "Nereye", then tap "Rotayı planla".
+- Account deletion: Profil > Ayarlar > Hesabı sil. Please test this with a new account (first screen > "Hadi başlayalım") so the demo account stays available.
+After a period of inactivity, the first server request can take about 30 seconds. The sign-in and registration screens show a waiting notice during this time.
+
+4. External services
+- Render: hosts our backend API (accounts, vehicles, favorites, support messages, error reports)
+- Mapbox, and OpenFreeMap with MapLibre GL JS loaded from unpkg.com: map styles and tiles, selectable in the app
+- OSRM public server and OpenStreetMap Nominatim: route calculation and address search
+- carimagesapi.com: vehicle images
+- Expo EAS Update: delivery of app updates
+The app does not use third-party sign-in, payment processors, advertising, analytics or AI services. Vehicle specifications in the built-in catalog are compiled from public sources.
+
+5. Regional differences
+The app works the same in all regions, with no region-specific features or content. The interface is in Turkish and the sample stations are located in Türkiye.
+
+6. Regulated activities and third-party material
+The app does not sell energy, operate charging sessions or process payments, so this version does not provide a regulated service. Map data comes from the providers listed above under their terms, and vehicle images come from carimagesapi.com under its API terms. Vehicle makes and models are shown only so users can identify their own car.
 ```
 
 ## İçerik derecelendirme
 
 Her iki konsolda da: şiddet yok, cinsellik yok, küfür yok, kumar yok,
 kullanıcılar arası iletişim yok, kullanıcı içeriği paylaşımı yok.
-Konum paylaşımı sorusuna **evet** (uygulama kullanıcının konumunu
-kendisine gösteriyor, başkalarıyla paylaşmıyor). Beklenen sonuç:
+Kullanıcının konumunu başka kullanıcılarla paylaşıyor mu sorusuna **hayır**
+(konum yalnızca kullanıcının kendi ekranında gösteriliyor). Beklenen sonuç:
 PEGI 3 / Everyone / 3+.
 
 Hedef kitle: 18+ (şarj hizmeti, çocuklara yönelik değil).
@@ -175,7 +254,16 @@ TORA WATT üzerinden şarj başlatılmaz ve ödeme alınmaz.
 şarj,elektrikli araç,şarj istasyonu,EV,rota,harita,soket,menzil,Type 2,CCS
 ```
 
-**Kategori:** Seyahat (birincil) / Yardımcı Programlar (ikincil)
+**Uzun açıklama (Play)**: yukarıdaki metnin aynısı, yalnızca "APPLE WATCH VE WIDGET"
+bölümü yerine şu iki satır:
+
+```
+WIDGET
+• En yakın örnek istasyonu ana ekranında gör
+```
+
+**Kategori:** App Store'da Seyahat (birincil) / Yardımcı Programlar (ikincil),
+Play'de Haritalar ve Navigasyon.
 
 ## Ekran görüntüleri
 
@@ -199,5 +287,6 @@ bu klasörde hazır.
 - **Backend Render'ın ücretsiz katmanında.** 15 dk isteksiz kalınca uyuyor,
   uyanması ölçülen 22,5 saniye. Harita bundan etkilenmiyor, ama giriş ve üyelik
   ilk istekte yavaş.
-- **Android widget'ı** (`plugins/android/ToraWidgetProvider.kt`) hâlâ test sunucusundaki
-  gerçek kataloğu okuyor. Android yayınından önce demo listeye alınmalı.
+- **Android widget'ı** (`plugins/android/ToraWidgetProvider.kt`) da gömülü demo listeyi
+  kullanıyor, ağ isteği yok. Liste değişirse telefon, iOS hedefleri ve bu dosya birlikte
+  güncellenmeli.

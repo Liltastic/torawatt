@@ -161,6 +161,7 @@ authRouter.delete('/me', requireAuth, async (req, res) => {
     prisma.chargingHistoryEntry.deleteMany({ where: { ownerId } }),
     prisma.favorite.deleteMany({ where: { ownerId } }),
     prisma.paymentMethod.deleteMany({ where: { ownerId } }),
+    prisma.supportRequest.deleteMany({ where: { ownerId } }),
     prisma.user.delete({ where: { id: ownerId } }),
   ]);
   res.status(204).send();

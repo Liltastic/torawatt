@@ -82,7 +82,7 @@ export default function SettingsScreen() {
   const onDeleteAccount = () => {
     Alert.alert(
       'Hesabı sil',
-      'Hesabın, araçların, favorilerin ve şarj geçmişin kalıcı olarak silinecek. Bu işlem geri alınamaz.',
+      'Hesabın, araçların ve favorilerin kalıcı olarak silinecek. Bu işlem geri alınamaz.',
       [
         { text: 'Vazgeç', style: 'cancel' },
         {

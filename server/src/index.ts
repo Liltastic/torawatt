@@ -9,6 +9,7 @@ import 'express-async-errors';
 import cors from 'cors';
 import express from 'express';
 
+import { accountDeletionRouter } from './routes/accountDeletion.js';
 import { authRouter } from './routes/auth.js';
 import { campaignsRouter } from './routes/campaigns.js';
 import { clientErrorsRouter } from './routes/clientErrors.js';
@@ -29,6 +30,8 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'tora-watt-server' });
 });
 
+// Google Play'in istedigi hesap silme sayfasi (bkz. routes/accountDeletion).
+app.use(['/hesap-silme', '/account-deletion'], accountDeletionRouter);
 app.use('/auth', authRouter);
 app.use('/stations', stationsRouter);
 app.use('/campaigns', campaignsRouter);

@@ -30,7 +30,7 @@ const RESOURCES = [
 ];
 
 const RECEIVER_CLASS = '.ToraWidgetProvider';
-const WIDGET_DESCRIPTION = 'Sana en yakın TORA şarj istasyonu';
+const WIDGET_DESCRIPTION = 'En yakın örnek şarj istasyonu (demo veri)';
 
 /** Kaynak dosyalarin bu depodaki yeri. */
 const sourceDir = path.join(__dirname, 'android');

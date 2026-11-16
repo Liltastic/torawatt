@@ -11,47 +11,45 @@ import android.location.LocationManager
 import android.os.Build
 import android.util.Log
 import android.widget.RemoteViews
+import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import org.json.JSONObject
-import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
-import java.util.UUID
 import kotlin.concurrent.thread
 
 /**
- * Ana ekran widget'i: en yakin TORA istasyonu.
+ * Ana ekran widget'i: en yakin ORNEK istasyon.
  *
- * iOS tarafindaki widget ve saat uygulamasiyla ayni tasarim karari - veriyi
- * uygulamanin JS tarafindan paylasilan bir depo uzerinden almiyor, dogrudan
- * EVCS katalogundan cekiyor. Boylece JS'e native modul girmiyor ve Expo Go
- * calismaya devam ediyor (bkz. plugins/withToraWidget.js).
+ * Bu surum demo veriyle calisiyor: istasyon listesi asagida gomulu, ag istegi
+ * yok. Telefondaki src/data/demoStations.ts ve iOS'taki
+ * targets/widget/EvcsFeed.swift ile ayni liste; biri degisirse hepsi
+ * guncellenmeli.
  *
- * Bilerek ek bagimlilik yok: HTTP icin HttpURLConnection, JSON icin org.json,
- * konum icin LocationManager. Hepsi Android'in kendi kutuphanesinde; Gradle'a
- * bir sey eklemek gerekmiyor, dolayisiyla config eklentisi de yalnizca dosya
- * kopyalayip manifest'e receiver ekliyor.
+ * Bilerek ek bagimlilik yok: konum icin LocationManager, JSON icin org.json.
+ * Ikisi de Android'in kendi kutuphanesinde; config eklentisi yalnizca dosya
+ * kopyalayip manifest'e receiver ekliyor (bkz. plugins/withToraWidget.js).
  */
 class ToraWidgetProvider : AppWidgetProvider() {
 
     private data class WidgetState(val distance: String, val name: String)
+
+    private data class DemoStation(val name: String, val latitude: Double, val longitude: Double)
 
     override fun onUpdate(
         context: Context,
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
-        // Ag istegi ana is parcaciginda yapilamaz; goAsync bize yayin
-        // tamamlanmadan once birkac saniye veriyor (sistem siniri ~10 sn,
-        // tek bir istek icin fazlasiyla yeterli).
+        // Taze konum istegi birkac saniye surebiliyor; ana is parcacigini
+        // bekletmemek icin goAsync (sistem siniri ~10 sn).
         val pendingResult = goAsync()
         thread {
             val state = try {
                 loadNearest(context)
             } catch (error: Exception) {
-                WidgetState("—", "Bağlanılamadı")
+                Log.w(TAG, "widget guncellenemedi: ${error.message}")
+                WidgetState("—", "Uygulamayı bir kez aç")
             }
             try {
                 for (id in appWidgetIds) {
@@ -98,9 +96,30 @@ class ToraWidgetProvider : AppWidgetProvider() {
         if (location == null) {
             return WidgetState("—", "Uygulamayı bir kez aç")
         }
-        return fetchNearestTora(context, location.latitude, location.longitude)
-            ?: WidgetState("—", "Yakında istasyon yok")
+        // Yaricap yok (iOS widget'i gibi): ornek istasyonlar tek bir hatta
+        // duruyor, baska sehirdeki kullanici bos widget gormemeli.
+        val nearest = DEMO_STATIONS
+            .map { station -> station to distanceKm(location, station) }
+            .minByOrNull { it.second }
+            ?: return WidgetState("—", "İstasyon yok")
+        return WidgetState(distanceLabel(nearest.second), nearest.first.name)
     }
+
+    private fun distanceKm(from: Location, station: DemoStation): Double {
+        val result = FloatArray(1)
+        Location.distanceBetween(
+            from.latitude,
+            from.longitude,
+            station.latitude,
+            station.longitude,
+            result
+        )
+        return result[0] / 1000.0
+    }
+
+    private fun distanceLabel(distanceKm: Double): String =
+        if (distanceKm < 10) String.format("%.1f km", distanceKm)
+        else "${Math.round(distanceKm)} km"
 
     /**
      * Uygulamanin on plandayken yazdigi konum
@@ -219,113 +238,21 @@ class ToraWidgetProvider : AppWidgetProvider() {
         return location
     }
 
-    private fun fetchNearestTora(context: Context, latitude: Double, longitude: Double): WidgetState? {
-        val url = URL(
-            "$BASE_URL/api/v1/stations/external" +
-                "?lat=$latitude&lng=$longitude&radius=$RADIUS_KM&page=1&size=$PAGE_SIZE"
-        )
-        val connection = (url.openConnection() as HttpURLConnection).apply {
-            connectTimeout = TIMEOUT_MS
-            readTimeout = TIMEOUT_MS
-            setRequestProperty("X-App-Name", "TORA WATT")
-            setRequestProperty("X-App-Version", "1.0.0")
-            setRequestProperty("X-App-Platform", "Android")
-            setRequestProperty("X-Device-Id", deviceId(context))
-            setRequestProperty("X-App-Locale", "tr")
-        }
-
-        try {
-            val status = connection.responseCode
-            if (status !in 200..299) {
-                Log.w(TAG, "katalog HTTP $status")
-                return null
-            }
-
-            val body = connection.inputStream.bufferedReader().use { it.readText() }
-            val envelope = JSONObject(body)
-            if (!envelope.optBoolean("success")) {
-                Log.w(TAG, "katalog reddetti: ${envelope.optString("message")}")
-                return null
-            }
-
-            val items = envelope.optJSONObject("data")?.optJSONArray("items")
-            if (items == null) {
-                Log.w(TAG, "katalog yaniti items tasimiyor")
-                return null
-            }
-
-            // Liste mesafeye gore sirali geliyor; ilk TORA kaydi en yakini.
-            for (index in 0 until items.length()) {
-                val item = items.optJSONObject(index) ?: continue
-                if (!isTora(item)) continue
-                Log.i(TAG, "${items.length()} kayittan ${index + 1}. sirada TORA bulundu")
-                return WidgetState(distanceLabel(item), displayName(item))
-            }
-
-            Log.w(TAG, "${items.length()} kayit geldi ama TORA yok")
-            return null
-        } finally {
-            connection.disconnect()
-        }
-    }
-
-    /**
-     * Katalogda isletmeci filtresi yok; TORA kayitlarini istemcide ayikliyoruz.
-     * Kelime sinirini sozcuklere bolerek sagliyoruz ki icinde "tora" gecen
-     * baska adlar yanlislikla eslesmesin (telefonda karsiligi /\btora\b/i).
-     */
-    private fun isTora(item: JSONObject): Boolean =
-        mentionsTora(item.optString("brand")) || mentionsTora(item.optString("operator"))
-
-    private fun mentionsTora(value: String?): Boolean {
-        if (value.isNullOrBlank()) return false
-        return value.lowercase()
-            .split(Regex("[^\\p{L}\\p{N}]+"))
-            .any { it == "tora" }
-    }
-
-    /** Katalogda ad bazen sicil kodu ("000056") oluyor; o zaman marka adi daha anlamli. */
-    private fun displayName(item: JSONObject): String {
-        val name = item.optString("name").trim()
-        if (name.isNotEmpty() && !name.all { it.isDigit() }) return name
-
-        val brand = item.optString("brand").trim()
-        if (brand.isNotEmpty()) return brand
-
-        val operator = item.optString("operator").trim()
-        return if (operator.isEmpty()) "İsimsiz istasyon" else operator
-    }
-
-    private fun distanceLabel(item: JSONObject): String {
-        if (!item.has("distanceKm") || item.isNull("distanceKm")) return "—"
-        val distance = item.optDouble("distanceKm", -1.0)
-        if (distance < 0) return "—"
-        return if (distance < 10) String.format("%.1f km", distance)
-        else "${Math.round(distance)} km"
-    }
-
-    private fun deviceId(context: Context): String {
-        val preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        preferences.getString(PREFS_DEVICE_ID, null)?.let { return it }
-
-        val created = UUID.randomUUID().toString()
-        preferences.edit().putString(PREFS_DEVICE_ID, created).apply()
-        return created
-    }
-
     private companion object {
-        /**
-         * Telefondaki EXPO_PUBLIC_EVCS_API_URL ile ayni adres. Widget Metro'dan
-         * gecmedigi icin ortam degiskeni okuyamiyor; adres degisirse burasi,
-         * targets/watch/EvcsClient.swift ve targets/widget/EvcsFeed.swift
-         * birlikte guncellenmeli.
-         */
-        const val BASE_URL = "https://testmobileapi2.torasarj.net"
-        const val RADIUS_KM = 50
-        const val PAGE_SIZE = 50
-        const val TIMEOUT_MS = 10_000
-        const val PREFS_NAME = "tora-watt-widget"
-        const val PREFS_DEVICE_ID = "device-id"
+        /** src/data/demoStations.ts ile ayni ornek istasyonlar. */
+        private val DEMO_STATIONS = listOf(
+            DemoStation("Demo Maslak", 41.1106, 29.0206),
+            DemoStation("Demo Levent", 41.0819, 29.0117),
+            DemoStation("Demo Kağıthane", 41.0876, 28.9712),
+            DemoStation("Demo Beşiktaş", 41.0422, 29.0061),
+            DemoStation("Demo Ataşehir", 40.9923, 29.1244),
+            DemoStation("Demo Gebze", 40.8021, 29.4307),
+            DemoStation("Demo Sakarya", 40.7654, 30.4012),
+            DemoStation("Demo Düzce", 40.8438, 31.1565),
+            DemoStation("Demo Bolu", 40.7396, 31.6112),
+            DemoStation("Demo Gerede", 40.8005, 32.1985),
+            DemoStation("Demo Kızılcahamam", 40.4712, 32.6489),
+        )
         const val CURRENT_LOCATION_TIMEOUT_SECONDS = 6L
         /** Uygulamanin yazdigi konum; bkz. src/services/widgetLocation.ts */
         const val STORED_LOCATION_FILE = "widget-location.json"
