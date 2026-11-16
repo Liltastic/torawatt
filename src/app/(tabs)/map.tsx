@@ -333,10 +333,17 @@ export default function MapScreen() {
 
   // Giris animasyonu yalnizca ilk ekranda: asagidaki satirlar kaydirirken
   // kuruldugu icin hepsine verilirse liste boyunca yanip sonerdi.
+  // Android'de hic yok: bazi satirlar animasyonun baslangic ofsetinde (25dp)
+  // takili kalip bir sonrakinin ustune biniyordu (emulatorde, girisin hemen
+  // ardindan goruldu).
   const renderStationRow = useCallback(
     ({ item, index }: { item: Station; index: number }) => (
       <Animated.View
-        entering={index < 8 ? FadeInDown.delay(index * 45).duration(320) : undefined}>
+        entering={
+          Platform.OS === 'ios' && index < 8
+            ? FadeInDown.delay(index * 45).duration(320)
+            : undefined
+        }>
         <StationCard station={item} onPress={() => openStation(item)} />
       </Animated.View>
     ),

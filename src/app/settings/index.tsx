@@ -82,7 +82,7 @@ export default function SettingsScreen() {
   const onDeleteAccount = () => {
     Alert.alert(
       'Hesabı sil',
-      'Hesabın, araçların ve favorilerin kalıcı olarak silinecek. Bu işlem geri alınamaz.',
+      'Hesabın, araçların, favorilerin ve destek mesajların kalıcı olarak silinecek. Bu işlem geri alınamaz.',
       [
         { text: 'Vazgeç', style: 'cancel' },
         {
@@ -172,7 +172,7 @@ export default function SettingsScreen() {
           <Text style={styles.sectionTitle}>Tehlikeli bölge</Text>
           <Card style={styles.card}>
             <Text style={styles.dangerText}>
-              Hesabını silmek; araçlarını ve favorilerini kalıcı olarak kaldırır.
+              Hesabını silmek; araçlarını, favorilerini ve destek mesajlarını kalıcı olarak kaldırır.
             </Text>
             <Button
               label="Hesabı sil"
