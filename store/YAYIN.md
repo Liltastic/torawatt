@@ -267,14 +267,17 @@ Play'de Haritalar ve Navigasyon.
 
 ## Ekran görüntüleri
 
-Play iç test için en az 2 telefon görüntüsü gerekiyor. App Store'un zorunlu tuttuğu
-iPhone yuvası "Dynamic Island (medium display)", kabul ettiği ölçü 1206×2622; uygulamada
-saat olduğu için bir de Apple Watch görüntüsü isteniyor. Hazır dosyalar:
-`screenshots/iphone-orta-ekran/` (zorunlu yuva), `screenshots/` kökündeki 1320×2868
-kopyalar (isteğe bağlı "large display" yuvası) ve `4-apple-watch.png` (416×496).
+**App Store:** zorunlu iPhone yuvası "Dynamic Island (medium display)", kabul ettiği ölçü
+1206×2622; uygulamada saat olduğu için bir de Apple Watch görüntüsü isteniyor. Hazır
+dosyalar: `screenshots/iphone-orta-ekran/` (zorunlu yuva), `screenshots/` kökündeki
+1320×2868 kopyalar (isteğe bağlı "large display" yuvası) ve `4-apple-watch.png` (416×496).
 
-`play-feature-graphic.png` (1024×500) Play'in "Öne çıkan grafik" alanı için
-bu klasörde hazır.
+**Google Play:** `play/` klasörü. `icon-512.png` uygulama simgesi, `feature-graphic.jpg`
+öne çıkan görsel (1024×500, saydamlıksız; `play-feature-graphic.png` bunun saydam
+kaynağı), `screenshots/` altında Android derlemesinden alınmış dört telefon görüntüsü
+(1080×1920, JPEG): karşılama, harita listesi, istasyon detayı, rota. Play en az iki
+görüntü istiyor ve uzun kenar kısa kenarın iki katını geçemiyor; iPhone görüntüleri bu
+yüzden Play'e yüklenemez.
 
 ## Bilinen sınırlar
 
