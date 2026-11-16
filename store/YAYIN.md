@@ -89,7 +89,8 @@ ad `Demo hesap`, kullanıcı adı `appreview@torasarj.com`, şifre Play Console'
 (depoda yok), not: "İlk ekranda 'Zaten hesabım var'a dokunun. Harita ve istasyon
 detayları için giriş gerekmez; rota, araç ve favoriler için gerekir."
 
-**Reklamlar:** Hayır. **Hedef kitle:** 18 ve üzeri, çocuklara yönelik değil.
+**Reklamlar:** Hayır. **Reklam kimliği:** Kullanmıyor (pakette `AD_ID` izni yok).
+**Hedef kitle:** 18 ve üzeri, çocuklara yönelik değil.
 **Haber uygulaması / sağlık / finans özellikleri / devlet uygulaması:** Hayır, hiçbiri.
 
 ## Play — Veri güvenliği formu
